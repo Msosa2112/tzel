@@ -77,6 +77,7 @@ def setup_database(db):
             list_price REAL,
             close_date TEXT,
             county TEXT,
+            state TEXT,
             remarks TEXT,
             owner_name TEXT,
             surplus_amount REAL,
@@ -108,7 +109,7 @@ def fetch_and_process_leads():
         "$filter": "MlsStatus eq 'Closed' and ClosePrice gt 0",
         "$orderby": "CloseDate desc",
         "$top": 200,
-        "$select": "ListingKey,ListingId,ParcelNumber,UnparsedAddress,ClosePrice,ListPrice,CloseDate,MlsStatus,PublicRemarks,CountyOrParish"
+        "$select": "ListingKey,ListingId,ParcelNumber,UnparsedAddress,ClosePrice,ListPrice,CloseDate,MlsStatus,PublicRemarks,CountyOrParish,StateOrProvince"
     }
     
     print(f"\n[MLS] Fetching latest closed properties from MLS (Top {params['$top']})...")
@@ -141,7 +142,23 @@ def fetch_and_process_leads():
         list_price = prop.get("ListPrice", 0.0)
         close_date = prop.get("CloseDate")
         county = prop.get("CountyOrParish")
+        state = prop.get("StateOrProvince")
         remarks = prop.get("PublicRemarks", "")
+        
+        # Geographic boundaries filter (Kentuckiana)
+        # Kentucky: Mainly Louisville (Jefferson County) and surrounding counties
+        # Indiana: New Albany (Floyd County) and surrounding counties within 50 miles of Louisville
+        target_ky_counties = ["jefferson", "bullitt", "oldham", "shelby", "hardin", "nelson", "spencer"]
+        target_in_counties = ["floyd", "clark", "harrison", "scott", "washington"]
+        
+        is_target_location = False
+        if state == "KY" and county and county.lower() in target_ky_counties:
+            is_target_location = True
+        elif state == "IN" and county and county.lower() in target_in_counties:
+            is_target_location = True
+            
+        if not is_target_location:
+            continue
         
         if not remarks:
             remarks = ""
@@ -151,7 +168,7 @@ def fetch_and_process_leads():
         
         if matched_keywords:
             print(f"\n---> MATCH FOUND: {address}")
-            print(f"     ListingId: {listing_id} | County: {county}")
+            print(f"     ListingId: {listing_id} | Location: {county}, {state}")
             print(f"     Close Price: ${close_price:,.2f} | List Price: ${list_price:,.2f}")
             print(f"     Keywords matched: {matched_keywords}")
             
@@ -160,12 +177,12 @@ def fetch_and_process_leads():
                 db.execute("""
                     INSERT INTO properties (
                         listing_key, listing_id, parcel_id, address, 
-                        close_price, list_price, close_date, county, 
+                        close_price, list_price, close_date, county, state, 
                         remarks, owner_name, surplus_amount, status
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """, [
                     listing_key, listing_id, parcel_id, address, 
-                    close_price, list_price, close_date, county, 
+                    close_price, list_price, close_date, county, state, 
                     remarks, None, 0.0, "New Lead"
                 ])
                 print("     [DATABASE] Saved new lead successfully.")
