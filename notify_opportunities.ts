@@ -102,10 +102,10 @@ async function sendTelegramNotification(message: string): Promise<boolean> {
 }
 
 /**
- * Despacha notificaciones para oportunidades de alta rentabilidad no notificadas.
+ * Despacha notificaciones para oportunidades de alta rentabilidad o revisiones manuales no notificadas.
  */
 async function notifyOpportunities() {
-  console.log("[INICIO] Buscando oportunidades de alta rentabilidad sin notificar...");
+  console.log("[INICIO] Buscando oportunidades y revisiones sin notificar...");
   
   let opportunitiesRes;
   try {
@@ -113,17 +113,18 @@ async function notifyOpportunities() {
       SELECT 
         auction_id, case_number, address, county, state, auction_date, 
         plaintiff, defendant, debt_amount, appraisal_value, 
-        mls_estimated_value, mls_id, pdf_url
+        mls_estimated_value, mls_id, pdf_url,
+        defendant_phones, defendant_emails, needs_manual_review
       FROM foreclosure_auctions 
-      WHERE is_high_yield = 1 AND telegram_sent = 0
+      WHERE (is_high_yield = 1 OR (state = 'IN' AND needs_manual_review = 1)) AND telegram_sent = 0
     `);
   } catch (dbErr: any) {
-    console.error("[DB ERROR] Error al consultar oportunidades de alta rentabilidad:", dbErr.message);
+    console.error("[DB ERROR] Error al consultar oportunidades:", dbErr.message);
     process.exit(1);
   }
   
   const opportunities = opportunitiesRes.rows;
-  console.log(`[NOTIFICAR] Se detectaron ${opportunities.length} oportunidades nuevas listas para alertar.`);
+  console.log(`[NOTIFICAR] Se detectaron ${opportunities.length} registros listos para alertar en Telegram.`);
   
   let sentCount = 0;
   
@@ -140,6 +141,9 @@ async function notifyOpportunities() {
     const mlsValue = row.mls_estimated_value as number || 0;
     const mlsId = row.mls_id as string || "N/A";
     const pdfUrl = row.pdf_url as string || null;
+    const phones = row.defendant_phones as string || null;
+    const emails = row.defendant_emails as string || null;
+    const needsManualReview = row.needs_manual_review as number || 0;
     
     // Días restantes
     const daysRemaining = getDaysRemaining(auctionDate);
@@ -171,26 +175,57 @@ async function notifyOpportunities() {
       }
     }
     
-    let msg = `🚨 *OPORTUNIDAD DE ADQUISICIÓN PRE-SUBASTA* 🚨\n`;
-    msg += `_Propiedad identificada con descuento > 50% de valor comercial MLS_\n\n`;
+    let msg = "";
     
-    msg += `📍 *Dirección:* ${address}\n`;
-    msg += `🏢 *Condado/Estado:* ${county} County, ${state}\n`;
-    msg += `📅 *Fecha de Subasta:* ${auctionDate} *(${daysStr} restantes)*\n\n`;
-    
-    msg += `💵 *Precio de Adquisición (Deuda):* $${debtAmount.toLocaleString("en-US", { minimumFractionDigits: 2 })}\n`;
-    msg += `📊 *Valor Comercial MLS:* $${mlsValue.toLocaleString("en-US", { minimumFractionDigits: 2 })}\n`;
-    msg += `📉 *Descuento Potencial:* *${discountPct.toFixed(1)}%*\n\n`;
-    
-    msg += `👤 *Dueño Deudor (Demandado):* ${defendant}\n`;
-    msg += `🏦 *Acreedor (Demandante):* ${plaintiff}\n`;
-    msg += `📋 *Caso Judicial:* ${caseNumber}\n`;
-    msg += `🔗 *MLS ID:* [${mlsId}](https://replication.sparkapi.com/Reso/OData/Property('${mlsId}'))\n\n`;
-    
-    msg += pdfSection;
-    
-    msg += `💡 *Estrategia Recomendada:* Contactar al dueño deudor de inmediato para negociar una compra directa (Short Sale o pago de deuda) antes de que la propiedad llegue al remate el ${auctionDate}.`;
-
+    if (state === "IN" && needsManualReview === 1) {
+      // Alerta de Revisión Manual para Indiana
+      msg += `⚠️ *REVISIÓN MANUAL REQUERIDA (INDIANA)* ⚠️\n`;
+      msg += `_El crawler no pudo extraer automáticamente la deuda judicial de este expediente (bloqueo de captcha o caso no indexado)._\n\n`;
+      
+      msg += `📍 *Dirección:* ${address}\n`;
+      msg += `🏢 *Condado/Estado:* ${county} County, ${state}\n`;
+      msg += `📅 *Fecha de Subasta:* ${auctionDate} *(${daysStr} restantes)*\n\n`;
+      
+      if (mlsValue > 0) {
+        msg += `📊 *Valor Comercial ARV:* $${mlsValue.toLocaleString("en-US", { minimumFractionDigits: 2 })}\n\n`;
+      }
+      
+      msg += `📋 *Caso Judicial:* ${caseNumber}\n`;
+      msg += `🔗 *Buscador Judicial (MyCase):* [Abrir MyCase](https://public.courts.in.gov/mycase/)\n\n`;
+      
+      msg += `💡 *Instrucciones:* Busca el caso en el portal judicial para obtener el Judgment Amount. Si la deuda es menor a $${((mlsValue > 0 ? mlsValue : 200000) * 0.5).toLocaleString("en-US")}, es una gran oportunidad de negocio.`;
+    } else {
+      // Alerta de Oportunidad normal
+      msg += `🚨 *OPORTUNIDAD DE ADQUISICIÓN PRE-SUBASTA* 🚨\n`;
+      msg += `_Propiedad identificada con descuento > 50% de valor comercial MLS_\n\n`;
+      
+      msg += `📍 *Dirección:* ${address}\n`;
+      msg += `🏢 *Condado/Estado:* ${county} County, ${state}\n`;
+      msg += `📅 *Fecha de Subasta:* ${auctionDate} *(${daysStr} restantes)*\n\n`;
+      
+      msg += `💵 *Precio de Adquisición (Deuda):* $${debtAmount.toLocaleString("en-US", { minimumFractionDigits: 2 })}\n`;
+      msg += `📊 *Valor Comercial ARV:* $${mlsValue.toLocaleString("en-US", { minimumFractionDigits: 2 })}\n`;
+      msg += `📉 *Descuento Potencial:* *${discountPct.toFixed(1)}%*\n\n`;
+      
+      msg += `👤 *Dueño Deudor (Demandado):* ${defendant}\n`;
+      if (phones && phones !== "000-000-0000" && phones.trim() !== "") {
+        msg += `📞 *Teléfonos:* \`${phones}\`\n`;
+      }
+      if (emails && emails !== "no-contact@example.com" && emails.trim() !== "") {
+        msg += `✉️ *Correos:* \`${emails}\`\n`;
+      }
+      
+      msg += `🏦 *Acreedor (Demandante):* ${plaintiff}\n`;
+      msg += `📋 *Caso Judicial:* ${caseNumber}\n`;
+      
+      if (mlsId && mlsId !== "N/A") {
+        msg += `🔗 *MLS ID:* [${mlsId}](https://replication.sparkapi.com/Reso/OData/Property('${mlsId}'))\n\n`;
+      }
+      
+      msg += pdfSection;
+      
+      msg += `💡 *Estrategia Recomendada:* Contactar al dueño deudor de inmediato para negociar una compra directa antes del remate el ${auctionDate}.`;
+    }
     
     console.log(`[ALERTANDO] Enviando alerta para dirección: ${address}...`);
     const success = await sendTelegramNotification(msg);

@@ -32,6 +32,11 @@ CREATE TABLE IF NOT EXISTS foreclosure_auctions (
     mls_id TEXT,
     is_high_yield INTEGER DEFAULT 0, -- 1 si el precio de adquisición potencial es < 50% de mercado
     redemption_margin REAL, -- Cálculo de Kentucky: (mls_estimated_value * 0.66) - appraisal_value
+    telegram_sent INTEGER DEFAULT 0,
+    pdf_url TEXT,
+    defendant_phones TEXT,
+    defendant_emails TEXT,
+    needs_manual_review INTEGER DEFAULT 0,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
