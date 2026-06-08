@@ -269,6 +269,8 @@ async function scrapeClarkCounty() {
           const plaintiffVal = lastPlaintiff || null;
           const defendantVal = lastDefendant || null;
           
+          console.log(`[TEMP LOG - CLARK] Nombre de defendant extraído antes de guardar: "${defendantVal}"`);
+          
           try {
             await db.execute({
               sql: `
@@ -428,7 +430,7 @@ async function scrapeFloydCounty() {
               console.log(`[SCRAPER FLOYD] Caso detectado en celda de fila de propiedad: Plaintiff="${plaintiffVal}" | Defendant="${defendantVal}"`);
             }
           }
-        }
+        console.log(`[TEMP LOG - FLOYD] Nombre de defendant extraído antes de guardar: "${defendantVal}"`);
         
         // Insertar en la base de datos de Turso
         db.execute({
