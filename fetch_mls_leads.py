@@ -87,6 +87,26 @@ def setup_database(db):
     """)
     print("[DATABASE] Table 'properties' is ready.")
 
+def send_telegram_notification(message):
+    token = os.getenv("TELEGRAM_BOT_TOKEN")
+    chat_id = os.getenv("TELEGRAM_CHAT_ID")
+    if not token or not chat_id:
+        print("[TELEGRAM] Warning: Telegram credentials not set in .env. Skipping notification.")
+        return
+        
+    url = f"https://api.telegram.org/bot{token}/sendMessage"
+    payload = {
+        "chat_id": chat_id,
+        "text": message,
+        "parse_mode": "Markdown"
+    }
+    try:
+        response = requests.post(url, json=payload, timeout=10)
+        if response.status_code != 200:
+            print(f"[TELEGRAM ERROR] Failed to send message: {response.text}")
+    except Exception as e:
+        print(f"[TELEGRAM EXCEPTION] Failed to connect: {e}")
+
 def fetch_and_process_leads():
     # 1. Initialize DB Client
     db = TursoClient()
@@ -187,6 +207,21 @@ def fetch_and_process_leads():
                 ])
                 print("     [DATABASE] Saved new lead successfully.")
                 new_leads_count += 1
+                
+                # Send Telegram Notification
+                est_surplus = max(0.0, close_price - list_price)
+                msg = (
+                    f"🚨 *NUEVO LEAD ENCONTRADO*\n\n"
+                    f"📍 *Dirección:* {address}\n"
+                    f"🏢 *Condado:* {county}, {state}\n"
+                    f"💵 *Precio de Venta:* ${close_price:,.2f}\n"
+                    f"📋 *Precio de Lista:* ${list_price:,.2f}\n"
+                    f"⚖️ *Excedente Est. (Diferencia):* ${est_surplus:,.2f}\n"
+                    f"📅 *Fecha de Cierre:* {close_date}\n"
+                    f"🔗 *MLS ID:* {listing_id}\n\n"
+                    f"🔍 *Keywords:* {matched_keywords}\n"
+                )
+                send_telegram_notification(msg)
             except Exception as e:
                 if "UNIQUE constraint failed" in str(e):
                     # Already exists, just skip or log
