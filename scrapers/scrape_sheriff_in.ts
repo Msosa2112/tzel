@@ -27,6 +27,43 @@ function cleanText(text: string): string {
 }
 
 /**
+ * Limpia y normaliza el nombre del demandado
+ */
+function cleanDefendant(name: string): string {
+  if (!name) return "";
+  let clean = name;
+  
+  // Remover texto entre paréntesis
+  clean = clean.replace(/\([^)]*\)/g, "");
+  
+  // Remover et al, et al., et. al., etal
+  clean = clean.replace(/,?\s+et\.?\s*al\.?/gi, "");
+  clean = clean.replace(/,?\s+etal/gi, "");
+  
+  // Remover "spouse of", "and spouse", "husband/wife of", etc.
+  clean = clean.replace(/,?\s+spouse\s+of\s+.*$/gi, "");
+  clean = clean.replace(/,?\s+and\s+spouse.*$/gi, "");
+  clean = clean.replace(/,?\s+husband\s+and\s+wife.*$/gi, "");
+  clean = clean.replace(/,?\s+wife\s+of\s+.*$/gi, "");
+  clean = clean.replace(/,?\s+husband\s+of\s+.*$/gi, "");
+  
+  // Remover "deceased" o "individually"
+  clean = clean.replace(/,?\s+deceased/gi, "");
+  clean = clean.replace(/,?\s+individually/gi, "");
+  
+  // Limpiar caracteres de puntuación sobrantes al final
+  clean = clean.replace(/[\*\,\-\_\#\s]+$/, "");
+  
+  // Quitar comillas
+  clean = clean.replace(/["']/g, "");
+  
+  // Normalizar espacios
+  clean = clean.replace(/\s+/g, " ").trim();
+  
+  return clean;
+}
+
+/**
  * Scraper para las subastas del Sheriff de Clark County, IN
  */
 async function scrapeClarkCounty() {
@@ -61,6 +98,9 @@ async function scrapeClarkCounty() {
     
     const months = ["january", "february", "march", "april", "may", "june", "july", "august", "september", "october", "november", "december"];
     
+    let lastPlaintiff: string | null = null;
+    let lastDefendant: string | null = null;
+    
     for (let i = 0; i < textElements.length; i++) {
       const text = textElements[i];
       const textLower = text.toLowerCase();
@@ -87,7 +127,25 @@ async function scrapeClarkCounty() {
         continue;
       }
       
-      // 2. Detectar Líneas de Propiedades
+      // 2. Detectar caso (Plaintiff vs. Defendant)
+      const vsRegex = /\s+vs\.?\s+/i;
+      if (vsRegex.test(text)) {
+        const parts = text.split(vsRegex);
+        if (parts.length >= 2) {
+          lastPlaintiff = parts[0].trim();
+          lastDefendant = cleanDefendant(parts[1]);
+          console.log(`[SCRAPER CLARK] Caso detectado por patrón vs: Plaintiff="${lastPlaintiff}" | Defendant="${lastDefendant}"`);
+        }
+      } else if (textLower === "vs" || textLower === "vs.") {
+        // Si el "vs" está separado en su propia línea
+        if (i > 0 && i + 1 < textElements.length) {
+          lastPlaintiff = textElements[i - 1].trim();
+          lastDefendant = cleanDefendant(textElements[i + 1]);
+          console.log(`[SCRAPER CLARK] Caso detectado por vs en línea: Plaintiff="${lastPlaintiff}" | Defendant="${lastDefendant}"`);
+        }
+      }
+      
+      // 3. Detectar Líneas de Propiedades
       // Buscamos si empieza con un número de calle y tiene una coma con ciudad de Clark County
       const startsWithNumber = /^\d+/.test(text);
       const containsClarkCity = CLARK_CITIES.some(c => textLower.includes(c));
@@ -107,6 +165,9 @@ async function scrapeClarkCounty() {
           
           const auctionId = `IN_CLARK_${streetAddress.replace(/\s+/g, "_")}_${cleanText(currentDate).replace(/\s+/g, "_")}`;
           
+          const plaintiffVal = lastPlaintiff || null;
+          const defendantVal = lastDefendant || null;
+          
           try {
             await db.execute({
               sql: `
@@ -116,7 +177,9 @@ async function scrapeClarkCounty() {
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending_check')
                 ON CONFLICT(auction_id) DO UPDATE SET
                   address = excluded.address,
-                  auction_date = excluded.auction_date
+                  auction_date = excluded.auction_date,
+                  plaintiff = COALESCE(excluded.plaintiff, foreclosure_auctions.plaintiff),
+                  defendant = COALESCE(excluded.defendant, foreclosure_auctions.defendant)
               `,
               args: [
                 auctionId,
@@ -125,12 +188,16 @@ async function scrapeClarkCounty() {
                 "Clark",
                 "IN",
                 cleanText(currentDate),
-                null,
-                null
+                plaintiffVal,
+                defendantVal
               ]
             });
             activeSavedCount++;
-            console.log(`[SUBASTA CLARK GUARDADA] Dirección: ${streetAddress}, ${city} | Fecha: ${currentDate}`);
+            console.log(`[SUBASTA CLARK GUARDADA] Dirección: ${streetAddress}, ${city} | Defendant: ${defendantVal} | Fecha: ${currentDate}`);
+            
+            // Resetear para la siguiente propiedad
+            lastPlaintiff = null;
+            lastDefendant = null;
           } catch (dbErr) {
             console.error(`[DB ERROR] Error al guardar subasta de Clark County:`, dbErr);
           }
@@ -179,6 +246,9 @@ async function scrapeFloydCounty() {
     let currentDate = "Unknown Date 2026";
     let activeSavedCount = 0;
     
+    let lastPlaintiff: string | null = null;
+    let lastDefendant: string | null = null;
+    
     // Recorremos las filas de la tabla
     $("tr").each((_, trElem) => {
       const cells: string[] = [];
@@ -190,15 +260,26 @@ async function scrapeFloydCounty() {
       
       const non_empty = cells.filter(c => c);
       
-      // 1. Detectar cabecera de fecha agrupada (fila con una sola celda que contiene un mes o año)
+      // 1. Detectar cabecera de fecha agrupada o caso
       if (non_empty.length === 1) {
         const val = non_empty[0];
         const valLower = val.toLowerCase();
         
-        const isHeader = ["january", "february", "march", "april", "may", "june", "july", "august", "september", "october", "november", "december", "sales"].some(m => valLower.includes(m));
-        if (isHeader && !valLower.includes("no sales")) {
-          currentDate = val;
-          console.log(`[SCRAPER FLOYD] Nueva fecha de subasta detectada: ${currentDate}`);
+        // Verificar si contiene "vs" o "vs." para Floyd
+        const vsRegex = /\s+vs\.?\s+/i;
+        if (vsRegex.test(val)) {
+          const parts = val.split(vsRegex);
+          if (parts.length >= 2) {
+            lastPlaintiff = parts[0].trim();
+            lastDefendant = cleanDefendant(parts[1]);
+            console.log(`[SCRAPER FLOYD] Caso detectado en fila simple: Plaintiff="${lastPlaintiff}" | Defendant="${lastDefendant}"`);
+          }
+        } else {
+          const isHeader = ["january", "february", "march", "april", "may", "june", "july", "august", "september", "october", "november", "december", "sales"].some(m => valLower.includes(m));
+          if (isHeader && !valLower.includes("no sales")) {
+            currentDate = val;
+            console.log(`[SCRAPER FLOYD] Nueva fecha de subasta detectada: ${currentDate}`);
+          }
         }
       }
       
@@ -224,6 +305,22 @@ async function scrapeFloydCounty() {
         const fullAddress = `${address}, ${city}`;
         const auctionId = `IN_FLOYD_${address.replace(/\s+/g, "_")}_${currentDate.replace(/\s+/g, "_")}`;
         
+        let plaintiffVal = lastPlaintiff || null;
+        let defendantVal = lastDefendant || null;
+        
+        // Comprobar si hay "vs" en alguna celda de esta fila por si acaso
+        const vsRegex = /\s+vs\.?\s+/i;
+        for (const cell of cells) {
+          if (vsRegex.test(cell)) {
+            const parts = cell.split(vsRegex);
+            if (parts.length >= 2) {
+              plaintiffVal = parts[0].trim();
+              defendantVal = cleanDefendant(parts[1]);
+              console.log(`[SCRAPER FLOYD] Caso detectado en celda de fila de propiedad: Plaintiff="${plaintiffVal}" | Defendant="${defendantVal}"`);
+            }
+          }
+        }
+        
         // Insertar en la base de datos de Turso
         db.execute({
           sql: `
@@ -233,7 +330,9 @@ async function scrapeFloydCounty() {
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending_check')
             ON CONFLICT(auction_id) DO UPDATE SET
               address = excluded.address,
-              auction_date = excluded.auction_date
+              auction_date = excluded.auction_date,
+              plaintiff = COALESCE(excluded.plaintiff, foreclosure_auctions.plaintiff),
+              defendant = COALESCE(excluded.defendant, foreclosure_auctions.defendant)
           `,
           args: [
             auctionId,
@@ -242,15 +341,19 @@ async function scrapeFloydCounty() {
             "Floyd",
             state,
             currentDate,
-            null,
-            null
+            plaintiffVal,
+            defendantVal
           ]
         }).then(() => {
           activeSavedCount++;
-          console.log(`[SUBASTA FLOYD GUARDADA] Dirección: ${fullAddress} | Fecha: ${currentDate}`);
+          console.log(`[SUBASTA FLOYD GUARDADA] Dirección: ${fullAddress} | Defendant: ${defendantVal} | Fecha: ${currentDate}`);
         }).catch(dbErr => {
           console.error(`[DB ERROR] Error al guardar subasta de Floyd County:`, dbErr);
         });
+        
+        // Resetear para la siguiente propiedad
+        lastPlaintiff = null;
+        lastDefendant = null;
       }
     });
     

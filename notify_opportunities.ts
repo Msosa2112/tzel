@@ -190,10 +190,11 @@ async function notifyOpportunities() {
         msg += `📊 *Valor Comercial ARV:* $${mlsValue.toLocaleString("en-US", { minimumFractionDigits: 2 })}\n\n`;
       }
       
+      msg += `👤 *Demandado:* ${defendant}\n`;
       msg += `📋 *Caso Judicial:* ${caseNumber}\n`;
       msg += `🔗 *Buscador Judicial (MyCase):* [Abrir MyCase](https://public.courts.in.gov/mycase/)\n\n`;
       
-      msg += `💡 *Instrucciones:* Busca el caso en el portal judicial para obtener el Judgment Amount. Si la deuda es menor a $${((mlsValue > 0 ? mlsValue : 200000) * 0.5).toLocaleString("en-US")}, es una gran oportunidad de negocio.`;
+      msg += `💡 *Instrucciones:* Haz clic en el enlace, ve a la pestaña NAME y busca por el nombre del demandado limitando la búsqueda a Casos Civiles en este condado.`;
     } else {
       // Alerta de Oportunidad normal
       msg += `🚨 *OPORTUNIDAD DE ADQUISICIÓN PRE-SUBASTA* 🚨\n`;
