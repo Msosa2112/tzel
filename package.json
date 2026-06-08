@@ -1,0 +1,21 @@
+{
+  "name": "tzel-realestate-osint",
+  "version": "1.0.0",
+  "description": "OSINT Real Estate engine for Surplus Funds and Distressed Properties",
+  "main": "dist/fetch_osint.js",
+  "scripts": {
+    "fetch": "ts-node fetch_osint.ts",
+    "test-db": "ts-node test_turso.py",
+    "setup-db": "ts-node setup_turso.py"
+  },
+  "dependencies": {
+    "@libsql/client": "^0.14.0",
+    "axios": "^1.7.9",
+    "dotenv": "^16.4.7"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.7.2"
+  }
+}

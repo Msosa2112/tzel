@@ -1,6 +1,10 @@
 # Ignore environment variables / secrets
 .env
 
+# Node.js dependencies and builds
+node_modules/
+dist/
+
 # Python cache
 __pycache__/
 *.pyc
