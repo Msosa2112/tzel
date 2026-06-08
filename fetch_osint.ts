@@ -11,6 +11,32 @@ const db = createClient({
   authToken: process.env.TURSO_AUTH_TOKEN || "",
 });
 
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+async function sendTelegramNotification(message: string) {
+  const token = process.env.TELEGRAM_BOT_TOKEN;
+  const chatId = process.env.TELEGRAM_CHAT_ID;
+  if (!token || !chatId) {
+    console.log("[TELEGRAM] Warning: Telegram credentials not set in .env. Skipping notification.");
+    return;
+  }
+  
+  const url = `https://api.telegram.org/bot${token}/sendMessage`;
+  const payload = {
+    chat_id: chatId,
+    text: message,
+    parse_mode: "Markdown"
+  };
+  try {
+    const response = await axios.post(url, payload, { timeout: 10000 });
+    if (response.status !== 200) {
+      console.error(`[TELEGRAM ERROR] Failed to send message: ${JSON.stringify(response.data)}`);
+    }
+  } catch (e: any) {
+    console.error(`[TELEGRAM EXCEPTION] Failed to connect: ${e.message || e}`);
+  }
+}
+
 // Keywords for OSINT Lexical Analysis of Distressed/Motivated Sellers
 const DISTRESSED_KEYWORDS = [
   "as-is", "tlc", "handyman", "cash only", "motivated", 
@@ -156,7 +182,19 @@ async function fetchAndProcessOsintOpportunities() {
           profileType = prop.StandardStatus;
         }
 
-        // 5. Upsert Opportunity to Turso DB
+// 5. Check if lead already exists in DB to avoid duplicate Telegram notifications
+        let isNewLead = false;
+        try {
+          const checkRes = await db.execute({
+            sql: "SELECT 1 FROM osint_opportunities WHERE mls_id = ?",
+            args: [prop.ListingId]
+          });
+          isNewLead = checkRes.rows.length === 0;
+        } catch (dbErr) {
+          console.error(`[DB ERROR] Failed to check if lead exists ${prop.ListingId}:`, dbErr);
+        }
+
+        // 6. Upsert Opportunity to Turso DB
         try {
           await db.execute({
             sql: `
@@ -193,6 +231,27 @@ async function fetchAndProcessOsintOpportunities() {
           
           savedLeadsCount++;
           console.log(`[LEAD SAVED] ID: ${prop.ListingId} | Address: ${prop.UnparsedAddress} | Keywords: ${matchedKeywords.join(",")}`);
+
+          // Send Telegram Notification only if it's a new lead
+          if (isNewLead) {
+            console.log(`[TELEGRAM ALERT] Dispatching notification for new lead ${prop.ListingId}...`);
+            const dropPct = originalPrice > 0 ? ((originalPrice - currentPrice) / originalPrice) * 100 : 0;
+            const dropWarning = isPanicDrop ? " ⚠️ (PANIC DROP >= 10%)" : "";
+            
+            const msg = `🚨 *NUEVO LEAD OSINT (ESTRÉS REAL ESTATE)*\n\n` +
+              `📍 *Dirección:* ${prop.UnparsedAddress}\n` +
+              `🏢 *Condado:* ${prop.CountyOrParish || "N/A"}, ${prop.StateOrProvince || "N/A"}\n` +
+              `💵 *Precio de Lista:* $${currentPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}\n` +
+              `📋 *Precio Original:* $${originalPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}\n` +
+              `📉 *Descuento:* ${dropPct.toFixed(1)}%${dropWarning}\n` +
+              `⏳ *DOM (Días en Mercado):* ${prop.DaysOnMarket || 0}\n` +
+              `📁 *Perfil:* ${profileType}\n` +
+              `🔗 *MLS ID:* ${prop.ListingId}\n\n` +
+              `🔍 *Keywords:* ${matchedKeywords.join(", ")}\n`;
+
+            await sendTelegramNotification(msg);
+            await sleep(200); // Respect Telegram API limits
+          }
         } catch (dbErr) {
           console.error(`[DB ERROR] Failed to save lead ${prop.ListingId}:`, dbErr);
         }

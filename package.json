@@ -10,8 +10,11 @@
   },
   "dependencies": {
     "@libsql/client": "^0.14.0",
+    "@types/cheerio": "^0.22.35",
     "axios": "^1.7.9",
-    "dotenv": "^16.4.7"
+    "cheerio": "^1.2.0",
+    "dotenv": "^16.4.7",
+    "pdf-parse": "^2.4.5"
   },
   "devDependencies": {
     "@types/node": "^22.10.2",
