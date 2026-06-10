@@ -317,13 +317,34 @@ async function scrapeClarkCounty() {
 /**
  * Scraper para las subastas del Sheriff de Floyd County, IN
  */
+async function fetchFloydNonce(): Promise<string> {
+  const url = "https://www.fcsdin.com/sheriffsales/";
+  try {
+    const response = await axios.get(url, {
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+      },
+      timeout: 10000
+    });
+    const match = response.data.match(/"nonce"\s*:\s*"([^"]+)"/);
+    if (match) {
+      console.log(`[SCRAPER FLOYD] Nonce dinámico obtenido con éxito: ${match[1]}`);
+      return match[1];
+    }
+  } catch (err: any) {
+    console.error(`[SCRAPER FLOYD WARNING] No se pudo obtener nonce dinámico: ${err.message}. Usando fallback.`);
+  }
+  return "7a6095ba72";
+}
+
 async function scrapeFloydCounty() {
   console.log("[SCRAPER FLOYD] Iniciando extracción de subastas de Floyd County, IN...");
+  const nonce = await fetchFloydNonce();
   const ajaxUrl = "https://www.fcsdin.com/wp-admin/admin-ajax.php";
   const payload = new URLSearchParams({
     action: "gswpts_sheet_fetch",
     id: "5",
-    nonce: "7a6095ba72"
+    nonce: nonce
   });
   
   try {
@@ -430,6 +451,7 @@ async function scrapeFloydCounty() {
               console.log(`[SCRAPER FLOYD] Caso detectado en celda de fila de propiedad: Plaintiff="${plaintiffVal}" | Defendant="${defendantVal}"`);
             }
           }
+        }
         console.log(`[TEMP LOG - FLOYD] Nombre de defendant extraído antes de guardar: "${defendantVal}"`);
         
         // Insertar en la base de datos de Turso

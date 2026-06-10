@@ -337,7 +337,10 @@ async function runCrossReference() {
               mls_id = ?,
               mls_status = ?,
               mls_estimated_value = ?,
-              is_high_yield = ?
+              is_high_yield = ?,
+              sqft = ?,
+              beds = ?,
+              baths = ?
             WHERE auction_id = ?
           `,
           args: [
@@ -345,6 +348,9 @@ async function runCrossReference() {
             mlsStatus,
             mlsValue,
             isHighYield,
+            sqft,
+            beds,
+            baths,
             auctionId
           ]
         });
@@ -367,12 +373,164 @@ async function runCrossReference() {
     // Respetar límites de rate limiting
     await sleep(500);
   }
+
+  // 4. Consultar violaciones de código pendientes de cruce en Turso DB
+  let violationsRes;
+  try {
+    violationsRes = await db.execute(
+      "SELECT violation_id, case_number, address FROM code_violations WHERE mls_status = 'pending_check'"
+    );
+  } catch (dbErr: any) {
+    console.error("[DB ERROR] Error al consultar violaciones pendientes:", dbErr.message);
+    process.exit(1);
+  }
+
+  const violations = violationsRes.rows;
+  console.log(`\n[CRUCE] Se encontraron ${violations.length} violaciones de código pendientes para cruzar con el MLS.`);
+
+  let violationMatchCount = 0;
+  let violationNotFoundCount = 0;
+  let violationErrorCount = 0;
+
+  for (const row of violations) {
+    const violationId = row.violation_id as string;
+    const caseNumber = row.case_number as string;
+    const address = row.address as string;
+    const state = "KY"; // Las violaciones registradas corresponden a Louisville, KY
+
+    console.log(`\n-------------------------------------------------------------`);
+    console.log(`[PROCESANDO VIOLACIÓN] Caso: ${caseNumber} | Dirección: ${address} | KY`);
+
+    // Normalizar dirección
+    const { houseNumber, coreWords } = parseAddress(address);
+
+    if (!houseNumber) {
+      console.log(`[SKIP] No se encontró número de casa para la dirección de violación: "${address}". Marcando como 'not_found'.`);
+      try {
+        await db.execute({
+          sql: "UPDATE code_violations SET mls_status = 'not_found' WHERE violation_id = ?",
+          args: [violationId]
+        });
+      } catch (e) {}
+      violationNotFoundCount++;
+      continue;
+    }
+
+    console.log(`[NORM] Número de casa: ${houseNumber} | Palabras clave calle: ${JSON.stringify(coreWords)}`);
+
+    // Consultar Spark MLS usando OData filter
+    const mlsUrl = "https://replication.sparkapi.com/Reso/OData/Property";
+    const odataFilter = `contains(UnparsedAddress, '${houseNumber}') and StateOrProvince eq '${state}'`;
+
+    const params = {
+      "$filter": odataFilter,
+      "$select": "ListingKey,ListingId,UnparsedAddress,PostalCode,ListPrice,ClosePrice,MlsStatus,StandardStatus,CountyOrParish,StateOrProvince,BedroomsTotal,BathroomsTotalDecimal,LivingArea,YearBuilt",
+      "$top": 20
+    };
+
+    try {
+      console.log(`[MLS QUERY] Buscando violación en MLS: ${odataFilter}...`);
+      const response = await axios.get(mlsUrl, {
+        headers: mlsHeaders,
+        params,
+        timeout: 15000
+      });
+
+      if (response.status !== 200) {
+        throw new Error(`MLS API status ${response.status}: ${response.statusText}`);
+      }
+
+      const properties = response.data.value || [];
+      console.log(`[MLS QUERY] MLS devolvió ${properties.length} propiedades candidatas.`);
+
+      let matchedProp: any = null;
+
+      // Validar coincidencia de calle en memoria
+      for (const prop of properties) {
+        const mlsAddress = prop.UnparsedAddress || "";
+        const mlsCleaned = mlsAddress.toLowerCase().replace(/[^a-z0-9\s]/g, " ");
+        const mlsWords = mlsCleaned.split(/\s+/).filter((w: string) => w.length > 0);
+
+        // Verificar si todas las palabras del core de la calle están en la dirección MLS
+        const isMatch = coreWords.every(word => mlsWords.includes(word));
+
+        if (isMatch) {
+          matchedProp = prop;
+          break;
+        }
+      }
+
+      if (matchedProp) {
+        const mlsId = matchedProp.ListingId;
+        const mlsStatus = matchedProp.StandardStatus || matchedProp.MlsStatus || "Active";
+        const closePrice = matchedProp.ClosePrice || 0;
+        const listPrice = matchedProp.ListPrice || 0;
+
+        const zip = matchedProp.PostalCode || "";
+        const beds = matchedProp.BedroomsTotal || null;
+        const baths = matchedProp.BathroomsTotalDecimal || null;
+        const sqft = matchedProp.LivingArea || null;
+
+        console.log(`[MATCH FOUND] ¡Coincidencia con MLS para violación! ID: ${mlsId} | Dirección MLS: "${matchedProp.UnparsedAddress}"`);
+
+        // Calcular ARV usando Comps en tiempo real
+        const mlsValue = await calculateARV(mlsHeaders, zip, beds, sqft, closePrice, listPrice);
+        console.log(`[ARV RESULT] Estatus MLS: ${mlsStatus} | Valor ARV (Comps): $${mlsValue.toLocaleString("en-US")}`);
+
+        // Al no haber deuda para violaciones de código, consideramos de alta rentabilidad si logramos calcular el ARV
+        const isHighYield = mlsValue > 0 ? 1 : 0;
+
+        await db.execute({
+          sql: `
+            UPDATE code_violations SET
+              mls_id = ?,
+              mls_status = ?,
+              mls_estimated_value = ?,
+              is_high_yield = ?,
+              sqft = ?,
+              beds = ?,
+              baths = ?
+            WHERE violation_id = ?
+          `,
+          args: [
+            mlsId,
+            mlsStatus,
+            mlsValue,
+            isHighYield,
+            sqft,
+            beds,
+            baths,
+            violationId
+          ]
+        });
+
+        violationMatchCount++;
+      } else {
+        console.log(`[NOT FOUND] No se encontró coincidencia de calle en las ${properties.length} propiedades del MLS.`);
+        await db.execute({
+          sql: "UPDATE code_violations SET mls_status = 'not_found' WHERE violation_id = ?",
+          args: [violationId]
+        });
+        violationNotFoundCount++;
+      }
+
+    } catch (err: any) {
+      console.error(`[ERROR QUERYING MLS] Falló consulta para la violación ${violationId}:`, err.message || err);
+      violationErrorCount++;
+    }
+
+    // Respetar límites de rate limiting
+    await sleep(500);
+  }
   
   console.log("\n========================================================");
   console.log("RESUMEN GENERAL DEL MOTOR DE CRUCE:");
-  console.log(`- Cruces exitosos (Coincidencias MLS): ${matchCount}`);
-  console.log(`- No encontradas en MLS: ${notFoundCount}`);
-  console.log(`- Errores de API / Sistema: ${errorCount}`);
+  console.log(`- Subastas Cruzadas exitosamente: ${matchCount}`);
+  console.log(`- Subastas No encontradas en MLS: ${notFoundCount}`);
+  console.log(`- Subastas con Errores: ${errorCount}`);
+  console.log(`- Violaciones Cruzadas exitosamente: ${violationMatchCount}`);
+  console.log(`- Violaciones No encontradas en MLS: ${violationNotFoundCount}`);
+  console.log(`- Violaciones con Errores: ${violationErrorCount}`);
   console.log("========================================================\n");
 }
 

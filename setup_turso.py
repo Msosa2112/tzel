@@ -47,9 +47,10 @@ def setup():
     db_exists = False
     db_url = None
     for db in databases:
-        if db["name"] == db_name:
+        db_name_actual = db.get("Name") or db.get("name")
+        if db_name_actual == db_name:
             db_exists = True
-            db_url = f"libsql://{db['Hostname']}"
+            db_url = f"libsql://{db.get('Hostname') or db.get('hostname')}"
             print(f"Database '{db_name}' already exists. URL: {db_url}")
             break
             

@@ -1,5 +1,7 @@
 import { scrapeJeffersonCounty } from "./scrapers/scrape_jeffcomm";
 import { scrapeIndiana } from "./scrapers/scrape_sheriff_in";
+import { scrapeCodeViolations } from "./scrapers/scrapeCodeViolations";
+import { scrapePVA } from "./scrapers/scrapePVA";
 import { runCrossReference } from "./cross_reference";
 import { runIndianaCrawler } from "./indiana_court_crawler";
 import { runSkipTracing } from "./skip_trace";
@@ -13,7 +15,7 @@ async function runPipeline() {
   console.log(`Fecha/Hora: ${new Date().toISOString()}`);
   console.log("=================================================================");
 
-  // FASE 1: Extracción de Subastas desde Portales de Cortes/Sheriff
+  // FASE 1: Extracción de Subastas y Listas de Estrés (KY/IN)
   try {
     console.log("\n[FASE 1A] Scraping Jefferson County (KY)...");
     await scrapeJeffersonCounty();
@@ -26,6 +28,20 @@ async function runPipeline() {
     await scrapeIndiana();
   } catch (err: any) {
     console.error("[PIPELINE ERROR] Falló el scraper de Indiana:", err.message);
+  }
+
+  try {
+    console.log("\n[FASE 1C] Scraping Louisville Metro Code Violations (KY)...");
+    await scrapeCodeViolations();
+  } catch (err: any) {
+    console.error("[PIPELINE ERROR] Falló el scraper de Louisville Code Violations:", err.message);
+  }
+
+  try {
+    console.log("\n[FASE 1D] Resolviendo Propietarios Catastrales (PVA)...");
+    await scrapePVA();
+  } catch (err: any) {
+    console.error("[PIPELINE ERROR] Falló el resolvedor de PVA:", err.message);
   }
 
   // Esperar 3 segundos para garantizar que todos los registros asíncronos no-promisificados de Floyd County se escriban en Turso

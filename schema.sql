@@ -37,6 +37,11 @@ CREATE TABLE IF NOT EXISTS foreclosure_auctions (
     defendant_phones TEXT,
     defendant_emails TEXT,
     needs_manual_review INTEGER DEFAULT 0,
+    mailing_address TEXT,
+    absentee_owner INTEGER DEFAULT 0,
+    sqft INTEGER,
+    beds INTEGER,
+    baths REAL,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -51,5 +56,29 @@ CREATE TABLE IF NOT EXISTS landbank_inventory (
     county TEXT NOT NULL,
     state TEXT NOT NULL,
     is_high_yield INTEGER DEFAULT 0,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Tabla de Violaciones de Código (Louisville Metro)
+CREATE TABLE IF NOT EXISTS code_violations (
+    violation_id TEXT PRIMARY KEY, -- Formato: 'CASE_NUMBER_VIOLATION_CODE'
+    case_number TEXT NOT NULL,
+    address TEXT NOT NULL,
+    violation_type TEXT NOT NULL,
+    report_date TEXT,
+    status TEXT,
+    owner_name TEXT,
+    mls_status TEXT DEFAULT 'pending_check',
+    mls_estimated_value REAL,
+    mls_id TEXT,
+    is_high_yield INTEGER DEFAULT 0,
+    defendant_phones TEXT,
+    defendant_emails TEXT,
+    telegram_sent INTEGER DEFAULT 0,
+    mailing_address TEXT,
+    absentee_owner INTEGER DEFAULT 0,
+    sqft INTEGER,
+    beds INTEGER,
+    baths REAL,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
