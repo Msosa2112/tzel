@@ -2,7 +2,10 @@ import { scrapeJeffersonCounty } from "./scrapers/scrape_jeffcomm";
 import { scrapeIndiana } from "./scrapers/scrape_sheriff_in";
 import { scrapeCodeViolations } from "./scrapers/scrapeCodeViolations";
 import { scrapePVA } from "./scrapers/scrapePVA";
+import { scrapeProbates } from "./scrapers/scrape_probates";
+import { scrapeDivorces } from "./scrapers/scrape_divorces";
 import { runCrossReference } from "./cross_reference";
+import { runTitleLienCheck } from "./check_title_liens";
 import { runIndianaCrawler } from "./indiana_court_crawler";
 import { runSkipTracing } from "./skip_trace";
 import { notifyOpportunities } from "./notify_opportunities";
@@ -44,6 +47,20 @@ async function runPipeline() {
     console.error("[PIPELINE ERROR] Falló el resolvedor de PVA:", err.message);
   }
 
+  try {
+    console.log("\n[FASE 1E] Scraping Sucesiones/Testamentarias (Probates)...");
+    await scrapeProbates();
+  } catch (err: any) {
+    console.error("[PIPELINE ERROR] Falló el scraper de testamentarias (Probates):", err.message);
+  }
+
+  try {
+    console.log("\n[FASE 1F] Scraping Divorcios (Divorces)...");
+    await scrapeDivorces();
+  } catch (err: any) {
+    console.error("[PIPELINE ERROR] Falló el scraper de divorcios (Divorces):", err.message);
+  }
+
   // Esperar 3 segundos para garantizar que todos los registros asíncronos no-promisificados de Floyd County se escriban en Turso
   console.log("\n[WAIT] Esperando 3 segundos a que se asienten las escrituras en la base de datos...");
   await sleep(3000);
@@ -55,6 +72,17 @@ async function runPipeline() {
   } catch (err: any) {
     console.error("[PIPELINE ERROR] Falló el motor de cruce MLS:", err.message);
   }
+
+  // FASE 2.5: Verificación de Títulos y Deudas Ocultas (Desactivado temporalmente por bypass de API)
+  /*
+  try {
+    console.log("\n[FASE 2.5] Verificando Gravámenes y Hipotecas Ocultas (DataTree API)...");
+    await runTitleLienCheck();
+  } catch (err: any) {
+    console.error("[PIPELINE ERROR] Falló el verificador de deudas ocultas (Fallo Fuerte):", err.message);
+    throw err; // Relanzar para detener el pipeline si falla (Hard Fail)
+  }
+  */
 
   // FASE 3: Enriquecimiento de Casos de Indiana sin Deuda a través de MyCase
   try {

@@ -1,8 +1,12 @@
 import axios from "axios";
 import * as cheerio from "cheerio";
-import { chromium } from "playwright";
+import { chromium } from "playwright-extra";
+import stealthPlugin from "puppeteer-extra-plugin-stealth";
 import { createClient } from "@libsql/client";
 import * as dotenv from "dotenv";
+
+chromium.use(stealthPlugin());
+
 
 // Cargar variables de entorno
 dotenv.config();
@@ -183,6 +187,7 @@ async function searchCaseAndParties(address: string, county: string): Promise<{
   return { caseNumber: null, plaintiff: null, defendant: null };
 }
 
+
 /**
  * Navega por MyCase Indiana usando Playwright para extraer detalles financieros del expediente.
  */
@@ -355,10 +360,14 @@ async function runIndianaCrawler() {
       }
     }
     
-    // 3. Consultar MyCase usando Playwright
+    // 3. Consultar MyCase usando Playwright Stealth
     try {
       const details = await getCaseDetailsFromMyCase(caseNumber);
       
+      const debt = details ? details.debt : null;
+      const finalPlaintiff = details?.plaintiff || extractedPlaintiff || "No especificado";
+      const finalDefendant = details?.defendant || extractedDefendant || "No especificado";
+
       if (details) {
         // Guardar en base de datos
         await db.execute({
@@ -367,36 +376,33 @@ async function runIndianaCrawler() {
               debt_amount = ?,
               plaintiff = ?,
               defendant = ?,
-              needs_manual_review = 0
+              needs_manual_review = ?
             WHERE auction_id = ?
           `,
           args: [
-            details.debt,
-            details.plaintiff || "No especificado",
-            details.defendant || "No especificado",
+            debt,
+            finalPlaintiff,
+            finalDefendant,
+            debt ? 0 : 1, // Si rescatamos deuda, no requiere revisión manual
             auctionId
           ]
         });
         
-        console.log(`[ÉXITO] Detalles guardados para caso ${caseNumber}: Deuda: $${details.debt ? details.debt.toLocaleString() : "N/A"}`);
-        successCount++;
+        console.log(`[ÉXITO] Detalles guardados para caso ${caseNumber}: Deuda: $${debt ? debt.toLocaleString() : "N/A (Falta revisión manual)"}`);
+        if (debt) {
+          successCount++;
+        } else {
+          manualReviewCount++;
+        }
       } else {
         throw new Error("Caso no encontrado en el portal MyCase");
       }
       
     } catch (err: any) {
-      // Captura de error robusta para evadir caídas del pipeline ante bloqueos de Cloudflare
-      console.log(`[BLOQUEO CRAWLER] Falló el rastreo para el caso ${caseNumber}. Detalle: ${err.message}`);
+      console.log(`[CRAWLER IN ERROR] Falló el rastreo para el caso ${caseNumber}. Detalle: ${err.message}`);
       
-      // Fallback: Si no tenemos extractedDefendant del paso anterior, busquemos ahora
-      if (!extractedDefendant) {
-        console.log(`[FALLBACK] Buscando parties en los avisos web para salvar el nombre del demandado...`);
-        const searchRes = await searchCaseAndParties(address, county);
-        extractedPlaintiff = searchRes.plaintiff;
-        extractedDefendant = searchRes.defendant;
-      }
-      
-      console.log(`[FALLBACK RESULT] Defendant: "${extractedDefendant || "No especificado"}" | Plaintiff: "${extractedPlaintiff || "No especificado"}"`);
+      const finalPlaintiff = extractedPlaintiff || "No especificado";
+      const finalDefendant = extractedDefendant || "No especificado";
       
       try {
         await db.execute({
@@ -407,7 +413,11 @@ async function runIndianaCrawler() {
               needs_manual_review = 1
             WHERE auction_id = ?
           `,
-          args: [extractedPlaintiff, extractedDefendant, auctionId]
+          args: [
+            finalPlaintiff,
+            finalDefendant,
+            auctionId
+          ]
         });
         manualReviewCount++;
       } catch (dbErr) {}

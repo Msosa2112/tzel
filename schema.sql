@@ -42,6 +42,7 @@ CREATE TABLE IF NOT EXISTS foreclosure_auctions (
     sqft INTEGER,
     beds INTEGER,
     baths REAL,
+    hidden_mortgages REAL DEFAULT 0,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -80,5 +81,54 @@ CREATE TABLE IF NOT EXISTS code_violations (
     sqft INTEGER,
     beds INTEGER,
     baths REAL,
+    hidden_mortgages REAL DEFAULT 0,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
+
+-- Tabla de Sucesiones (Probates / Herencias)
+CREATE TABLE IF NOT EXISTS probates (
+    probate_id TEXT PRIMARY KEY,
+    case_number TEXT NOT NULL,
+    address TEXT NOT NULL,
+    county TEXT NOT NULL,
+    state TEXT NOT NULL,
+    deceased_name TEXT,
+    heir_name TEXT,
+    heir_phones TEXT,
+    heir_emails TEXT,
+    telegram_sent INTEGER DEFAULT 0,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Tabla de Divorcios (Divorces)
+CREATE TABLE IF NOT EXISTS divorces (
+    divorce_id TEXT PRIMARY KEY,
+    case_number TEXT NOT NULL,
+    address TEXT NOT NULL,
+    county TEXT NOT NULL,
+    state TEXT NOT NULL,
+    spouse_a TEXT,
+    spouse_b TEXT,
+    spouse_a_phones TEXT,
+    spouse_a_emails TEXT,
+    spouse_b_phones TEXT,
+    spouse_b_emails TEXT,
+    telegram_sent INTEGER DEFAULT 0,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Tabla de Bancarrotas (Bankruptcies)
+CREATE TABLE IF NOT EXISTS bankruptcies (
+    bankruptcy_id TEXT PRIMARY KEY,
+    case_number TEXT NOT NULL,
+    address TEXT NOT NULL,
+    county TEXT NOT NULL,
+    state TEXT NOT NULL,
+    debtor_name TEXT,
+    bankruptcy_type TEXT,
+    debtor_phones TEXT,
+    debtor_emails TEXT,
+    telegram_sent INTEGER DEFAULT 0,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+

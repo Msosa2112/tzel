@@ -1,6 +1,7 @@
 import axios from "axios";
 import { createClient } from "@libsql/client";
 import * as dotenv from "dotenv";
+import { isHighYieldProperty } from "./underwriting/underwriter";
 
 // Cargar variables de entorno
 dotenv.config();
@@ -315,14 +316,14 @@ async function runCrossReference() {
         const mlsValue = await calculateARV(mlsHeaders, zip, beds, sqft, closePrice, listPrice);
         console.log(`[ARV RESULT] Estatus MLS: ${mlsStatus} | Valor ARV (Comps): $${mlsValue.toLocaleString("en-US")}`);
         
-        // Determinar si es de Alta Rentabilidad (Descuento > 50%)
+        // Determinar si es de Alta Rentabilidad (Equity Neto >= 40% del ARV)
         let isHighYield = 0;
         if (debtAmount && debtAmount > 0 && mlsValue > 0) {
           const discountPct = ((mlsValue - debtAmount) / mlsValue) * 100;
           console.log(`[MATCH SCORING] Deuda: $${debtAmount.toLocaleString("en-US")} vs ARV: $${mlsValue.toLocaleString("en-US")} | Descuento potencial: ${discountPct.toFixed(1)}%`);
-          if (debtAmount < mlsValue * 0.5) {
+          if (isHighYieldProperty(mlsValue, debtAmount, 0)) {
             isHighYield = 1;
-            console.log(`[HIGH YIELD] ¡Propiedad marcada como alta rentabilidad!`);
+            console.log(`[HIGH YIELD] ¡Propiedad marcada como alta rentabilidad (Equity >= 40% del ARV)!`);
           }
         }
 
