@@ -9,10 +9,12 @@
     "setup-db": "ts-node setup_turso.py"
   },
   "dependencies": {
+    "@crawlee/playwright": "^3.17.0",
     "@libsql/client": "^0.14.0",
     "@types/cheerio": "^0.22.35",
     "axios": "^1.7.9",
     "cheerio": "^1.2.0",
+    "crawlee": "^3.17.0",
     "dotenv": "^16.4.7",
     "pdf-parse": "^2.4.5",
     "playwright": "^1.60.0",
