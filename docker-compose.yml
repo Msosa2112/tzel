@@ -1,0 +1,26 @@
+version: '3.7'
+
+services:
+  searxng:
+    image: docker.io/searxng/searxng:latest
+    container_name: searxng_local
+    restart: always
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./searxng:/etc/searxng:rw
+    environment:
+      - SEARXNG_SETTINGS_PATH=/etc/searxng/settings.yml
+      - SEARXNG_BASE_URL=http://localhost:8080/
+      - INSTANCE_NAME=tzel-realestate-osint
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - SETGID
+      - SETUID
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"

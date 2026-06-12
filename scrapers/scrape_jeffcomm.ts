@@ -1,6 +1,7 @@
 import axios from "axios";
 import { createClient } from "@libsql/client";
 import * as dotenv from "dotenv";
+import { isAddressInJurisdiction } from "./geo_fencing";
 
 // Cargar variables de entorno
 dotenv.config();
@@ -217,6 +218,12 @@ async function scrapeJeffersonCounty() {
         }
       }
       
+      // Validación de Geocerca (Kentucky o Indiana)
+      if (!isAddressInJurisdiction(address, "KY")) {
+        console.log(`[SKIP] Propiedad fuera de jurisdicción detectada y descartada. Dirección: "${address}"`);
+        continue;
+      }
+
       // Guardar/Actualizar la subasta en la base de datos de Turso
       try {
         await db.execute({

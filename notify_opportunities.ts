@@ -317,7 +317,16 @@ async function notifyOpportunities() {
     console.error("[DB ERROR] Error al consultar subastas:", dbErr.message);
     process.exit(1);
   }
-  const opportunities = opportunitiesRes.rows;
+  const opportunities = opportunitiesRes.rows.filter(row => {
+    const dateStr = row.auction_date as string;
+    const daysRemaining = getDaysRemaining(dateStr);
+    if (daysRemaining === null) {
+      // Si no se puede parsear la fecha, lo mantenemos como medida de seguridad (por ejemplo, Indiana manual review)
+      return true;
+    }
+    return daysRemaining >= 0 && daysRemaining <= 30;
+  });
+
 
   // 2. Consultar violaciones de código no notificadas
   let violationsRes;
@@ -682,7 +691,22 @@ async function notifyOpportunities() {
     const city = extractCity(lead.displayAddress, lead.county, lead.state);
     const hasLegalRadarMatch = await searchLegalRadar(lead.ownerName, city);
 
+    let isHighMotivation = false;
+    if (hasAuctions) {
+      const firstAuction = lead.auctions[0];
+      const daysRemaining = getDaysRemaining(firstAuction.auction_date);
+      if (daysRemaining !== null && daysRemaining >= 0 && daysRemaining <= 30) {
+        if (hasViolations || primaryDebt > 0 || hiddenDebt > 0) {
+          isHighMotivation = true;
+        }
+      }
+    }
+
     let msg = "";
+    if (isHighMotivation) {
+      msg += `🔥 *ALTA MOTIVACIÓN* 🔥\n\n`;
+    }
+
 
     const hasProbates = lead.probates && lead.probates.length > 0;
     const hasDivorces = lead.divorces && lead.divorces.length > 0;
@@ -750,10 +774,13 @@ async function notifyOpportunities() {
 
     const regularEmails: string[] = [];
     const osintLinks: string[] = [];
+    const osintEmails: string[] = [];
     for (const emailOrLink of lead.emails) {
       const lower = emailOrLink.toLowerCase();
       if (lower.startsWith("osint link:")) {
         osintLinks.push(emailOrLink.substring(11).trim());
+      } else if (lower.startsWith("osint:")) {
+        osintEmails.push(emailOrLink.substring(6).trim());
       } else if (lower.startsWith("osint")) {
         // Ignorar posibles splits erróneos
       } else {
@@ -768,10 +795,13 @@ async function notifyOpportunities() {
       msg += `✉️ *Correos:* \`${regularEmails.join(", ")}\`\n`;
     }
 
-    if (osintPhones.length > 0 || osintLinks.length > 0) {
+    if (osintPhones.length > 0 || osintLinks.length > 0 || osintEmails.length > 0) {
       msg += `\n📞 *Contactos (OSINT / Scraping Gratuito):*\n`;
       if (osintPhones.length > 0) {
         msg += `  - Teléfonos: \`${osintPhones.join(", ")}\`\n`;
+      }
+      if (osintEmails.length > 0) {
+        msg += `  - Correos: \`${osintEmails.join(", ")}\`\n`;
       }
       if (osintLinks.length > 0) {
         msg += `  - Enlaces públicos:\n`;
@@ -928,6 +958,7 @@ async function notifyOpportunities() {
     console.log(`[ALERTANDO] Enviando alerta agrupada para: ${lead.displayAddress} (Subastas: ${lead.auctions.length}, Violaciones: ${lead.violations.length}, Herencias: ${lead.probates.length}, Divorcios: ${lead.divorces.length}, Quiebras: ${lead.bankruptcies.length})...`);
     
     const success = await sendTelegramNotification(msg, replyMarkup);
+
     
     if (success) {
       // Marcar subastas asociadas como notificadas

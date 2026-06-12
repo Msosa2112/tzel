@@ -1,0 +1,1839 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TZEL - Mapa Táctico de Propiedades Distresadas</title>
+  
+  <!-- SEO & Fonts -->
+  <meta name="description" content="Radar táctico de oportunidades de bienes raíces distresados en KY e IN. Estilo Dark Mode / GTA V Radar.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Orbitron:wght@500;700;900&display=swap" rel="stylesheet">
+  
+  <!-- Leaflet CSS CDN -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+  
+  <!-- Custom CSS Styling (Dark Mode, Premium, Glassmorphism, Radar Theme) -->
+  <style>
+    :root {
+      --bg-darker: #05070c;
+      --bg-dark: #0d111d;
+      --bg-glass: rgba(13, 17, 29, 0.75);
+      --border-glass: rgba(255, 255, 255, 0.08);
+      --text-main: #f1f5f9;
+      --text-muted: #94a3b8;
+      
+      /* Accent Colors (GTA / Cyber style) */
+      --color-radar-green: #10b981;
+      --color-high-motivation: #ef4444; /* 🔥 */
+      --color-foreclosure: #06b6d4;      /* ⏳ */
+      --color-violation: #f59e0b;        /* ⚠️ */
+      --color-divorce: #ec4899;          /* 💔 */
+      --color-probate: #8b5cf6;          /* 🪦 */
+      --color-bankruptcy: #10b981;       /* 💸 */
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: var(--bg-darker);
+      color: var(--text-main);
+      height: 100vh;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    h1, h2, h3, .hud-title {
+      font-family: 'Orbitron', sans-serif;
+      letter-spacing: 1px;
+    }
+
+    /* Main Grid Layout */
+    .app-container {
+      display: flex;
+      flex: 1;
+      height: calc(100vh - 60px);
+      position: relative;
+    }
+
+    /* Top HUD / Header Bar */
+    header {
+      height: 60px;
+      background: linear-gradient(180deg, #090d16 0%, rgba(9, 13, 22, 0.9) 100%);
+      border-bottom: 1px solid var(--border-glass);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 24px;
+      z-index: 1000;
+      position: relative;
+    }
+
+    header::after {
+      content: '';
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, var(--color-radar-green), transparent);
+    }
+
+    .brand-container {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .radar-icon {
+      width: 24px;
+      height: 24px;
+      border: 2px solid var(--color-radar-green);
+      border-radius: 50%;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .radar-icon::before {
+      content: '';
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 100%;
+      height: 100%;
+      background: conic-gradient(from 0deg, transparent 50%, rgba(16, 185, 129, 0.4) 100%);
+      transform-origin: top left;
+      animation: radar-spin-mini 2s linear infinite;
+    }
+
+    @keyframes radar-spin-mini {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    .brand-title {
+      font-size: 1.25rem;
+      font-weight: 900;
+      color: #ffffff;
+      text-shadow: 0 0 8px rgba(16, 185, 129, 0.6);
+    }
+
+    .system-status {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.8rem;
+      color: var(--color-radar-green);
+      text-transform: uppercase;
+      font-family: 'Orbitron', sans-serif;
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      background-color: var(--color-radar-green);
+      border-radius: 50%;
+      box-shadow: 0 0 8px var(--color-radar-green);
+      animation: pulse-glow 1.5s infinite alternate;
+    }
+
+    @keyframes pulse-glow {
+      0% { opacity: 0.4; }
+      100% { opacity: 1; }
+    }
+
+    /* Left Sidebar: Filters & Prospect list */
+    .sidebar-left {
+      width: 380px;
+      background: var(--bg-glass);
+      backdrop-filter: blur(12px);
+      border-right: 1px solid var(--border-glass);
+      display: flex;
+      flex-direction: column;
+      z-index: 999;
+      transition: transform 0.3s ease;
+    }
+
+    .sidebar-section {
+      padding: 16px;
+      border-bottom: 1px solid var(--border-glass);
+    }
+
+    .sidebar-section h3 {
+      font-size: 0.9rem;
+      color: var(--text-muted);
+      margin-bottom: 12px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .search-input {
+      width: 100%;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid var(--border-glass);
+      padding: 10px 14px;
+      border-radius: 6px;
+      color: var(--text-main);
+      font-size: 0.9rem;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    .search-input:focus {
+      border-color: var(--color-radar-green);
+      background: rgba(255, 255, 255, 0.07);
+    }
+
+    .filter-group {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-top: 10px;
+    }
+
+    .filter-select {
+      background: #0d111d;
+      border: 1px solid var(--border-glass);
+      padding: 8px 12px;
+      border-radius: 6px;
+      color: var(--text-main);
+      font-size: 0.85rem;
+      outline: none;
+      cursor: pointer;
+    }
+
+    .filter-select:focus {
+      border-color: var(--color-radar-green);
+    }
+
+    /* Custom Radio-Pills for Filters */
+    .pill-selectors {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 6px;
+    }
+
+    .pill-checkbox {
+      display: none;
+    }
+
+    .pill-label {
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid var(--border-glass);
+      padding: 8px 4px;
+      border-radius: 6px;
+      font-size: 0.75rem;
+      text-align: center;
+      cursor: pointer;
+      user-select: none;
+      transition: all 0.2s;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .pill-label:hover {
+      background: rgba(255, 255, 255, 0.08);
+    }
+
+    .pill-checkbox:checked + .pill-label {
+      background: rgba(16, 185, 129, 0.1);
+      border-color: var(--color-radar-green);
+      color: #ffffff;
+      box-shadow: 0 0 8px rgba(16, 185, 129, 0.2);
+    }
+
+    /* Leads List */
+    .leads-list {
+      flex: 1;
+      overflow-y: auto;
+      padding: 8px;
+    }
+
+    /* Custom Scrollbar for Sleek Aesthetic */
+    ::-webkit-scrollbar {
+      width: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: rgba(0, 0, 0, 0.2);
+    }
+    ::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 3px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: rgba(255, 255, 255, 0.2);
+    }
+
+    .lead-card {
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid var(--border-glass);
+      border-radius: 8px;
+      padding: 12px;
+      margin-bottom: 8px;
+      cursor: pointer;
+      transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .lead-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      bottom: 0;
+      width: 4px;
+      background: transparent;
+      transition: background-color 0.2s;
+    }
+
+    .lead-card.high-motivation::before {
+      background: var(--color-high-motivation);
+    }
+
+    .lead-card:hover {
+      background: rgba(255, 255, 255, 0.05);
+      border-color: rgba(16, 185, 129, 0.3);
+      transform: translateY(-2px);
+    }
+
+    .lead-card.selected {
+      background: rgba(16, 185, 129, 0.06);
+      border-color: var(--color-radar-green);
+      box-shadow: 0 0 12px rgba(16, 185, 129, 0.15);
+    }
+
+    .lead-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 6px;
+    }
+
+    .lead-address {
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: #ffffff;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 240px;
+    }
+
+    .lead-badges {
+      display: flex;
+      gap: 4px;
+    }
+
+    .badge {
+      font-size: 0.65rem;
+      font-weight: bold;
+      padding: 2px 6px;
+      border-radius: 4px;
+      text-transform: uppercase;
+    }
+
+    .badge-high {
+      background: rgba(239, 68, 68, 0.15);
+      color: var(--color-high-motivation);
+      border: 1px solid rgba(239, 68, 68, 0.3);
+    }
+
+    .badge-absentee {
+      background: rgba(245, 158, 11, 0.15);
+      color: var(--color-violation);
+      border: 1px solid rgba(245, 158, 11, 0.3);
+    }
+
+    .lead-details {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      margin-top: 6px;
+    }
+
+    .lead-comps {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 6px;
+      padding-top: 6px;
+      border-top: 1px dashed rgba(255, 255, 255, 0.05);
+      font-size: 0.75rem;
+    }
+
+    .comp-item {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .comp-label {
+      color: var(--text-muted);
+      font-size: 0.65rem;
+      text-transform: uppercase;
+    }
+
+    .comp-val {
+      color: #ffffff;
+      font-weight: 600;
+    }
+
+    .comp-val.roi-positive {
+      color: var(--color-radar-green);
+    }
+
+    /* Map Area */
+    .map-container {
+      flex: 1;
+      height: 100%;
+      position: relative;
+    }
+
+    #map {
+      width: 100%;
+      height: 100%;
+      background-color: var(--bg-darker);
+    }
+
+    /* Custom Leaflet Map Pin (Radar Ping style) */
+    .radar-ping-icon {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 36px !important;
+      height: 36px !important;
+    }
+
+    .ping-marker {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: rgba(13, 17, 29, 0.85);
+      border: 2px solid var(--marker-color);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+      box-shadow: 0 0 10px var(--marker-color);
+      position: relative;
+      z-index: 10;
+    }
+
+    .ping-pulse {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      border-radius: 50%;
+      border: 2px solid var(--marker-color);
+      opacity: 0.8;
+      animation: ping-expand 2s cubic-bezier(0, 0, 0.2, 1) infinite;
+      pointer-events: none;
+      z-index: 1;
+    }
+
+    @keyframes ping-expand {
+      0% {
+        transform: scale(0.9);
+        opacity: 0.8;
+      }
+      100% {
+        transform: scale(2.2);
+        opacity: 0;
+      }
+    }
+
+    /* Right Sidebar: Tactical Details Drawer */
+    .sidebar-right {
+      width: 440px;
+      background: var(--bg-glass);
+      backdrop-filter: blur(12px);
+      border-left: 1px solid var(--border-glass);
+      display: flex;
+      flex-direction: column;
+      z-index: 999;
+      position: absolute;
+      right: 0;
+      top: 0;
+      bottom: 0;
+      transform: translateX(100%);
+      transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      box-shadow: -8px 0 24px rgba(0, 0, 0, 0.5);
+    }
+
+    .sidebar-right.open {
+      transform: translateX(0);
+    }
+
+    .drawer-header {
+      padding: 16px;
+      border-bottom: 1px solid var(--border-glass);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: rgba(255,255,255,0.01);
+    }
+
+    .drawer-header h2 {
+      font-size: 1rem;
+      color: #ffffff;
+    }
+
+    .close-btn {
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      cursor: pointer;
+      font-size: 1.2rem;
+      padding: 4px;
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s;
+    }
+
+    .close-btn:hover {
+      color: #ffffff;
+      background: rgba(255, 255, 255, 0.05);
+    }
+
+    .drawer-content {
+      flex: 1;
+      overflow-y: auto;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    /* UI Cards inside tactical drawer */
+    .detail-card {
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid var(--border-glass);
+      border-radius: 8px;
+      padding: 16px;
+    }
+
+    .detail-card-title {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 0.8rem;
+      color: var(--color-radar-green);
+      margin-bottom: 12px;
+      text-transform: uppercase;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+      padding-bottom: 6px;
+    }
+
+    .prop-info-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 12px;
+    }
+
+    .prop-info-item {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .prop-info-label {
+      font-size: 0.7rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+    }
+
+    .prop-info-value {
+      font-size: 0.85rem;
+      font-weight: 500;
+      color: #ffffff;
+    }
+
+    /* Underwriting Variables Styling */
+    .uw-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 12px;
+    }
+
+    .uw-item {
+      background: rgba(0,0,0,0.15);
+      border: 1px solid rgba(255,255,255,0.03);
+      border-radius: 6px;
+      padding: 10px;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .uw-label {
+      font-size: 0.65rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      margin-bottom: 4px;
+    }
+
+    .uw-value {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 1.05rem;
+      font-weight: 700;
+    }
+
+    .uw-value.highlight-green {
+      color: var(--color-radar-green);
+      text-shadow: 0 0 6px rgba(16, 185, 129, 0.3);
+    }
+
+    .uw-value.highlight-red {
+      color: var(--color-high-motivation);
+    }
+
+    .uw-alert-banner {
+      background: rgba(239, 68, 68, 0.1);
+      border: 1px solid rgba(239, 68, 68, 0.25);
+      border-radius: 6px;
+      padding: 10px;
+      margin-top: 10px;
+      font-size: 0.75rem;
+      color: #fca5a5;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    /* Logs distress list */
+    .distress-log-item {
+      font-size: 0.75rem;
+      padding: 8px;
+      background: rgba(255, 255, 255, 0.01);
+      border-left: 2px solid var(--color-radar-green);
+      margin-bottom: 6px;
+      border-radius: 0 4px 4px 0;
+    }
+
+    .distress-log-item:last-child {
+      margin-bottom: 0;
+    }
+
+    .distress-log-header {
+      font-weight: 600;
+      color: #ffffff;
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 4px;
+    }
+
+    /* Contacts list styling */
+    .contact-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 0;
+      border-bottom: 1px solid rgba(255,255,255,0.03);
+    }
+
+    .contact-item:last-child {
+      border-bottom: none;
+    }
+
+    .contact-info {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .contact-type {
+      font-size: 0.65rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+    }
+
+    .contact-value {
+      font-size: 0.85rem;
+      color: #ffffff;
+      font-family: monospace;
+    }
+
+    .contact-action-btn {
+      background: rgba(16, 185, 129, 0.15);
+      border: 1px solid rgba(16, 185, 129, 0.3);
+      color: var(--color-radar-green);
+      padding: 4px 10px;
+      border-radius: 4px;
+      font-size: 0.75rem;
+      cursor: pointer;
+      text-decoration: none;
+      transition: all 0.2s;
+    }
+
+    .contact-action-btn:hover {
+      background: var(--color-radar-green);
+      color: #000000;
+    }
+
+    /* Dynamic Call Script section */
+    .script-box {
+      background: rgba(0, 0, 0, 0.3);
+      border: 1px solid var(--border-glass);
+      border-radius: 6px;
+      padding: 12px;
+      font-size: 0.8rem;
+      line-height: 1.5;
+      color: #e2e8f0;
+      position: relative;
+      min-height: 80px;
+    }
+
+    .copy-script-btn {
+      position: absolute;
+      right: 8px;
+      top: 8px;
+      background: rgba(255,255,255,0.05);
+      border: 1px solid var(--border-glass);
+      color: var(--text-muted);
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 0.7rem;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      transition: all 0.2s;
+    }
+
+    .copy-script-btn:hover {
+      background: rgba(255,255,255,0.1);
+      color: #ffffff;
+    }
+
+    .script-tabs {
+      display: flex;
+      gap: 6px;
+      margin-bottom: 8px;
+    }
+
+    .script-tab {
+      background: rgba(255,255,255,0.03);
+      border: 1px solid var(--border-glass);
+      color: var(--text-muted);
+      padding: 6px 10px;
+      border-radius: 4px;
+      font-size: 0.7rem;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .script-tab.active {
+      background: rgba(16, 185, 129, 0.15);
+      border-color: var(--color-radar-green);
+      color: #ffffff;
+    }
+
+    /* Metrics Strip Footer */
+    .metrics-bar {
+      height: 60px;
+      background: #090d16;
+      border-top: 1px solid var(--border-glass);
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      z-index: 1000;
+    }
+
+    .metric-card {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      border-right: 1px solid var(--border-glass);
+      padding: 8px;
+    }
+
+    .metric-card:last-child {
+      border-right: none;
+    }
+
+    .metric-label {
+      font-size: 0.65rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      font-family: 'Orbitron', sans-serif;
+    }
+
+    .metric-value {
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: #ffffff;
+      font-family: 'Orbitron', sans-serif;
+    }
+
+    .metric-value.green {
+      color: var(--color-radar-green);
+    }
+    .metric-value.red {
+      color: var(--color-high-motivation);
+    }
+
+    /* Leaflet Overrides for Dark Integration */
+    .leaflet-popup-content-wrapper {
+      background: var(--bg-dark) !important;
+      color: var(--text-main) !important;
+      border: 1px solid var(--border-glass) !important;
+      box-shadow: 0 10px 20px rgba(0,0,0,0.5) !important;
+      border-radius: 8px !important;
+    }
+
+    .leaflet-popup-tip {
+      background: var(--bg-dark) !important;
+      border: 1px solid var(--border-glass) !important;
+    }
+
+    .popup-title {
+      font-size: 0.9rem;
+      font-weight: 700;
+      margin-bottom: 6px;
+      color: #ffffff;
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+      padding-bottom: 4px;
+    }
+
+    .popup-body {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      line-height: 1.4;
+    }
+
+    .popup-row {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 4px;
+    }
+
+    .popup-row-label {
+      font-weight: 500;
+    }
+
+    .popup-row-value {
+      color: #ffffff;
+      font-weight: 600;
+    }
+
+    .popup-btn {
+      width: 100%;
+      background: var(--color-radar-green);
+      color: #000000;
+      border: none;
+      padding: 6px;
+      border-radius: 4px;
+      font-weight: 600;
+      margin-top: 8px;
+      cursor: pointer;
+      text-align: center;
+      font-size: 0.75rem;
+      font-family: 'Orbitron', sans-serif;
+    }
+
+    .popup-btn:hover {
+      opacity: 0.9;
+    }
+
+    /* Radar Sweep Animation overlay (Background aesthetic) */
+    .radar-scan-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 500;
+      background: radial-gradient(circle, transparent 40%, rgba(16, 185, 129, 0.02) 100%);
+      box-shadow: inset 0 0 100px rgba(0,0,0,0.8);
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Header HUD -->
+  <header>
+    <div class="brand-container">
+      <div class="radar-icon"></div>
+      <h1 class="brand-title">TZEL TACTICAL RADAR v1.2</h1>
+    </div>
+    
+    <div class="system-status">
+      <div class="status-dot"></div>
+      <span>Radar Activo - Jurisdicción KY/IN</span>
+    </div>
+  </header>
+
+  <!-- App Body Layout -->
+  <div class="app-container">
+    
+    <!-- Left Sidebar: Filters & Alerts list -->
+    <aside class="sidebar-left">
+      <!-- Search -->
+      <div class="sidebar-section">
+        <h3>Filtros Operativos</h3>
+        <input type="text" id="address-search" class="search-input" placeholder="Buscar dirección o dueño...">
+        
+        <div class="filter-group">
+          <select id="state-filter" class="filter-select">
+            <option value="ALL">Jurisdicción: Ambos Estados (KY / IN)</option>
+            <option value="KY">Kentucky (KY)</option>
+            <option value="IN">Indiana (IN)</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Distress Multi-select Pills -->
+      <div class="sidebar-section">
+        <h3>Foco de Distress</h3>
+        <div class="pill-selectors">
+          <div>
+            <input type="checkbox" id="pill-foreclosure" class="pill-checkbox" checked>
+            <label for="pill-foreclosure" class="pill-label">
+              <span>⏳</span>
+              <span>Subasta</span>
+            </label>
+          </div>
+          <div>
+            <input type="checkbox" id="pill-violation" class="pill-checkbox" checked>
+            <label for="pill-violation" class="pill-label">
+              <span>⚠️</span>
+              <span>Violación</span>
+            </label>
+          </div>
+          <div>
+            <input type="checkbox" id="pill-stack" class="pill-checkbox">
+            <label for="pill-stack" class="pill-label" style="border-color: rgba(239,68,68,0.2)">
+              <span>🔥</span>
+              <span>Stacked</span>
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <!-- Estatus Financiero Segment Selector -->
+      <div class="sidebar-section">
+        <h3>Estatus Financiero</h3>
+        <div class="segment-selector" style="display: flex; background: rgba(0,0,0,0.25); border: 1px solid var(--border-glass); border-radius: 6px; padding: 3px; gap: 4px;">
+          <button id="btn-deals" class="segment-btn active" style="flex: 1; background: rgba(16, 185, 129, 0.15); border: 1px solid var(--color-radar-green); color: #ffffff; padding: 8px 4px; border-radius: 4px; font-size: 0.7rem; font-family: 'Orbitron', sans-serif; cursor: pointer; transition: all 0.2s; text-align: center; font-weight: bold; border: 1px solid var(--color-radar-green); outline: none;">
+            🟢 BUENOS DEALS
+          </button>
+          <button id="btn-underwater" class="segment-btn" style="flex: 1; background: transparent; border: 1px solid transparent; color: var(--text-muted); padding: 8px 4px; border-radius: 4px; font-size: 0.7rem; font-family: 'Orbitron', sans-serif; cursor: pointer; transition: all 0.2s; text-align: center; font-weight: bold; border: 1px solid transparent; outline: none;">
+            🔴 BAJO EL AGUA
+          </button>
+        </div>
+      </div>
+
+      <!-- Prospect List -->
+      <div class="sidebar-section" style="flex: 1; display: flex; flex-direction: column; overflow: hidden; padding-bottom: 0;">
+        <h3>Lista de Objetivos (<span id="count-indicator">0</span>)</h3>
+        <div class="leads-list" id="leads-list-container">
+          <!-- Dynamically populated via JS -->
+          <div style="text-align: center; color: var(--text-muted); margin-top: 40px; font-size: 0.85rem;">
+            Cargando objetivos de Turso DB...
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Map Container -->
+    <main class="map-container">
+      <div id="map"></div>
+      <div class="radar-scan-overlay"></div>
+    </main>
+
+    <!-- Right Drawer: Tactical details of selected property -->
+    <aside class="sidebar-right" id="tactical-drawer">
+      <div class="drawer-header">
+        <h2 id="drawer-address">123 Calle Falsa</h2>
+        <button class="close-btn" onclick="closeDrawer()">&times;</button>
+      </div>
+      
+      <div class="drawer-content" id="drawer-content-pane">
+        <!-- Target Overview -->
+        <div class="detail-card">
+          <div class="detail-card-title">🌐 Resumen del Objetivo</div>
+          <div class="prop-info-grid">
+            <div class="prop-info-item">
+              <span class="prop-info-label">Propietario / Demandado</span>
+              <span class="prop-info-value" id="prop-owner">Juan Perez</span>
+            </div>
+            <div class="prop-info-item">
+              <span class="prop-info-label">Condado</span>
+              <span class="prop-info-value" id="prop-county">Jefferson, KY</span>
+            </div>
+            <div class="prop-info-item">
+              <span class="prop-info-label">MLS ID</span>
+              <span class="prop-info-value" id="prop-mls-id">N/A</span>
+            </div>
+            <div class="prop-info-item">
+              <span class="prop-info-label">Tipo de Dueño</span>
+              <span class="prop-info-value" id="prop-owner-type">Residente</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Underwriting / Comps Summary -->
+        <div class="detail-card">
+          <div class="detail-card-title">📊 Análisis Financiero (Underwriting)</div>
+          <div class="uw-grid">
+            <div class="uw-item">
+              <span class="uw-label">MLS ARV</span>
+              <span class="uw-value" id="uw-arv">$0</span>
+            </div>
+            <div class="uw-item">
+              <span class="uw-label">MAO (Oferta Máx)</span>
+              <span class="uw-value highlight-green" id="uw-mao">$0</span>
+            </div>
+            <div class="uw-item">
+              <span class="uw-label">Deuda Primaria</span>
+              <span class="uw-value" id="uw-debt">$0</span>
+            </div>
+            <div class="uw-item">
+              <span class="uw-label">Hipotecas Ocultas</span>
+              <span class="uw-value highlight-red" id="uw-hidden">$0</span>
+            </div>
+            <div class="uw-item">
+              <span class="uw-label">Est. Rehab (Costo)</span>
+              <span class="uw-value" id="uw-rehab">$0</span>
+            </div>
+            <div class="uw-item">
+              <span class="uw-label">Retorno Est. (ROI)</span>
+              <span class="uw-value highlight-green" id="uw-roi">0%</span>
+            </div>
+          </div>
+          <div class="uw-alert-banner" id="uw-alert" style="display: none;">
+            <span>⚠️</span>
+            <span id="uw-alert-text">Alerta Crítica: Propiedad Bajo el Agua</span>
+          </div>
+        </div>
+
+        <!-- Market Comparison Analysis (MCA) Comps -->
+        <div class="detail-card" id="mca-card" style="display: none;">
+          <div class="detail-card-title">📈 Comparables de Mercado (MCA)</div>
+          
+          <div style="font-size: 0.75rem; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center;">
+            <div><strong>ARV MCA Sugerido:</strong> <span id="mca-suggested-arv" style="font-weight: bold; color: var(--color-radar-green);">$0</span></div>
+            <div id="mca-comps-count" style="color: var(--text-muted); font-size: 0.7rem;">(0 comparables)</div>
+          </div>
+          
+          <div style="font-size: 0.7rem; color: var(--text-muted); background: rgba(0,0,0,0.2); padding: 8px; border-radius: 4px; margin-bottom: 10px; border: 1px solid rgba(255,255,255,0.03); line-height: 1.4;" id="mca-target-profile">
+            Cargando perfil del MLS...
+          </div>
+
+          <div style="max-height: 200px; overflow-y: auto; border: 1px solid rgba(255,255,255,0.03); border-radius: 4px; background: rgba(0,0,0,0.1);">
+            <table style="width: 100%; border-collapse: collapse; font-size: 0.7rem; text-align: left;" id="mca-comps-table">
+              <thead>
+                <tr style="border-bottom: 1px solid rgba(255,255,255,0.08); color: var(--text-muted); background: rgba(255,255,255,0.02);">
+                  <th style="padding: 6px; font-weight: 600;">Dirección</th>
+                  <th style="padding: 6px; text-align: right; font-weight: 600;">Precio</th>
+                  <th style="padding: 6px; text-align: right; font-weight: 600;">Beds/SqFt</th>
+                  <th style="padding: 6px; text-align: right; font-weight: 600;">Fecha</th>
+                </tr>
+              </thead>
+              <tbody id="mca-comps-tbody">
+                <tr><td colspan="4" style="text-align: center; padding: 10px; color: var(--text-muted);">Consultando comparables...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Distress History / Timeline logs -->
+        <div class="detail-card">
+          <div class="detail-card-title">📜 Registro de Distress Coincidentes</div>
+          <div id="distress-logs-container">
+            <!-- Dynamically populated -->
+          </div>
+        </div>
+
+        <!-- OSINT Contacts -->
+        <div class="detail-card">
+          <div class="detail-card-title">📞 Contactos Cruzados (OSINT)</div>
+          <div id="contacts-container">
+            <!-- Dynamically populated -->
+          </div>
+        </div>
+
+        <!-- Call Script Generator -->
+        <div class="detail-card">
+          <div class="detail-card-title">💬 Guion Táctico de Llamada</div>
+          <div class="script-tabs" id="script-tabs-container">
+            <!-- Tabs added dynamically depending on distress type -->
+          </div>
+          <div class="script-box">
+            <button class="copy-script-btn" onclick="copyCallScript()">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+              Copiar
+            </button>
+            <div id="call-script-content">
+              Seleccione un guion táctico para iniciar la llamada.
+            </div>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+  </div>
+
+  <!-- Bottom Metrics bar -->
+  <footer class="metrics-bar">
+    <div class="metric-card">
+      <span class="metric-label">Total Alertas Encontradas</span>
+      <span class="metric-value" id="metric-total">0</span>
+    </div>
+    <div class="metric-card">
+      <span class="metric-label">Alta Motivación (🔥 Stacking)</span>
+      <span class="metric-value red" id="metric-high">0</span>
+    </div>
+    <div class="metric-card">
+      <span class="metric-label">ARV Promedio de la Zona</span>
+      <span class="metric-value" id="metric-avg-arv">$0</span>
+    </div>
+    <div class="metric-card">
+      <span class="metric-label">ROI Promedio General</span>
+      <span class="metric-value green" id="metric-avg-roi">0%</span>
+    </div>
+  </footer>
+
+  <!-- Leaflet JS CDN -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+  
+  <!-- Client Dashboard Code -->
+  <script>
+    let map;
+    let markersLayer;
+    let allLeads = [];
+    let selectedLead = null;
+    let mapMarkers = new Map(); // key -> leaflet marker
+    let financialFilter = 'deals'; // 'deals' or 'underwater'
+
+    // Initialize Map on load
+    window.addEventListener('DOMContentLoaded', () => {
+      initMap();
+      fetchLeads();
+      
+      // Wire up event listeners
+      document.getElementById('address-search').addEventListener('input', applyFilters);
+      document.getElementById('state-filter').addEventListener('change', applyFilters);
+      document.getElementById('pill-foreclosure').addEventListener('change', applyFilters);
+      document.getElementById('pill-violation').addEventListener('change', applyFilters);
+      document.getElementById('pill-stack').addEventListener('change', applyFilters);
+      
+      document.getElementById('btn-deals').addEventListener('click', () => {
+        setFinancialFilter('deals');
+      });
+      document.getElementById('btn-underwater').addEventListener('click', () => {
+        setFinancialFilter('underwater');
+      });
+    });
+
+    function setFinancialFilter(filter) {
+      financialFilter = filter;
+      const btnDeals = document.getElementById('btn-deals');
+      const btnUnder = document.getElementById('btn-underwater');
+      
+      if (filter === 'deals') {
+        btnDeals.classList.add('active');
+        btnDeals.style.background = 'rgba(16, 185, 129, 0.15)';
+        btnDeals.style.borderColor = 'var(--color-radar-green)';
+        btnDeals.style.color = '#ffffff';
+        
+        btnUnder.classList.remove('active');
+        btnUnder.style.background = 'transparent';
+        btnUnder.style.borderColor = 'transparent';
+        btnUnder.style.color = 'var(--text-muted)';
+      } else {
+        btnUnder.classList.add('active');
+        btnUnder.style.background = 'rgba(239, 68, 68, 0.15)';
+        btnUnder.style.borderColor = 'var(--color-high-motivation)';
+        btnUnder.style.color = '#ffffff';
+        
+        btnDeals.classList.remove('active');
+        btnDeals.style.background = 'transparent';
+        btnDeals.style.borderColor = 'transparent';
+        btnDeals.style.color = 'var(--text-muted)';
+      }
+      applyFilters();
+    }
+
+    function initMap() {
+      // Coordinates default to Louisville, KY area (middle of KY & IN border)
+      map = L.map('map', {
+        zoomControl: true,
+        attributionControl: false
+      }).setView([38.2527, -85.7585], 11);
+
+      // CartoDB DarkMatter layers (Clean dark Hacker aesthetic)
+      L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+        maxZoom: 20
+      }).addTo(map);
+
+      markersLayer = L.layerGroup().addTo(map);
+    }
+
+    async function fetchLeads() {
+      try {
+        const res = await fetch('/api/prospectos');
+        const json = await res.json();
+        
+        if (json.status === 'success') {
+          allLeads = json.data;
+          renderUI();
+        } else {
+          console.error("API error:", json.message);
+          document.getElementById('leads-list-container').innerHTML = `
+            <div style="text-align: center; color: var(--color-high-motivation); padding: 20px;">
+              Error al obtener prospectos de la base de datos.
+            </div>
+          `;
+        }
+      } catch (err) {
+        console.error("Fetch failed:", err);
+        document.getElementById('leads-list-container').innerHTML = `
+          <div style="text-align: center; color: var(--color-high-motivation); padding: 20px;">
+            Error de conexión con el servidor local.
+          </div>
+        `;
+      }
+    }
+
+    function renderUI() {
+      applyFilters();
+      calculateFooterMetrics();
+    }
+
+    function calculateFooterMetrics() {
+      const filtered = getFilteredLeads();
+      const totalCount = filtered.length;
+      const highMotivationCount = filtered.filter(l => l.isHighMotivation).length;
+      
+      let totalArv = 0;
+      let validArvCount = 0;
+      let totalRoi = 0;
+      let validRoiCount = 0;
+
+      filtered.forEach(lead => {
+        if (lead.mlsValue > 0) {
+          totalArv += lead.mlsValue;
+          validArvCount++;
+        }
+        if (lead.roi !== undefined && lead.roi !== null && !isNaN(lead.roi)) {
+          totalRoi += lead.roi;
+          validRoiCount++;
+        }
+      });
+
+      const avgArv = validArvCount > 0 ? Math.round(totalArv / validArvCount) : 0;
+      const avgRoi = validRoiCount > 0 ? (totalRoi / validRoiCount).toFixed(1) : '0';
+
+      document.getElementById('metric-total').textContent = totalCount;
+      document.getElementById('metric-high').textContent = highMotivationCount;
+      document.getElementById('metric-avg-arv').textContent = `$${avgArv.toLocaleString()}`;
+      document.getElementById('metric-avg-roi').textContent = `${avgRoi}%`;
+    }
+
+    function getFilteredLeads() {
+      const searchVal = document.getElementById('address-search').value.toLowerCase().trim();
+      const stateVal = document.getElementById('state-filter').value;
+      
+      const showForeclosure = document.getElementById('pill-foreclosure').checked;
+      const showViolation = document.getElementById('pill-violation').checked;
+      const showStackOnly = document.getElementById('pill-stack').checked;
+
+      return allLeads.filter(lead => {
+        // Search text filter
+        const matchesSearch = 
+          lead.displayAddress.toLowerCase().includes(searchVal) ||
+          lead.ownerName.toLowerCase().includes(searchVal);
+        
+        if (!matchesSearch) return false;
+
+        // State filter
+        if (stateVal !== 'ALL' && lead.state !== stateVal) return false;
+
+        // Filtro Financiero (Buenos Deals vs Bajo el Agua)
+        // Definición: Un Buen Deal tiene mlsValue > 0 y netEquity >= 40% del mlsValue
+        const isGoodDeal = lead.mlsValue > 0 && lead.netEquity >= lead.mlsValue * 0.40;
+        if (financialFilter === 'deals' && !isGoodDeal) return false;
+        if (financialFilter === 'underwater' && isGoodDeal) return false;
+
+        // Distress Stacking / Type Filter
+        const hasAuctions = lead.auctions.length > 0;
+        const hasViolations = lead.violations.length > 0;
+
+        if (showStackOnly && !lead.isHighMotivation) return false;
+        
+        // Check if it matches any of the active category filters
+        let matchesCategory = false;
+        if (showForeclosure && hasAuctions) matchesCategory = true;
+        if (showViolation && hasViolations) matchesCategory = true;
+        if (showStackOnly && lead.isHighMotivation) matchesCategory = true;
+
+        if (!matchesCategory) return false;
+
+        return true;
+      });
+    }
+
+    function applyFilters() {
+      markersLayer.clearLayers();
+      mapMarkers.clear();
+      
+      const filtered = getFilteredLeads();
+      document.getElementById('count-indicator').textContent = filtered.length;
+
+      const container = document.getElementById('leads-list-container');
+      container.innerHTML = '';
+
+      if (filtered.length === 0) {
+        container.innerHTML = `
+          <div style="text-align: center; color: var(--text-muted); margin-top: 40px; font-size: 0.85rem;">
+            Ningún objetivo coincide con los filtros.
+          </div>
+        `;
+        return;
+      }
+
+      // Order filtered leads by High Motivation (descending)
+      filtered.sort((a, b) => (b.isHighMotivation ? 1 : 0) - (a.isHighMotivation ? 1 : 0));
+
+      filtered.forEach(lead => {
+        // 1. Create card in list
+        const card = document.createElement('div');
+        card.className = `lead-card ${lead.isHighMotivation ? 'high-motivation' : ''}`;
+        if (selectedLead && selectedLead.groupingKey === lead.groupingKey) {
+          card.classList.add('selected');
+        }
+
+        const isAbsentee = lead.isAbsentee;
+        const isHigh = lead.isHighMotivation;
+        const hasCoords = lead.lat !== null && lead.lon !== null;
+        
+        let badgesHtml = '';
+        if (isHigh) badgesHtml += `<span class="badge badge-high">🔥 ALTA MOTIVACIÓN</span>`;
+        if (isAbsentee) badgesHtml += `<span class="badge badge-absentee">Absentee</span>`;
+        if (!hasCoords) {
+          badgesHtml += `<span class="badge" style="background: rgba(255,255,255,0.05); color: var(--text-muted); border: 1px solid var(--border-glass)">⏳ Geocodificando</span>`;
+        }
+
+        card.innerHTML = `
+          <div class="lead-header">
+            <div class="lead-address">${lead.displayAddress}</div>
+            <div class="lead-badges">${badgesHtml}</div>
+          </div>
+          <div class="lead-details">
+            <span>👤 ${lead.ownerName}</span>
+            <span>📍 ${lead.county}, ${lead.state}</span>
+          </div>
+          <div class="lead-comps">
+            <div class="comp-item">
+              <span class="comp-label">ARV (MLS)</span>
+              <span class="comp-val">$${(lead.mlsValue || 0).toLocaleString()}</span>
+            </div>
+            <div class="comp-item">
+              <span class="comp-label">Deuda</span>
+              <span class="comp-val" style="color: var(--color-high-motivation)">$${((lead.primaryDebt || 0) + (lead.hiddenMortgages || 0)).toLocaleString()}</span>
+            </div>
+            <div class="comp-item">
+              <span class="comp-label">Oferta MAO</span>
+              <span class="comp-val">$${(lead.mao || 0).toLocaleString()}</span>
+            </div>
+            <div class="comp-item">
+              <span class="comp-label">Retorno (ROI)</span>
+              <span class="comp-val ${lead.roi > 0 ? 'roi-positive' : ''}">${lead.roi}%</span>
+            </div>
+          </div>
+        `;
+
+        card.addEventListener('click', () => {
+          selectLead(lead);
+        });
+
+        container.appendChild(card);
+
+        // 2. Render marker on Map (only if geocoded successfully)
+        if (hasCoords && !isNaN(lead.lat) && !isNaN(lead.lon)) {
+          let markerColor = 'var(--color-foreclosure)';
+          let emoji = '⏳';
+          let markerClass = 'foreclosure';
+
+          if (lead.isHighMotivation) {
+            markerColor = 'var(--color-high-motivation)';
+            emoji = '🔥';
+            markerClass = 'high-motivation';
+          } else if (lead.auctions.length > 0) {
+            markerColor = 'var(--color-foreclosure)';
+            emoji = '⏳';
+            markerClass = 'foreclosure';
+          } else if (lead.violations.length > 0) {
+            markerColor = 'var(--color-violation)';
+            emoji = '⚠️';
+            markerClass = 'violation';
+          } else if (lead.divorces.length > 0) {
+            markerColor = 'var(--color-divorce)';
+            emoji = '💔';
+            markerClass = 'divorce';
+          } else if (lead.probates.length > 0) {
+            markerColor = 'var(--color-probate)';
+            emoji = '🪦';
+            markerClass = 'probate';
+          } else if (lead.bankruptcies.length > 0) {
+            markerColor = 'var(--color-bankruptcy)';
+            emoji = '💸';
+            markerClass = 'bankruptcy';
+          }
+
+          // Custom Leaflet HTML Pin
+          const radarPinHtml = `
+            <div class="ping-pulse" style="--marker-color: ${markerColor}"></div>
+            <div class="ping-marker" style="--marker-color: ${markerColor}">
+              ${emoji}
+            </div>
+          `;
+
+          const customIcon = L.divIcon({
+            html: radarPinHtml,
+            className: `radar-ping-icon ${markerClass}`,
+            iconSize: [36, 36],
+            iconAnchor: [18, 18],
+            popupAnchor: [0, -18]
+          });
+
+          const marker = L.marker([lead.lat, lead.lon], { icon: customIcon })
+            .addTo(markersLayer);
+
+          // Popup Content
+          const popupContent = `
+            <div class="popup-title">${lead.displayAddress}</div>
+            <div class="popup-body">
+              <div class="popup-row">
+                <span class="popup-row-label">Dueño:</span>
+                <span class="popup-row-value">${lead.ownerName}</span>
+              </div>
+              <div class="popup-row">
+                <span class="popup-row-label">MLS ARV:</span>
+                <span class="popup-row-value">$${(lead.mlsValue || 0).toLocaleString()}</span>
+              </div>
+              <div class="popup-row">
+                <span class="popup-row-label">Costo Rehab:</span>
+                <span class="popup-row-value">$${(lead.rehab || 0).toLocaleString()}</span>
+              </div>
+              <div class="popup-row">
+                <span class="popup-row-label">Deuda Primaria:</span>
+                <span class="popup-row-value" style="color: var(--color-high-motivation)">$${(lead.primaryDebt || 0).toLocaleString()}</span>
+              </div>
+              <div class="popup-row">
+                <span class="popup-row-label">ROI Estimado:</span>
+                <span class="popup-row-value" style="color: var(--color-radar-green)">${lead.roi}%</span>
+              </div>
+              <button class="popup-btn" onclick="openLeadDrawer('${lead.groupingKey}')">Ver Ficha Táctica</button>
+            </div>
+          `;
+
+          marker.bindPopup(popupContent);
+          mapMarkers.set(lead.groupingKey, marker);
+        }
+      });
+
+      calculateFooterMetrics();
+    }
+
+    function selectLead(lead, flyTo = true) {
+      selectedLead = lead;
+      const hasCoords = lead.lat !== null && lead.lon !== null;
+      
+      // Update selected class in sidebar cards
+      const cards = document.querySelectorAll('.lead-card');
+      cards.forEach(c => {
+        c.classList.remove('selected');
+        const addrText = c.querySelector('.lead-address').textContent;
+        if (addrText === lead.displayAddress) {
+          c.classList.add('selected');
+          c.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+      });
+
+      if (flyTo && hasCoords && !isNaN(lead.lat) && !isNaN(lead.lon)) {
+        map.flyTo([lead.lat, lead.lon], 15, {
+          duration: 1.2
+        });
+      }
+
+      // Open Popup on map
+      if (hasCoords) {
+        const marker = mapMarkers.get(lead.groupingKey);
+        if (marker) {
+          marker.openPopup();
+        }
+      }
+
+      // Hydrate Tactical Drawer
+      hydrateDrawer(lead);
+    }
+
+    // Explictly called by Leaflet popup button
+    window.openLeadDrawer = function(groupingKey) {
+      const lead = allLeads.find(l => l.groupingKey === groupingKey);
+      if (lead) {
+        selectLead(lead, false);
+        const drawer = document.getElementById('tactical-drawer');
+        drawer.classList.add('open');
+      }
+    };
+
+    function closeDrawer() {
+      const drawer = document.getElementById('tactical-drawer');
+      drawer.classList.remove('open');
+    }
+
+    function hydrateDrawer(lead) {
+      document.getElementById('drawer-address').textContent = lead.displayAddress;
+      document.getElementById('prop-owner').textContent = lead.ownerName;
+      document.getElementById('prop-county').textContent = `${lead.county}, ${lead.state}`;
+      document.getElementById('prop-mls-id').textContent = lead.mlsId || 'N/A';
+      document.getElementById('prop-owner-type').textContent = lead.isAbsentee ? 'Propietario Ausente (Absentee)' : 'Residente';
+
+      // Underwriting
+      document.getElementById('uw-arv').textContent = `$${(lead.mlsValue || 0).toLocaleString()}`;
+      document.getElementById('uw-mao').textContent = `$${(lead.mao || 0).toLocaleString()}`;
+      document.getElementById('uw-debt').textContent = `$${(lead.primaryDebt || 0).toLocaleString()}`;
+      document.getElementById('uw-hidden').textContent = `$${(lead.hiddenMortgages || 0).toLocaleString()}`;
+      document.getElementById('uw-rehab').textContent = `$${(lead.rehab || 0).toLocaleString()}`;
+      document.getElementById('uw-roi').textContent = `${lead.roi}%`;
+
+      // Underwater check
+      const totalDebt = (lead.primaryDebt || 0) + (lead.hiddenMortgages || 0);
+      const isUnderwater = totalDebt > lead.mlsValue && lead.mlsValue > 0;
+      const alertBanner = document.getElementById('uw-alert');
+      if (isUnderwater) {
+        alertBanner.style.display = 'flex';
+        document.getElementById('uw-alert-text').textContent = `Alerta Crítica: Propiedad Bajo el Agua (Deuda Total $${totalDebt.toLocaleString()} > ARV $${lead.mlsValue.toLocaleString()})`;
+      } else {
+        alertBanner.style.display = 'none';
+      }
+
+      // Fetch MCA dynamic comps
+      const mcaCard = document.getElementById('mca-card');
+      const mcaTbody = document.getElementById('mca-comps-tbody');
+      const mcaSuggestedArv = document.getElementById('mca-suggested-arv');
+      const mcaCompsCount = document.getElementById('mca-comps-count');
+      const mcaTargetProfile = document.getElementById('mca-target-profile');
+
+      mcaCard.style.display = 'block';
+      mcaTargetProfile.innerHTML = 'Consultando perfil en el MLS...';
+      mcaTbody.innerHTML = `<tr><td colspan="4" style="text-align: center; padding: 10px; color: var(--text-muted);">Consultando MLS...</td></tr>`;
+      mcaSuggestedArv.textContent = 'Calculando...';
+      mcaCompsCount.textContent = '';
+
+      fetch(`/api/mca?address=${encodeURIComponent(lead.displayAddress)}&state=${lead.state}`)
+        .then(r => r.json())
+        .then(res => {
+          if (res.status === 'success') {
+            mcaSuggestedArv.textContent = `$${res.mcaArv.toLocaleString()}`;
+            mcaCompsCount.textContent = `(${res.compsCount} comparables)`;
+            
+            const t = res.target;
+            let lastClosedText = t.lastClosedPrice ? `$${t.lastClosedPrice.toLocaleString()} (${t.lastClosedDate})` : 'Sin registros de cierre';
+            mcaTargetProfile.innerHTML = `
+              <strong>Perfil MLS:</strong> ${t.beds} hab, ${t.baths} baños, ${t.sqft} SqFt | Zip: ${t.zip}<br>
+              <strong>Estatus Estándar:</strong> <span style="text-transform: uppercase; color: var(--color-radar-green);">${t.status}</span> | <strong>Última venta:</strong> ${lastClosedText}
+            `;
+
+            mcaTbody.innerHTML = '';
+            if (res.comps.length === 0) {
+              mcaTbody.innerHTML = `<tr><td colspan="4" style="text-align: center; padding: 10px; color: var(--text-muted);">No se encontraron comparables en 365 días.</td></tr>`;
+            } else {
+              res.comps.forEach(comp => {
+                const tr = document.createElement('tr');
+                tr.style.borderBottom = '1px solid rgba(255,255,255,0.03)';
+                tr.innerHTML = `
+                  <td style="padding: 6px; color: #ffffff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 140px;" title="${comp.address}">${comp.address}</td>
+                  <td style="padding: 6px; text-align: right; font-weight: bold; color: var(--color-radar-green);">$${comp.price.toLocaleString()}</td>
+                  <td style="padding: 6px; text-align: right; color: var(--text-muted);">${comp.beds}H / ${comp.sqft}ft²</td>
+                  <td style="padding: 6px; text-align: right; color: var(--text-muted);">${comp.date}</td>
+                `;
+                mcaTbody.appendChild(tr);
+              });
+            }
+          } else {
+            mcaTargetProfile.innerHTML = `<span style="color: var(--color-high-motivation);">No disponible: ${res.message}</span>`;
+            mcaTbody.innerHTML = `<tr><td colspan="4" style="text-align: center; padding: 10px; color: var(--text-muted);">Sin datos comparables.</td></tr>`;
+            mcaSuggestedArv.textContent = 'N/A';
+          }
+        })
+        .catch(err => {
+          console.error("Error fetching MCA:", err);
+          mcaTargetProfile.innerHTML = `<span style="color: var(--color-high-motivation);">Error al conectar al MLS</span>`;
+          mcaTbody.innerHTML = `<tr><td colspan="4" style="text-align: center; padding: 10px; color: var(--text-muted);">Error del servidor.</td></tr>`;
+          mcaSuggestedArv.textContent = 'Error';
+        });
+
+      // Distress logs
+      const logsContainer = document.getElementById('distress-logs-container');
+      logsContainer.innerHTML = '';
+      
+      let activeDistressCategories = [];
+
+      // A. Auctions
+      if (lead.auctions && lead.auctions.length > 0) {
+        activeDistressCategories.push('auction');
+        lead.auctions.forEach(auc => {
+          const div = document.createElement('div');
+          div.className = 'distress-log-item';
+          div.style.borderLeftColor = 'var(--color-foreclosure)';
+          
+          let pdfLink = '';
+          if (auc.pdf_url) {
+            pdfLink = `<a href="${auc.pdf_url}" target="_blank" style="color: var(--color-foreclosure); margin-left: 10px; font-weight: bold;">[Ver PDF]</a>`;
+          }
+
+          div.innerHTML = `
+            <div class="distress-log-header">
+              <span>⏳ Ejecución Hipotecaria (Subasta)</span>
+              <span style="color: var(--color-foreclosure)">${auc.auction_date}</span>
+            </div>
+            <div><strong>Caso Judicial:</strong> ${auc.case_number}</div>
+            <div><strong>Demandante:</strong> ${auc.plaintiff || 'No especificado'}</div>
+            <div><strong>Monto del Reclamo:</strong> $${(auc.debt_amount || 0).toLocaleString()} ${pdfLink}</div>
+          `;
+          logsContainer.appendChild(div);
+        });
+      }
+
+      // B. Violations
+      if (lead.violations && lead.violations.length > 0) {
+        activeDistressCategories.push('violation');
+        lead.violations.forEach(v => {
+          const div = document.createElement('div');
+          div.className = 'distress-log-item';
+          div.style.borderLeftColor = 'var(--color-violation)';
+          div.innerHTML = `
+            <div class="distress-log-header">
+              <span>⚠️ Violación de Código Activa</span>
+              <span style="color: var(--color-violation)">${v.report_date || 'Reciente'}</span>
+            </div>
+            <div><strong>Caso Violación:</strong> ${v.case_number}</div>
+            <div><strong>Infracción:</strong> ${v.violation_type}</div>
+            <div><strong>Estatus Local:</strong> <span style="text-transform: uppercase;">${v.status || 'Active'}</span></div>
+          `;
+          logsContainer.appendChild(div);
+        });
+      }
+
+      // C. Probates
+      if (lead.probates && lead.probates.length > 0) {
+        activeDistressCategories.push('probate');
+        lead.probates.forEach(p => {
+          const div = document.createElement('div');
+          div.className = 'distress-log-item';
+          div.style.borderLeftColor = 'var(--color-probate)';
+          div.innerHTML = `
+            <div class="distress-log-header">
+              <span>🪦 Sucesiones (Probate)</span>
+              <span>Caso: ${p.case_number}</span>
+            </div>
+            <div><strong>De Cujus (Fallecido):</strong> ${p.deceased_name}</div>
+            <div><strong>Heredero Designado:</strong> ${p.heir_name}</div>
+          `;
+          logsContainer.appendChild(div);
+        });
+      }
+
+      // D. Divorces
+      if (lead.divorces && lead.divorces.length > 0) {
+        activeDistressCategories.push('divorce');
+        lead.divorces.forEach(d => {
+          const div = document.createElement('div');
+          div.className = 'distress-log-item';
+          div.style.borderLeftColor = 'var(--color-divorce)';
+          div.innerHTML = `
+            <div class="distress-log-header">
+              <span>💔 Demanda de Divorcio</span>
+              <span>Caso: ${d.case_number}</span>
+            </div>
+            <div><strong>Cónyuge A:</strong> ${d.spouse_a}</div>
+            <div><strong>Cónyuge B:</strong> ${d.spouse_b}</div>
+          `;
+          logsContainer.appendChild(div);
+        });
+      }
+
+      // E. Bankruptcies
+      if (lead.bankruptcies && lead.bankruptcies.length > 0) {
+        activeDistressCategories.push('bankruptcy');
+        lead.bankruptcies.forEach(b => {
+          const div = document.createElement('div');
+          div.className = 'distress-log-item';
+          div.style.borderLeftColor = 'var(--color-bankruptcy)';
+          div.innerHTML = `
+            <div class="distress-log-header">
+              <span>💸 Declaración de Bancarrota</span>
+              <span>Caso: ${b.case_number}</span>
+            </div>
+            <div><strong>Deudor Principal:</strong> ${b.debtor_name}</div>
+            <div><strong>Tipo / Capítulo:</strong> ${b.bankruptcy_type || 'Capítulo 7/13'}</div>
+          `;
+          logsContainer.appendChild(div);
+        });
+      }
+
+      if (logsContainer.children.length === 0) {
+        logsContainer.innerHTML = `<div style="font-size: 0.75rem; color: var(--text-muted);">Sin registros específicos de distress.</div>`;
+      }
+
+      // OSINT Contacts
+      const contactsContainer = document.getElementById('contacts-container');
+      contactsContainer.innerHTML = '';
+      
+      const phones = lead.phones || [];
+      const emails = lead.emails || [];
+
+      phones.forEach(phone => {
+        const div = document.createElement('div');
+        div.className = 'contact-item';
+        div.innerHTML = `
+          <div class="contact-info">
+            <span class="contact-type">Teléfono Celular / Propietario</span>
+            <span class="contact-value">${phone}</span>
+          </div>
+          <a class="contact-action-btn" href="tel:${phone}">Llamar</a>
+        `;
+        contactsContainer.appendChild(div);
+      });
+
+      emails.forEach(email => {
+        const div = document.createElement('div');
+        div.className = 'contact-item';
+        div.innerHTML = `
+          <div class="contact-info">
+            <span class="contact-type">Correo Electrónico Cruzado</span>
+            <span class="contact-value">${email}</span>
+          </div>
+          <a class="contact-action-btn" href="mailto:${email}">Enviar Mail</a>
+        `;
+        contactsContainer.appendChild(div);
+      });
+
+      if (phones.length === 0 && emails.length === 0) {
+        contactsContainer.innerHTML = `<div style="font-size: 0.75rem; color: var(--text-muted);">Sin contactos cruzados en OSINT Skip-Trace.</div>`;
+      }
+
+      // Build call scripts tabs and content
+      buildCallScripts(lead, activeDistressCategories);
+
+      // Open drawer in screen
+      const drawer = document.getElementById('tactical-drawer');
+      drawer.classList.add('open');
+    }
+
+    function buildCallScripts(lead, categories) {
+      const tabContainer = document.getElementById('script-tabs-container');
+      tabContainer.innerHTML = '';
+
+      const scripts = {};
+
+      // 1. Stacking Script (Always first if High Motivation)
+      if (lead.isHighMotivation) {
+        scripts['alta-motivacion'] = {
+          name: '🔥 Alta Mot.',
+          text: `[GUION ALTA MOTIVACIÓN - URGENTE]\nHola, buenas tardes. ¿Hablo con ${lead.ownerName}? Le llamo en relación con la propiedad en ${lead.displayAddress}.\nVi que tiene programada una subasta hipotecaria muy pronto y además cuenta con algunos reportes pendientes con la municipalidad.\nEntiendo perfectamente que esta situación es estresante. Represento a un fondo de inversión local. Nos especializamos en detener subastas de ejecución hipotecaria antes de la fecha límite cubriendo la deuda judicial de $${(lead.primaryDebt || 0).toLocaleString()} directamente y absorbiendo las multas y reparaciones de inmediato, dejándole a usted con liquidez en mano y salvando su historial de crédito.\n¿Le interesaría revisar una propuesta de compra directa en efectivo hoy mismo antes de que la propiedad vaya a subasta pública?`
+        };
+      }
+
+      // 2. Specific Distress Scripts
+      if (categories.includes('auction')) {
+        const firstAuc = lead.auctions[0];
+        scripts['subasta'] = {
+          name: '⏳ Subasta',
+          text: `[GUION DE SUBASTA HIPOTECARIA]\nHola, buenas tardes. ¿Hablo con ${lead.ownerName}? Le llamo respecto a la propiedad en ${lead.displayAddress}.\nVi en los registros de la corte del condado que tienen programada una subasta de ejecución hipotecaria para el ${firstAuc.auction_date} por la demanda presentada por ${firstAuc.plaintiff || 'el banco'}.\n¿Está enterado de esta fecha? Quería poner a su disposición nuestra ayuda. Nosotros podemos liquidar la deuda pendiente de $${(lead.primaryDebt || 0).toLocaleString()} con el juzgado de forma directa para cancelar la subasta de inmediato. Esto le evita perder todo su capital acumulado y protege su récord crediticio de una ejecución formal.\n¿Le gustaría evaluar una oferta de rescate de capital hoy?`
+        };
+      }
+
+      if (categories.includes('violation')) {
+        const firstViol = lead.violations[0];
+        scripts['violacion'] = {
+          name: '⚠️ Violación',
+          text: `[GUION DE VIOLACIÓN DE CÓDIGO]\nHola, buenas tardes. ¿Hablo con ${lead.ownerName}? Le llamo en relación a su propiedad ubicada en ${lead.displayAddress}.\nEstaba revisando los registros del departamento de cumplimiento de códigos y noté que tiene un caso activo abierto (${firstViol.violation_type}) y entiendo que las multas de la ciudad pueden acumularse con mucha rapidez.\nCompramos propiedades en su zona exactamente en el estado en que se encuentran (as-is), haciéndonos cargo de todas las reparaciones mayores necesarias y liquidando todas las multas acumuladas con la municipalidad en el momento del cierre. Así usted se desentiende de este problema sin gastar un solo dólar de su bolsillo.\n¿Estaría dispuesto a recibir una oferta de compra en efectivo por la propiedad?`
+        };
+      }
+
+      if (categories.includes('probate')) {
+        scripts['probate'] = {
+          name: '🪦 Probate',
+          text: `[GUION DE SUCESIONES - SENSIBLE]\nHola, buenas tardes. ¿Hablo con ${lead.ownerName}? Ante todo, mi más sincero pésame por la pérdida familiar.\nLe contacto con mucho respeto en relación con la sucesión del inmueble en ${lead.displayAddress}.\nSabemos que administrar una sucesión y una propiedad heredada a menudo implica trámites legales complejos, mantenimiento costoso o deudas atrasadas. Nosotros compramos propiedades heredadas directamente al contado, absorbiendo los costos del proceso de legalización que falten y nos encargamos de vaciar o limpiar la casa tal como esté.\n¿Tiene planes de conservar la propiedad o consideraría una oferta en efectivo sin compromiso de su parte?`
+        };
+      }
+
+      if (categories.includes('divorce')) {
+        scripts['divorce'] = {
+          name: '💔 Divorcio',
+          text: `[GUION DE LIQUIDACIÓN RÁPIDA - NEUTRAL]\nHola, buenas tardes. ¿Hablo con ${lead.ownerName}? Le llamo de forma directa respecto a la propiedad en ${lead.displayAddress}.\nSomos un grupo de inversión local y compramos casas al contado en esta zona. Vi que esta propiedad podría estar disponible para una venta de liquidación rápida.\nNosotros estructuramos compras simplificadas: cerramos en menos de 10 días, no requerimos inspecciones bancarias ni comisiones de agentes, y distribuimos los fondos del cheque de manera limpia entre las partes según lo disponga su acuerdo. Esto permite un cierre rápido y sin fricciones.\n¿Estarían interesados en recibir una cotización de compra en efectivo para esta propiedad?`
+        };
+      }
+
+      if (categories.includes('bankruptcy')) {
+        scripts['bankruptcy'] = {
+          name: '💸 Bancarrota',
+          text: `[GUION DE BANCARROTA / REESTRUCTURACIÓN]\nHola, buenas tardes. ¿Hablo con ${lead.ownerName}? Le contacto respecto a la propiedad en ${lead.displayAddress}.\nTrabajamos frecuentemente con propietarios en procesos de reestructuración financiera. Podemos formular una oferta de compra formal en efectivo lista para ser sometida a la aprobación del juez de quiebras.\nEsto le permite liquidar a sus acreedores garantizados de forma rápida, deteniendo acumulaciones de intereses y liberando su capital restante de forma limpia antes de que finalice el proceso judicial.\n¿Podríamos coordinar esta propuesta con usted o con su abogado de bancarrotas?`
+        };
+      }
+
+      // Default script (Always available)
+      scripts['general'] = {
+        name: '📞 General',
+        text: `[GUION GENERAL DE COMPRA DIRECTA]\nHola, buenas tardes. ¿Hablo con ${lead.ownerName}? Le llamo respecto a la propiedad en ${lead.displayAddress}.\nSomos inversionistas locales y compramos casas al contado en esta zona. No cobramos comisiones de intermediarios y compramos la casa en cualquier condición física.\n¿Ha considerado vender la propiedad o recibir una propuesta de compra en efectivo sin ningún compromiso de su parte?\nEstaremos listos para enviar una cotización formal en menos de 24 horas.`
+      };
+
+      // Populate Tabs
+      let firstTabKey = null;
+      Object.keys(scripts).forEach((key, idx) => {
+        if (idx === 0) firstTabKey = key;
+        
+        const tab = document.createElement('button');
+        tab.className = `script-tab ${idx === 0 ? 'active' : ''}`;
+        tab.textContent = scripts[key].name;
+        tab.onclick = () => {
+          // Switch active tab
+          const tabs = tabContainer.querySelectorAll('.script-tab');
+          tabs.forEach(t => t.classList.remove('active'));
+          tab.classList.add('active');
+          
+          document.getElementById('call-script-content').innerHTML = scripts[key].text.replace(/\n/g, '<br>');
+        };
+        tabContainer.appendChild(tab);
+      });
+
+      // Initialize Script box with first script
+      if (firstTabKey) {
+        document.getElementById('call-script-content').innerHTML = scripts[firstTabKey].text.replace(/\n/g, '<br>');
+      }
+    }
+
+    window.copyCallScript = function() {
+      const htmlText = document.getElementById('call-script-content').innerHTML;
+      const textToCopy = htmlText.replace(/<br>/g, '\n');
+      
+      navigator.clipboard.writeText(textToCopy).then(() => {
+        const btn = document.querySelector('.copy-script-btn');
+        const originalText = btn.innerHTML;
+        btn.innerHTML = '¡Copiado!';
+        setTimeout(() => {
+          btn.innerHTML = originalText;
+        }, 1500);
+      }).catch(err => {
+        console.error('Failed to copy text: ', err);
+      });
+    };
+  </script>
+</body>
+</html>

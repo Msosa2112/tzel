@@ -3,6 +3,7 @@ import stealthPlugin from "puppeteer-extra-plugin-stealth";
 import { createClient } from "@libsql/client";
 import * as dotenv from "dotenv";
 import { querySearXNG } from "../searxng_client";
+import { isAddressInJurisdiction, extractStateFromAddress } from "./geo_fencing";
 
 declare const document: any;
 
@@ -176,11 +177,7 @@ export async function scrapeDivorces() {
       spouseA = spouseA.replace(/^[,\s\.:;]+|[,\s\.:;]+$/g, "").trim();
       spouseB = spouseB.replace(/^[,\s\.:;]+|[,\s\.:;]+$/g, "").trim();
 
-      // Determinar Condado y Estado
-      let county = "Jefferson";
-      let state = "KY"; // Forzar a Jefferson, KY para el flujo consolidado del usuario
-
-      // 3. Extraer la dirección de la propiedad
+      // 3. Extraer la dirección de la propiedad o buscarla
       const addressRegex = /\b\d+[\ ]+[A-Za-z0-9\ \.,#\-]+\b(?:Street|St|Avenue|Ave|Road|Rd|Drive|Dr|Lane|Ln|Court|Ct|Blvd|Way|Circle|Cir)\b/i;
       const addrMatch = pageText.match(addressRegex);
       let address = addrMatch ? addrMatch[0].trim() : null;
@@ -189,13 +186,26 @@ export async function scrapeDivorces() {
         const city = "Louisville";
         const lookupName = spouseA !== "Cónyuge A" ? spouseA : (spouseB !== "Cónyuge B" ? spouseB : null);
         if (lookupName) {
-          address = await lookupPersonAddress(lookupName, city, state);
+          address = await lookupPersonAddress(lookupName, city, "KY");
         }
       }
 
       // Si aún no hay dirección, proveemos una dirección por defecto de Charles Town, WV para guardar el registro de prueba en vivo
       if (!address) {
         address = "119 N George St, Charles Town, WV 25414"; // Dirección del juzgado como fallback
+      }
+
+      // Validación de Geocerca
+      if (!isAddressInJurisdiction(address, "WV")) {
+        console.log(`[SKIP] Propiedad fuera de jurisdicción detectada y descartada. Dirección: "${address}"`);
+        continue;
+      }
+
+      let county = "Jefferson";
+      let state = "WV";
+      const extractedState = extractStateFromAddress(address);
+      if (extractedState === "KY" || extractedState === "IN") {
+        state = extractedState;
       }
 
       const divorceId = `DIVORCE_${caseNumber}`;

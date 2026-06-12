@@ -1,6 +1,7 @@
 import axios from "axios";
 import { createClient } from "@libsql/client";
 import * as dotenv from "dotenv";
+import { isAddressInJurisdiction } from "./geo_fencing";
 
 // Cargar variables de entorno
 dotenv.config();
@@ -119,6 +120,12 @@ async function scrapeCodeViolations() {
       }
 
       const normalizedAddress = cleanAddress(attr.FullAddress);
+
+      // Validación de Geocerca (Kentucky o Indiana)
+      if (!isAddressInJurisdiction(normalizedAddress, "KY")) {
+        console.log(`[SKIP] Propiedad fuera de jurisdicción detectada y descartada. Dirección: "${normalizedAddress}"`);
+        continue;
+      }
 
       // Imprimir log temporal de verificación requerido por especificación
       console.log(`[METRO311] Violación detectada: "${attr.GUIDE_ITEM_TEXT}" en "${normalizedAddress}"`);

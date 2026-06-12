@@ -256,7 +256,17 @@ async function runCrossReference() {
     
     // 3. Consultar Spark MLS usando OData filter
     const mlsUrl = "https://replication.sparkapi.com/Reso/OData/Property";
-    const odataFilter = `contains(UnparsedAddress, '${houseNumber}') and StateOrProvince eq '${state}'`;
+    
+    // Extraer ZIP de la dirección (usando el último match de 5 dígitos para evitar colisiones con el número de casa)
+    const zipMatches = address.match(/\b\d{5}\b/g);
+    const zipCode = zipMatches ? zipMatches[zipMatches.length - 1] : null;
+    
+    let odataFilter = `contains(UnparsedAddress, '${houseNumber}') and StateOrProvince eq '${state}'`;
+    if (zipCode) {
+      odataFilter += ` and PostalCode eq '${zipCode}'`;
+    } else if (coreWords.length > 0) {
+      odataFilter += ` and contains(UnparsedAddress, '${coreWords[0]}')`;
+    }
     
     const params = {
       "$filter": odataFilter,
@@ -421,7 +431,17 @@ async function runCrossReference() {
 
     // Consultar Spark MLS usando OData filter
     const mlsUrl = "https://replication.sparkapi.com/Reso/OData/Property";
-    const odataFilter = `contains(UnparsedAddress, '${houseNumber}') and StateOrProvince eq '${state}'`;
+    
+    // Extraer ZIP de la dirección (usando el último match de 5 dígitos para evitar colisiones con el número de casa)
+    const zipMatches = address.match(/\b\d{5}\b/g);
+    const zipCode = zipMatches ? zipMatches[zipMatches.length - 1] : null;
+    
+    let odataFilter = `contains(UnparsedAddress, '${houseNumber}') and StateOrProvince eq '${state}'`;
+    if (zipCode) {
+      odataFilter += ` and PostalCode eq '${zipCode}'`;
+    } else if (coreWords.length > 0) {
+      odataFilter += ` and contains(UnparsedAddress, '${coreWords[0]}')`;
+    }
 
     const params = {
       "$filter": odataFilter,

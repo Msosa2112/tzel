@@ -26,11 +26,14 @@ function parseAddress(rawAddress: string, state: string, county: string) {
   let city = "";
   let zip = "";
 
-  // 1. Extraer ZIP code (5 dígitos al final)
-  const zipMatch = street.match(/\b\d{5}\b/);
-  if (zipMatch) {
-    zip = zipMatch[0];
-    street = street.replace(zip, "").trim();
+  // 1. Extraer ZIP code (5 dígitos al final, usando el último match para evitar colisiones con el número de casa)
+  const zipMatches = street.match(/\b\d{5}\b/g);
+  if (zipMatches) {
+    zip = zipMatches[zipMatches.length - 1];
+    const lastIdx = street.lastIndexOf(zip);
+    if (lastIdx !== -1) {
+      street = (street.substring(0, lastIdx) + street.substring(lastIdx + zip.length)).trim();
+    }
   }
 
   // Quitar comas y espacios sobrantes al final
@@ -84,12 +87,19 @@ async function performFreeOSINTrace(
   address: string,
   state: string,
   county: string
-): Promise<{ phones: string[]; links: string[] }> {
+): Promise<{ phones: string[]; links: string[]; emails: string[] }> {
   const parsed = parseAddress(address, state, county);
   const city = parsed.city || county;
   
   let query = "";
-  if (isLLC(name)) {
+  const isUnknown = !name || 
+                    name.toLowerCase() === "unknown" || 
+                    name.toLowerCase() === "no especificado" || 
+                    name.trim() === "";
+  
+  if (isUnknown) {
+    query = `"${parsed.street}" "${city}" ${state} (phone OR owner OR contact)`;
+  } else if (isLLC(name)) {
     const stateName = state === "KY" ? "Kentucky" : (state === "IN" ? "Indiana" : state);
     query = `"${name}" "${stateName}" (bizapedia OR opencorporates OR "secretary of state")`;
   } else {
@@ -98,24 +108,38 @@ async function performFreeOSINTrace(
   
   const phones: string[] = [];
   const links: string[] = [];
+  const emails: string[] = [];
   
   try {
     console.log(`[FREE OSINT SKIP TRACE] Consultando SearXNG para "${name}": "${query}"...`);
     const results = await querySearXNG(query);
     
-    // Regex agresiva para formatos de teléfono
-    const phoneRegex = /\+?1?[-.\s]?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}/g;
+    // Regex agresiva para formatos de teléfono sin colisiones con números más largos
+    const phoneRegex = /(?<!\d)(?:\+?1[-.\s]*)?\(?\d{3}\)?[-.\s/]*\d{3}[-.\s/]*\d{4}(?!\d)/g;
+    // Regex para direcciones de correo electrónico válidas
+    const emailRegex = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g;
+
     const uniquePhones = new Set<string>();
+    const uniqueEmails = new Set<string>();
 
     for (const result of results) {
-      // 1. Escanear snippets (content/snippet) y título buscando teléfonos
+      // 1. Escanear snippets (content/snippet) y título buscando teléfonos y correos
       const textToScan = `${result.title || ""} ${result.content || ""} ${result.snippet || ""}`;
+      
+      // Escanear teléfonos
       const phoneMatches = textToScan.match(phoneRegex) || [];
       for (const match of phoneMatches) {
         const clean = match.trim();
         if (clean.replace(/[^0-9]/g, "").length >= 10) {
           uniquePhones.add(clean);
         }
+      }
+
+      // Escanear correos
+      const emailMatches = textToScan.match(emailRegex) || [];
+      for (const match of emailMatches) {
+        const clean = match.trim().toLowerCase();
+        uniqueEmails.add(clean);
       }
 
       // 2. Extraer enlaces públicos de directorios
@@ -139,13 +163,14 @@ async function performFreeOSINTrace(
     
     return {
       phones: Array.from(uniquePhones).slice(0, 5),
-      links: Array.from(new Set(links)).slice(0, 3)
+      links: Array.from(new Set(links)).slice(0, 3),
+      emails: Array.from(uniqueEmails).slice(0, 5)
     };
   } catch (err: any) {
     console.error(`[FREE OSINT ERROR] Error buscando en SearXNG para ${name}:`, err.message);
   }
   
-  return { phones: [], links: [] };
+  return { phones: [], links: [], emails: [] };
 }
 
 /**
@@ -160,10 +185,13 @@ async function performSkipTrace(
 ): Promise<SkipTraceResult> {
   try {
     const osintResult = await performFreeOSINTrace(defendant, rawAddress, state, county);
-    if (osintResult.phones.length > 0 || osintResult.links.length > 0) {
+    if (osintResult.phones.length > 0 || osintResult.links.length > 0 || osintResult.emails.length > 0) {
       return {
         phones: osintResult.phones.map(p => `OSINT: ${p}`),
-        emails: osintResult.links.map(l => `OSINT Link: ${l}`)
+        emails: [
+          ...osintResult.emails.map(e => `OSINT: ${e}`),
+          ...osintResult.links.map(l => `OSINT Link: ${l}`)
+        ]
       };
     }
   } catch (err: any) {
@@ -208,8 +236,8 @@ async function runSkipTracing() {
     const state = row.state as string;
     const county = row.county as string;
 
-    if (!defendant || defendant.toLowerCase() === "no especificado" || defendant.trim() === "") {
-      console.log(`[SKIP TRACE] Saltando caso ${auctionId}: Nombre de deudor no válido ("${defendant}")`);
+    if (!address || address.trim() === "") {
+      console.log(`[SKIP TRACE] Saltando caso ${auctionId}: Dirección no válida.`);
       continue;
     }
 

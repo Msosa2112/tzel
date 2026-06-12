@@ -1,0 +1,15 @@
+# Configuración Soberana de SearXNG para Tzel Real Estate OSINT
+use_default_settings: true
+
+server:
+  port: 8080
+  bind_address: "0.0.0.0"
+  secret_key: "6a7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c" # Clave secreta generada
+  image_proxy: true
+
+search:
+  safe_search: 0
+  autocomplete: ""
+  formats:
+    - html
+    - json # Formato JSON estricto para consumo de API interna

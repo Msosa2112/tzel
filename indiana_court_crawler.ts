@@ -4,6 +4,8 @@ import { chromium } from "playwright-extra";
 import stealthPlugin from "puppeteer-extra-plugin-stealth";
 import { createClient } from "@libsql/client";
 import * as dotenv from "dotenv";
+import { isHighYieldProperty } from "./underwriting/underwriter";
+
 
 chromium.use(stealthPlugin());
 
@@ -65,6 +67,18 @@ function extractParties(text: string): { plaintiff: string | null, defendant: st
 
   const cleanText = text.replace(/\r\n/g, "\n").replace(/[ \t]+/g, " ");
 
+  // Permissive multi-line / tab-separated parsing
+  const plaintiffMatch = cleanText.match(/(?:Plaintiff|Plaintiff\s*\(s\)|Plaintiff\s*Name|Acreedor|Demandante)\s*:?\s*([\s\S]+?)(?=\r?\n\r?\n|\r?\n\s*(?:Defendant|Plaintiff|Attorney|Chronological|Case|Court|Status|Filed)|$)/i);
+  const defendantMatch = cleanText.match(/(?:Defendant|Defendant\s*\(s\)|Defendant\s*Name|Demandado)\s*:?\s*([\s\S]+?)(?=\r?\n\r?\n|\r?\n\s*(?:Defendant|Plaintiff|Attorney|Chronological|Case|Court|Status|Filed)|$)/i);
+
+  if (plaintiffMatch) plaintiff = plaintiffMatch[1].replace(/\s+/g, " ").trim();
+  if (defendantMatch) defendant = cleanDefendant(defendantMatch[1].replace(/\s+/g, " ").trim());
+
+  if (plaintiff && defendant) {
+    return { plaintiff, defendant };
+  }
+
+  // Fallbacks para avisos públicos en texto continuo (legacy patterns)
   // Patrón A: "Plaintiff: [texto] Defendant: [texto]"
   const patternA = /Plaintiff\s*:\s*([^]+?)\s*Defendant\s*:\s*([^]+?)(?=\b(?:Required|Required\s+me|Parcel|Commonly|Attorney|Scottie|Matthew|\n\s*\n|$))/i;
   const matchA = cleanText.match(patternA);
@@ -217,11 +231,11 @@ async function getCaseDetailsFromMyCase(caseNumber: string): Promise<{ debt: num
     }
     
     // 2. Ingresar el número de caso en el buscador
-    await page.waitForSelector("#SearchValue", { timeout: 10000 });
-    await page.fill("#SearchValue", caseNumber);
+    await page.waitForSelector("#SearchCaseNumber", { timeout: 10000 });
+    await page.fill("#SearchCaseNumber", caseNumber);
     
     // Enviar formulario
-    await page.click("#cmdSearch", { timeout: 5000 });
+    await page.click("button.btn-primary", { timeout: 5000 });
     
     // 3. Esperar los resultados
     console.log("[MYCASE] Esperando resultados de búsqueda...");
@@ -236,28 +250,35 @@ async function getCaseDetailsFromMyCase(caseNumber: string): Promise<{ debt: num
     }
     
     // 4. Si hay resultados, hacer clic en el enlace del caso para abrirlo
-    const caseLinkSelector = `a:has-text("${caseNumber}")`;
-    await page.waitForSelector(caseLinkSelector, { timeout: 10000 });
-    await page.click(caseLinkSelector);
+    const rowLocator = page.locator('tr.result-row', {
+      has: page.locator(`span.result-subtitle:has-text("${caseNumber}")`)
+    });
+    const linkLocator = rowLocator.locator('a.result-title');
+    await page.waitForSelector('tr.result-row', { timeout: 10000 });
+    await linkLocator.first().click();
     
     // Esperar a que cargue el expediente
-    await page.waitForSelector(".case-header", { timeout: 15000 }).catch(() => {});
+    await page.waitForSelector(".case-summary", { timeout: 15000 }).catch(() => {});
+    await page.waitForTimeout(3000);
     const caseDetailsText = await page.innerText("body");
+
     
-    // 5. Extraer nombres de Demandante y Demandado
+    // 5. Extraer nombres de Demandante y Demandado (permissive multi-line / tab-separated parsing)
     let plaintiff: string | null = null;
     let defendant: string | null = null;
     
-    const plaintiffMatch = caseDetailsText.match(/Plaintiff\s*\n*:\s*([^\n]+)/i) || caseDetailsText.match(/Plaintiff\s+Name\s*\n*:\s*([^\n]+)/i);
-    const defendantMatch = caseDetailsText.match(/Defendant\s*\n*:\s*([^\n]+)/i) || caseDetailsText.match(/Defendant\s+Name\s*\n*:\s*([^\n]+)/i);
+    const plaintiffMatch = caseDetailsText.match(/(?:Plaintiff|Plaintiff\s*\(s\)|Plaintiff\s*Name|Acreedor|Demandante)\s*:?\s*([\s\S]+?)(?=\r?\n\r?\n|\r?\n\s*(?:Defendant|Plaintiff|Attorney|Chronological|Case|Court|Status|Filed)|$)/i);
+    const defendantMatch = caseDetailsText.match(/(?:Defendant|Defendant\s*\(s\)|Defendant\s*Name|Demandado)\s*:?\s*([\s\S]+?)(?=\r?\n\r?\n|\r?\n\s*(?:Defendant|Plaintiff|Attorney|Chronological|Case|Court|Status|Filed)|$)/i);
     
-    if (plaintiffMatch) plaintiff = plaintiffMatch[1].trim();
-    if (defendantMatch) defendant = defendantMatch[1].trim();
+    if (plaintiffMatch) plaintiff = plaintiffMatch[1].replace(/\s+/g, " ").trim();
+    if (defendantMatch) defendant = cleanDefendant(defendantMatch[1].replace(/\s+/g, " ").trim());
+
     
     // 6. Extraer Monto de Deuda (Judgment Amount)
     let debt: number | null = null;
     
     const judgmentRegexes = [
+      /Judgment\s*:\s*\$([0-9,]+(?:\.[0-9]{2})?)/i,
       /Judgment\s+Amount\s*:\s*\$([0-9,]+(?:\.[0-9]{2})?)/i,
       /Judgment\s+in\s+favor\s+of\s+[^$]*\$([0-9,]+(?:\.[0-9]{2})?)/i,
       /Judgment\s+for\s+\$([0-9,]+(?:\.[0-9]{2})?)/i,
@@ -299,7 +320,7 @@ async function runIndianaCrawler() {
   let auctionsRes;
   try {
     auctionsRes = await db.execute(`
-      SELECT auction_id, address, county, case_number, defendant, plaintiff 
+      SELECT auction_id, address, county, case_number, defendant, plaintiff, mls_estimated_value, hidden_mortgages
       FROM foreclosure_auctions 
       WHERE state = 'IN' AND (debt_amount IS NULL OR debt_amount = 0)
     `);
@@ -319,6 +340,8 @@ async function runIndianaCrawler() {
     const address = row.address as string;
     const county = row.county as string;
     let caseNumber = row.case_number as string;
+    const mlsEstimatedValue = row.mls_estimated_value as number || 0;
+    const hiddenMortgages = row.hidden_mortgages as number || 0;
     
     let extractedPlaintiff: string | null = null;
     let extractedDefendant: string | null = null;
@@ -365,10 +388,27 @@ async function runIndianaCrawler() {
       const details = await getCaseDetailsFromMyCase(caseNumber);
       
       const debt = details ? details.debt : null;
-      const finalPlaintiff = details?.plaintiff || extractedPlaintiff || "No especificado";
-      const finalDefendant = details?.defendant || extractedDefendant || "No especificado";
-
+      let finalPlaintiff = details?.plaintiff || extractedPlaintiff || "Unknown";
+      let finalDefendant = details?.defendant || extractedDefendant || "Unknown";
+      
+      if (finalPlaintiff === "No especificado") finalPlaintiff = "Unknown";
+      if (finalDefendant === "No especificado") finalDefendant = "Unknown";
+ 
       if (details) {
+        // Si no se extrajeron nombres pero hay una deuda válida, omitimos la revisión manual
+        const needsManual = debt && debt > 0 ? 0 : 1;
+        
+        // Calcular is_high_yield
+        let isHighYield = 0;
+        if (debt && debt > 0 && mlsEstimatedValue > 0) {
+          const discountPct = ((mlsEstimatedValue - debt) / mlsEstimatedValue) * 100;
+          console.log(`[MATCH SCORING] Deuda: $${debt.toLocaleString("en-US")} vs ARV: $${mlsEstimatedValue.toLocaleString("en-US")} | Descuento potencial: ${discountPct.toFixed(1)}%`);
+          if (isHighYieldProperty(mlsEstimatedValue, debt, hiddenMortgages)) {
+            isHighYield = 1;
+            console.log(`[HIGH YIELD] ¡Propiedad marcada como alta rentabilidad (Equity >= 40% del ARV)!`);
+          }
+        }
+ 
         // Guardar en base de datos
         await db.execute({
           sql: `
@@ -376,22 +416,28 @@ async function runIndianaCrawler() {
               debt_amount = ?,
               plaintiff = ?,
               defendant = ?,
-              needs_manual_review = ?
+              needs_manual_review = ?,
+              is_high_yield = ?
             WHERE auction_id = ?
           `,
           args: [
             debt,
             finalPlaintiff,
             finalDefendant,
-            debt ? 0 : 1, // Si rescatamos deuda, no requiere revisión manual
+            needsManual,
+            isHighYield,
             auctionId
           ]
         });
-        
-        console.log(`[ÉXITO] Detalles guardados para caso ${caseNumber}: Deuda: $${debt ? debt.toLocaleString() : "N/A (Falta revisión manual)"}`);
-        if (debt) {
+        if (debt && debt > 0) {
+          if (finalPlaintiff === "Unknown" || finalDefendant === "Unknown") {
+            console.log(`[AVISO] Nombres no extraídos para caso ${caseNumber}, pero se continuó con éxito porque se obtuvo deuda de $${debt.toLocaleString()} (Nombres guardados como 'Unknown').`);
+          } else {
+            console.log(`[ÉXITO] Detalles guardados para caso ${caseNumber}: Deuda: $${debt.toLocaleString()} | Plaintiff: "${finalPlaintiff}" | Defendant: "${finalDefendant}"`);
+          }
           successCount++;
         } else {
+          console.log(`[FALTA DEUDA] No se encontró monto de deuda para caso ${caseNumber}. Requiere revisión manual.`);
           manualReviewCount++;
         }
       } else {
@@ -401,15 +447,17 @@ async function runIndianaCrawler() {
     } catch (err: any) {
       console.log(`[CRAWLER IN ERROR] Falló el rastreo para el caso ${caseNumber}. Detalle: ${err.message}`);
       
-      const finalPlaintiff = extractedPlaintiff || "No especificado";
-      const finalDefendant = extractedDefendant || "No especificado";
+      let finalPlaintiff = extractedPlaintiff || "Unknown";
+      let finalDefendant = extractedDefendant || "Unknown";
+      if (finalPlaintiff === "No especificado") finalPlaintiff = "Unknown";
+      if (finalDefendant === "No especificado") finalDefendant = "Unknown";
       
       try {
         await db.execute({
           sql: `
             UPDATE foreclosure_auctions SET
-              plaintiff = COALESCE(?, plaintiff, 'No especificado'),
-              defendant = COALESCE(?, defendant, 'No especificado'),
+              plaintiff = COALESCE(?, plaintiff, 'Unknown'),
+              defendant = COALESCE(?, defendant, 'Unknown'),
               needs_manual_review = 1
             WHERE auction_id = ?
           `,
@@ -439,4 +487,4 @@ if (require.main === module) {
   runIndianaCrawler().catch(console.error);
 }
 
-export { runIndianaCrawler };
+export { runIndianaCrawler, getCaseDetailsFromMyCase };

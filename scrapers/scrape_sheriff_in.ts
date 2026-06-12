@@ -2,6 +2,7 @@ import axios from "axios";
 import * as cheerio from "cheerio";
 import { createClient } from "@libsql/client";
 import * as dotenv from "dotenv";
+import { isAddressInJurisdiction } from "./geo_fencing";
 
 // Cargar variables de entorno
 dotenv.config();
@@ -266,6 +267,14 @@ async function scrapeClarkCounty() {
           
           const auctionId = `IN_CLARK_${streetAddress.replace(/\s+/g, "_")}_${cleanText(currentDate).replace(/\s+/g, "_")}`;
           
+          const fullAddress = `${streetAddress}, ${city}`;
+          if (!isAddressInJurisdiction(fullAddress, "IN")) {
+            console.log(`[SKIP] Propiedad fuera de jurisdicción detectada y descartada. Dirección: "${fullAddress}"`);
+            lastPlaintiff = null;
+            lastDefendant = null;
+            continue;
+          }
+          
           const plaintiffVal = lastPlaintiff || null;
           const defendantVal = lastDefendant || null;
           
@@ -287,7 +296,7 @@ async function scrapeClarkCounty() {
               args: [
                 auctionId,
                 "PENDING",
-                `${streetAddress}, ${city}`,
+                fullAddress,
                 "Clark",
                 "IN",
                 cleanText(currentDate),
@@ -435,6 +444,13 @@ async function scrapeFloydCounty() {
         }
         
         const fullAddress = `${address}, ${city}`;
+        if (!isAddressInJurisdiction(fullAddress, "IN")) {
+          console.log(`[SKIP] Propiedad fuera de jurisdicción detectada y descartada. Dirección: "${fullAddress}"`);
+          lastPlaintiff = null;
+          lastDefendant = null;
+          return;
+        }
+        
         const auctionId = `IN_FLOYD_${address.replace(/\s+/g, "_")}_${currentDate.replace(/\s+/g, "_")}`;
         
         let plaintiffVal = lastPlaintiff || null;

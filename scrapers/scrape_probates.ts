@@ -3,6 +3,7 @@ import stealthPlugin from "puppeteer-extra-plugin-stealth";
 import { createClient } from "@libsql/client";
 import * as dotenv from "dotenv";
 import { querySearXNG } from "../searxng_client";
+import { isAddressInJurisdiction, extractStateFromAddress } from "./geo_fencing";
 
 declare const document: any;
 
@@ -170,8 +171,18 @@ export async function scrapeProbates() {
             address = "102 Industrial Blvd, Charles Town, WV 25430"; // Dirección genérica de prueba
           }
           
+          // Validación de Geocerca
+          if (!isAddressInJurisdiction(address, "WV")) {
+            console.log(`[SKIP] Propiedad fuera de jurisdicción detectada y descartada. Dirección: "${address}"`);
+            continue;
+          }
+          
           let county = "Jefferson";
-          let state = "KY"; // Forzar Jefferson, KY para el pipeline consolidado del usuario
+          let state = "WV";
+          const extractedState = extractStateFromAddress(address);
+          if (extractedState === "KY" || extractedState === "IN") {
+            state = extractedState;
+          }
           
           const probateId = `PROBATE_${caseNumber}`;
           console.log(`[PROBATES BLOC] Guardando: Caso=${caseNumber} | Finado=${deceasedName} | Heredero=${heirName} | Dirección=${address}`);
@@ -210,13 +221,23 @@ export async function scrapeProbates() {
           heirName = "Heredero Desconocido";
         }
 
-        let county = "Jefferson";
-        let state = "KY";
-
         const addressRegex = /\b\d+[\ ]+[A-Za-z0-9\ \.,#\-]+\b(?:Street|St|Avenue|Ave|Road|Rd|Drive|Dr|Lane|Ln|Court|Ct|Blvd|Way|Circle|Cir)\b/i;
         const addrMatch = pageText.match(addressRegex);
         let address = addrMatch ? addrMatch[0].trim() : "102 Industrial Blvd, Charles Town, WV 25430";
-
+        
+        // Validación de Geocerca
+        if (!isAddressInJurisdiction(address, "WV")) {
+          console.log(`[SKIP] Propiedad fuera de jurisdicción detectada y descartada. Dirección: "${address}"`);
+          continue;
+        }
+        
+        let county = "Jefferson";
+        let state = "WV";
+        const extractedState = extractStateFromAddress(address);
+        if (extractedState === "KY" || extractedState === "IN") {
+          state = extractedState;
+        }
+        
         const probateId = `PROBATE_${caseNumber}`;
         console.log(`[PROBATES SINGLE] Guardando: Caso=${caseNumber} | Finado=${deceasedName} | Heredero=${heirName} | Dirección=${address}`);
 
