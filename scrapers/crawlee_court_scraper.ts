@@ -296,7 +296,7 @@ export async function updateDatabaseWithScrapedDetails(auctionId: string, detail
           defendant = ?,
           needs_manual_review = ?,
           is_high_yield = CASE 
-            WHEN (mls_estimated_value - ?) >= (mls_estimated_value * 0.40) THEN 1 
+            WHEN (mls_estimated_value - ?) >= (mls_estimated_value * 0.30) THEN 1 
             ELSE 0 
           END
         WHERE auction_id = ?

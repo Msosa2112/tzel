@@ -1,39 +1,45 @@
-name: Daily Foreclosure Pipeline
+name: Daily Distress Foreclosure Pipeline
 
 on:
   schedule:
-    # 10:00 UTC corresponde a las 6:00 AM EST (o 5:00 AM EST en horario de invierno)
-    - cron: '0 10 * * *'
-  workflow_dispatch:
-    # Permite ejecutar el flujo manualmente desde la interfaz de GitHub
+    # Ejecutar todos los días a las 10:00 AM y 7:00 PM horario del Este/Indiana (EDT - UTC-4)
+    # 10:00 AM EDT -> 14:00 UTC
+    # 7:00 PM EDT -> 23:00 UTC
+    # (En invierno EST/UTC-5 correrá a las 9:00 AM y 6:00 PM EST, lo cual es aceptable o puede ajustarse)
+    - cron: '0 14 * * *'
+    - cron: '0 23 * * *'
+  workflow_dispatch: # Permite ejecución manual desde la pestaña Actions en GitHub
 
 jobs:
   run-pipeline:
+    name: Execute Extreme Distress Pipeline
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout Repository
+      - name: Checkout repository
         uses: actions/checkout@v4
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: '20'
           cache: 'npm'
 
-      - name: Install Dependencies
-        run: npm ci
+      - name: Install dependencies
+        run: npm install
 
-      - name: Install Playwright Chromium
-        run: npx playwright install chromium --with-deps
+      - name: Install Playwright browsers and dependencies
+        run: npx playwright install --with-deps
 
-      - name: Execute Foreclosure Pipeline
+      - name: Run main orchestrator pipeline
+        run: npx ts-node run_pipeline.ts
         env:
           TURSO_DATABASE_URL: ${{ secrets.TURSO_DATABASE_URL }}
           TURSO_AUTH_TOKEN: ${{ secrets.TURSO_AUTH_TOKEN }}
-          SPARK_ACCESS_TOKEN_1: ${{ secrets.SPARK_ACCESS_TOKEN_1 }}
+          SPARK_ACCESS_TOKEN_1: ${{ secrets.SPARK_API_TOKEN }}
+          SKIP_TRACE_API_KEY: ${{ secrets.BATCHDATA_API_KEY }}
+          BATCHDATA_API_KEY: ${{ secrets.BATCHDATA_API_KEY }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-          SKIP_TRACE_API_KEY: ${{ secrets.SKIP_TRACE_API_KEY }}
-          SKIP_TRACE_PROVIDER: ${{ secrets.SKIP_TRACE_PROVIDER }}
-        run: npx ts-node run_pipeline.ts
+          SKIP_TRACE_PROVIDER: batchdata
+          USE_PROXY: false

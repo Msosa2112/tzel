@@ -132,3 +132,100 @@ CREATE TABLE IF NOT EXISTS bankruptcies (
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Tabla de Estrés Físico y Abandono (Physical Distress)
+CREATE TABLE IF NOT EXISTS physical_distress (
+    distress_id TEXT PRIMARY KEY, -- Formato: 'PD_ADDR_HASH'
+    address TEXT NOT NULL,
+    county TEXT NOT NULL,
+    state TEXT NOT NULL,
+    distress_type TEXT NOT NULL, -- 'Fire Damage', 'Condemned', 'Water Shutoff', etc.
+    report_date TEXT,
+    details TEXT,
+    owner_name TEXT DEFAULT 'DUEÑO DESCONOCIDO',
+    mls_status TEXT DEFAULT 'pending_check',
+    mls_estimated_value REAL,
+    mls_id TEXT,
+    defendant_phones TEXT,
+    defendant_emails TEXT,
+    mailing_address TEXT,
+    absentee_owner INTEGER DEFAULT 0,
+    sqft INTEGER,
+    beds INTEGER,
+    baths REAL,
+    hidden_mortgages REAL DEFAULT 0,
+    is_high_yield INTEGER DEFAULT 0,
+    telegram_sent INTEGER DEFAULT 0,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Tabla de Estrés Financiero Extra (Financial Distress / Clerk records)
+CREATE TABLE IF NOT EXISTS financial_distress (
+    record_id TEXT PRIMARY KEY, -- Formato: 'FD_CASE_NUMBER' o 'FD_ADDR_HASH'
+    case_number TEXT NOT NULL,
+    address TEXT NOT NULL,
+    county TEXT NOT NULL,
+    state TEXT NOT NULL,
+    record_type TEXT NOT NULL, -- 'Tax Lien', 'Mechanic''s Lien', 'Judgment', 'Eviction', 'HOA Dues'
+    debt_amount REAL DEFAULT 0,
+    owner_name TEXT DEFAULT 'DUEÑO DESCONOCIDO',
+    plaintiff TEXT,
+    report_date TEXT,
+    mls_status TEXT DEFAULT 'pending_check',
+    mls_estimated_value REAL,
+    mls_id TEXT,
+    defendant_phones TEXT,
+    defendant_emails TEXT,
+    mailing_address TEXT,
+    absentee_owner INTEGER DEFAULT 0,
+    sqft INTEGER,
+    beds INTEGER,
+    baths REAL,
+    hidden_mortgages REAL DEFAULT 0,
+    is_high_yield INTEGER DEFAULT 0,
+    telegram_sent INTEGER DEFAULT 0,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Tabla de Eventos de Vida Críticos (Life Events)
+CREATE TABLE IF NOT EXISTS life_events (
+    event_id TEXT PRIMARY KEY, -- Formato: 'LE_ADDR_HASH' o 'LE_CASE_NUMBER'
+    event_type TEXT NOT NULL, -- 'Arrest', 'Obituary'
+    subject_name TEXT NOT NULL,
+    address TEXT NOT NULL,
+    county TEXT NOT NULL,
+    state TEXT NOT NULL,
+    details TEXT,
+    report_date TEXT,
+    mls_status TEXT DEFAULT 'pending_check',
+    mls_estimated_value REAL,
+    mls_id TEXT,
+    defendant_phones TEXT,
+    defendant_emails TEXT,
+    mailing_address TEXT,
+    absentee_owner INTEGER DEFAULT 0,
+    sqft INTEGER,
+    beds INTEGER,
+    baths REAL,
+    hidden_mortgages REAL DEFAULT 0,
+    is_high_yield INTEGER DEFAULT 0,
+    telegram_sent INTEGER DEFAULT 0,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Tabla de Fondos Excedentes (Surplus Funds) Post-Subasta
+CREATE TABLE IF NOT EXISTS surplus_funds (
+    surplus_id TEXT PRIMARY KEY, -- Formato: 'SF_COUNTY_STATE_CASE' o 'SF_ADDR_HASH'
+    owner_name TEXT NOT NULL,
+    address TEXT NOT NULL,
+    winning_bid REAL NOT NULL,
+    judgment_amount REAL NOT NULL,
+    surplus_amount REAL NOT NULL,
+    auction_date TEXT,
+    county TEXT,
+    state TEXT,
+    defendant_phones TEXT,
+    defendant_emails TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+

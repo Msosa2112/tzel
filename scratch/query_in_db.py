@@ -70,12 +70,13 @@ def parse_row(row, columns):
 
 try:
     client = TursoClient()
-    res = client.execute("SELECT auction_id, case_number, address, county, plaintiff, defendant, needs_manual_review FROM foreclosure_auctions WHERE state = 'IN' LIMIT 15")
+    res = client.execute("SELECT auction_id, case_number, address, county, plaintiff, defendant, needs_manual_review, auction_date FROM foreclosure_auctions WHERE state = 'IN'")
     columns = res.get("cols", [])
     rows = res.get("rows", [])
-    print(f"Total rows returned: {len(rows)}")
+    print(f"Total Indiana rows in DB: {len(rows)}")
     for r in rows:
         p = parse_row(r, columns)
-        print(f"ID: {p['auction_id']}\n  Case: {p['case_number']}\n  Addr: {p['address']}\n  Plnt: {p['plaintiff']} | Def: {p['defendant']} | Manual: {p['needs_manual_review']}")
+        print(f"ID: {p['auction_id']}\n  Case: {p['case_number']}\n  Addr: {p['address']}\n  Date: {p['auction_date']}\n  Plnt: {p['plaintiff']} | Def: {p['defendant']} | Manual: {p['needs_manual_review']}\n")
 except Exception as e:
     print("Error:", e)
+

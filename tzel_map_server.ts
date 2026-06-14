@@ -144,6 +144,9 @@ interface GroupedLead {
   probates: any[];
   divorces: any[];
   bankruptcies: any[];
+  physicalDistress: any[];
+  financialDistress: any[];
+  lifeEvents: any[];
   hiddenMortgages: number;
   mailingAddress?: string;
   isAbsentee: boolean;
@@ -259,14 +262,14 @@ app.get("/api/prospectos", async (req, res) => {
       FROM foreclosure_auctions
     `);
     
-    // Filter auctions to next 30 days or Indiana manual reviews
+    // Filter auctions to next 60 days or Indiana manual reviews
     const opportunities = auctionsRes.rows.filter(row => {
       const state = (row.state as string || "").toUpperCase();
       if (state !== "KY" && state !== "IN") return false;
       const dateStr = row.auction_date as string;
       const daysRemaining = getDaysRemaining(dateStr);
       if (daysRemaining === null) return true; // Keep manual reviews
-      return daysRemaining >= 0 && daysRemaining <= 30;
+      return daysRemaining >= 0 && daysRemaining <= 60;
     });
 
     // 2. Fetch code violations
@@ -309,6 +312,39 @@ app.get("/api/prospectos", async (req, res) => {
       return state === "KY" || state === "IN";
     });
 
+    // 6. Fetch physical distress
+    const physicalRes = await db.execute(`
+      SELECT distress_id, address, county, state, distress_type, report_date, details, owner_name,
+             mls_estimated_value, mls_id, defendant_phones, defendant_emails, mailing_address, absentee_owner, sqft, beds, baths, hidden_mortgages
+      FROM physical_distress
+    `);
+    const physicalDistressList = physicalRes.rows.filter(row => {
+      const state = (row.state as string || "").toUpperCase();
+      return state === "KY" || state === "IN";
+    });
+
+    // 7. Fetch financial distress
+    const financialRes = await db.execute(`
+      SELECT record_id, case_number, address, county, state, record_type, debt_amount, owner_name, plaintiff, report_date,
+             mls_estimated_value, mls_id, defendant_phones, defendant_emails, mailing_address, absentee_owner, sqft, beds, baths, hidden_mortgages
+      FROM financial_distress
+    `);
+    const financialDistressList = financialRes.rows.filter(row => {
+      const state = (row.state as string || "").toUpperCase();
+      return state === "KY" || state === "IN";
+    });
+
+    // 8. Fetch life events
+    const lifeEventsRes = await db.execute(`
+      SELECT event_id, event_type, subject_name, address, county, state, details, report_date,
+             mls_estimated_value, mls_id, defendant_phones, defendant_emails, mailing_address, absentee_owner, sqft, beds, baths, hidden_mortgages
+      FROM life_events
+    `);
+    const lifeEventsList = lifeEventsRes.rows.filter(row => {
+      const state = (row.state as string || "").toUpperCase();
+      return state === "KY" || state === "IN";
+    });
+
     // Grouping map
     const groupedMap = new Map<string, GroupedLead>();
 
@@ -335,6 +371,9 @@ app.get("/api/prospectos", async (req, res) => {
           probates: [],
           divorces: [],
           bankruptcies: [],
+          physicalDistress: [],
+          financialDistress: [],
+          lifeEvents: [],
           hiddenMortgages: row.hidden_mortgages as number || 0,
           mailingAddress: row.mailing_address as string || undefined,
           isAbsentee: (row.absentee_owner as number) === 1,
@@ -387,6 +426,9 @@ app.get("/api/prospectos", async (req, res) => {
           probates: [],
           divorces: [],
           bankruptcies: [],
+          physicalDistress: [],
+          financialDistress: [],
+          lifeEvents: [],
           hiddenMortgages: row.hidden_mortgages as number || 0,
           mailingAddress: row.mailing_address as string || undefined,
           isAbsentee: (row.absentee_owner as number) === 1,
@@ -441,6 +483,9 @@ app.get("/api/prospectos", async (req, res) => {
           probates: [],
           divorces: [],
           bankruptcies: [],
+          physicalDistress: [],
+          financialDistress: [],
+          lifeEvents: [],
           hiddenMortgages: 0,
           isAbsentee: false
         });
@@ -484,6 +529,9 @@ app.get("/api/prospectos", async (req, res) => {
           probates: [],
           divorces: [],
           bankruptcies: [],
+          physicalDistress: [],
+          financialDistress: [],
+          lifeEvents: [],
           hiddenMortgages: 0,
           isAbsentee: false
         });
@@ -518,6 +566,9 @@ app.get("/api/prospectos", async (req, res) => {
           probates: [],
           divorces: [],
           bankruptcies: [],
+          physicalDistress: [],
+          financialDistress: [],
+          lifeEvents: [],
           hiddenMortgages: 0,
           isAbsentee: false
         });
@@ -530,6 +581,190 @@ app.get("/api/prospectos", async (req, res) => {
         rowEmails.forEach(e => existing.emails.add(e));
       }
       groupedMap.get(key)!.bankruptcies.push(row);
+    }
+
+    // F. Group physical distress
+    for (const row of physicalDistressList) {
+      const address = row.address as string;
+      const key = getGroupingKey(address);
+      const rowPhones = (row.defendant_phones as string || "").split(/,\s*|;\s*/).map(p => p.trim()).filter(Boolean);
+      const rowEmails = (row.defendant_emails as string || "").split(/,\s*|;\s*/).map(e => e.trim()).filter(Boolean);
+
+      if (!groupedMap.has(key)) {
+        groupedMap.set(key, {
+          groupingKey: key,
+          displayAddress: address,
+          state: row.state as string || "KY",
+          county: row.county as string || "Jefferson",
+          ownerName: row.owner_name as string || "DUEÑO DESCONOCIDO",
+          phones: new Set(rowPhones),
+          emails: new Set(rowEmails),
+          mlsValue: row.mls_estimated_value as number || 0,
+          mlsId: row.mls_id as string || "N/A",
+          auctions: [],
+          violations: [],
+          probates: [],
+          divorces: [],
+          bankruptcies: [],
+          physicalDistress: [],
+          financialDistress: [],
+          lifeEvents: [],
+          hiddenMortgages: row.hidden_mortgages as number || 0,
+          mailingAddress: row.mailing_address as string || undefined,
+          isAbsentee: (row.absentee_owner as number) === 1,
+          sqft: row.sqft as number || undefined,
+          beds: row.beds as number || undefined,
+          baths: row.baths as number || undefined
+        });
+      } else {
+        const existing = groupedMap.get(key)!;
+        if (row.owner_name && row.owner_name !== "DUEÑO DESCONOCIDO" && (existing.ownerName === "No especificado" || existing.ownerName === "DUEÑO DESCONOCIDO")) {
+          existing.ownerName = row.owner_name as string;
+        }
+        if (row.mls_estimated_value && (row.mls_estimated_value as number) > existing.mlsValue) {
+          existing.mlsValue = row.mls_estimated_value as number;
+        }
+        if (row.mls_id && row.mls_id !== "N/A") existing.mlsId = row.mls_id as string;
+        if (!existing.mailingAddress && row.mailing_address) existing.mailingAddress = row.mailing_address as string;
+        if ((row.absentee_owner as number) === 1) existing.isAbsentee = true;
+        if (!existing.sqft && row.sqft) existing.sqft = row.sqft as number;
+        if (!existing.beds && row.beds) existing.beds = row.beds as number;
+        if (!existing.baths && row.baths) existing.baths = row.baths as number;
+        if (row.hidden_mortgages && (row.hidden_mortgages as number) > existing.hiddenMortgages) {
+          existing.hiddenMortgages = row.hidden_mortgages as number;
+        }
+        rowPhones.forEach(p => existing.phones.add(p));
+        rowEmails.forEach(e => existing.emails.add(e));
+        if (address.length > existing.displayAddress.length) existing.displayAddress = address;
+      }
+      groupedMap.get(key)!.physicalDistress.push(row);
+    }
+
+    // G. Group financial distress
+    for (const row of financialDistressList) {
+      const address = row.address as string;
+      const key = getGroupingKey(address);
+      const rowPhones = (row.defendant_phones as string || "").split(/,\s*|;\s*/).map(p => p.trim()).filter(Boolean);
+      const rowEmails = (row.defendant_emails as string || "").split(/,\s*|;\s*/).map(e => e.trim()).filter(Boolean);
+
+      if (!groupedMap.has(key)) {
+        groupedMap.set(key, {
+          groupingKey: key,
+          displayAddress: address,
+          state: row.state as string || "KY",
+          county: row.county as string || "Jefferson",
+          ownerName: row.owner_name as string || "DUEÑO DESCONOCIDO",
+          phones: new Set(rowPhones),
+          emails: new Set(rowEmails),
+          mlsValue: row.mls_estimated_value as number || 0,
+          mlsId: row.mls_id as string || "N/A",
+          auctions: [],
+          violations: [],
+          probates: [],
+          divorces: [],
+          bankruptcies: [],
+          physicalDistress: [],
+          financialDistress: [],
+          lifeEvents: [],
+          hiddenMortgages: row.hidden_mortgages as number || 0,
+          mailingAddress: row.mailing_address as string || undefined,
+          isAbsentee: (row.absentee_owner as number) === 1,
+          sqft: row.sqft as number || undefined,
+          beds: row.beds as number || undefined,
+          baths: row.baths as number || undefined
+        });
+      } else {
+        const existing = groupedMap.get(key)!;
+        if (row.owner_name && row.owner_name !== "DUEÑO DESCONOCIDO" && (existing.ownerName === "No especificado" || existing.ownerName === "DUEÑO DESCONOCIDO")) {
+          existing.ownerName = row.owner_name as string;
+        }
+        if (row.mls_estimated_value && (row.mls_estimated_value as number) > existing.mlsValue) {
+          existing.mlsValue = row.mls_estimated_value as number;
+        }
+        if (row.mls_id && row.mls_id !== "N/A") existing.mlsId = row.mls_id as string;
+        if (!existing.mailingAddress && row.mailing_address) existing.mailingAddress = row.mailing_address as string;
+        if ((row.absentee_owner as number) === 1) existing.isAbsentee = true;
+        if (!existing.sqft && row.sqft) existing.sqft = row.sqft as number;
+        if (!existing.beds && row.beds) existing.beds = row.beds as number;
+        if (!existing.baths && row.baths) existing.baths = row.baths as number;
+        if (row.hidden_mortgages && (row.hidden_mortgages as number) > existing.hiddenMortgages) {
+          existing.hiddenMortgages = row.hidden_mortgages as number;
+        }
+        rowPhones.forEach(p => existing.phones.add(p));
+        rowEmails.forEach(e => existing.emails.add(e));
+        if (address.length > existing.displayAddress.length) existing.displayAddress = address;
+      }
+      groupedMap.get(key)!.financialDistress.push(row);
+    }
+
+    // H. Group life events
+    for (const row of lifeEventsList) {
+      const address = row.address as string;
+      const key = getGroupingKey(address);
+      const rowPhones = (row.defendant_phones as string || "").split(/,\s*|;\s*/).map(p => p.trim()).filter(Boolean);
+      const rowEmails = (row.defendant_emails as string || "").split(/,\s*|;\s*/).map(e => e.trim()).filter(Boolean);
+
+      if (!groupedMap.has(key)) {
+        groupedMap.set(key, {
+          groupingKey: key,
+          displayAddress: address,
+          state: row.state as string || "KY",
+          county: row.county as string || "Jefferson",
+          ownerName: row.subject_name as string || "No especificado",
+          phones: new Set(rowPhones),
+          emails: new Set(rowEmails),
+          mlsValue: row.mls_estimated_value as number || 0,
+          mlsId: row.mls_id as string || "N/A",
+          auctions: [],
+          violations: [],
+          probates: [],
+          divorces: [],
+          bankruptcies: [],
+          physicalDistress: [],
+          financialDistress: [],
+          lifeEvents: [],
+          hiddenMortgages: row.hidden_mortgages as number || 0,
+          mailingAddress: row.mailing_address as string || undefined,
+          isAbsentee: (row.absentee_owner as number) === 1,
+          sqft: row.sqft as number || undefined,
+          beds: row.beds as number || undefined,
+          baths: row.baths as number || undefined
+        });
+      } else {
+        const existing = groupedMap.get(key)!;
+        if (row.subject_name && row.subject_name !== "No especificado" && (existing.ownerName === "No especificado" || existing.ownerName === "DUEÑO DESCONOCIDO")) {
+          existing.ownerName = row.subject_name as string;
+        }
+        if (row.mls_estimated_value && (row.mls_estimated_value as number) > existing.mlsValue) {
+          existing.mlsValue = row.mls_estimated_value as number;
+        }
+        if (row.mls_id && row.mls_id !== "N/A") existing.mlsId = row.mls_id as string;
+        if (!existing.mailingAddress && row.mailing_address) existing.mailingAddress = row.mailing_address as string;
+        if ((row.absentee_owner as number) === 1) existing.isAbsentee = true;
+        if (!existing.sqft && row.sqft) existing.sqft = row.sqft as number;
+        if (!existing.beds && row.beds) existing.beds = row.beds as number;
+        if (!existing.baths && row.baths) existing.baths = row.baths as number;
+        if (row.hidden_mortgages && (row.hidden_mortgages as number) > existing.hiddenMortgages) {
+          existing.hiddenMortgages = row.hidden_mortgages as number;
+        }
+        rowPhones.forEach(p => existing.phones.add(p));
+        rowEmails.forEach(e => existing.emails.add(e));
+        if (address.length > existing.displayAddress.length) existing.displayAddress = address;
+      }
+      groupedMap.get(key)!.lifeEvents.push(row);
+    }
+
+    // Pre-cargar la caché de geocodificación en memoria para evitar el problema de consultas N+1
+    const geocodeMap = new Map<string, { lat: number; lon: number }>();
+    try {
+      const cacheRes = await db.execute("SELECT address, lat, lon FROM geocode_cache");
+      for (const row of cacheRes.rows) {
+        if (row.address && row.lat !== null && row.lon !== null) {
+          geocodeMap.set(row.address as string, { lat: row.lat as number, lon: row.lon as number });
+        }
+      }
+    } catch (err) {
+      console.error("[GEOCODE CACHE LOAD ERROR] Failed to pre-load geocode cache:", err);
     }
 
     // Geocodificar y calcular variables en lote
@@ -557,29 +792,15 @@ app.get("/api/prospectos", async (req, res) => {
       if (hasAuctions) {
         const firstAuction = lead.auctions[0];
         const daysRemaining = getDaysRemaining(firstAuction.auction_date);
-        if (daysRemaining !== null && daysRemaining >= 0 && daysRemaining <= 30) {
+        if (daysRemaining !== null && daysRemaining >= 0 && daysRemaining <= 60) {
           if (hasViolations || primaryDebt > 0 || hiddenDebt > 0) {
             isHighMotivation = true;
           }
         }
       }
 
-      // Check geocode cache first
-      let coords = null;
-      try {
-        const cacheRes = await db.execute({
-          sql: "SELECT lat, lon FROM geocode_cache WHERE address = ?",
-          args: [lead.displayAddress]
-        });
-        if (cacheRes.rows.length > 0) {
-          const row = cacheRes.rows[0];
-          if (row.lat !== null && row.lon !== null) {
-            coords = { lat: row.lat as number, lon: row.lon as number };
-          }
-        }
-      } catch (err) {
-        console.error("Geocoding cache lookup failed for:", lead.displayAddress, err);
-      }
+      // Check geocode cache first from memory map
+      const coords = geocodeMap.get(lead.displayAddress) || null;
 
       responseData.push({
         groupingKey: lead.groupingKey,
@@ -596,6 +817,9 @@ app.get("/api/prospectos", async (req, res) => {
         probates: lead.probates,
         divorces: lead.divorces,
         bankruptcies: lead.bankruptcies,
+        physicalDistress: lead.physicalDistress,
+        financialDistress: lead.financialDistress,
+        lifeEvents: lead.lifeEvents,
         hiddenMortgages: hiddenDebt,
         isAbsentee: lead.isAbsentee,
         rehab,
@@ -618,6 +842,24 @@ app.get("/api/prospectos", async (req, res) => {
     res.json({ status: "success", count: responseData.length, data: responseData });
   } catch (err: any) {
     console.error("[API ERROR] Failed to fetch leads:", err.message);
+    res.status(500).json({ status: "error", message: err.message });
+  }
+});
+
+app.get("/api/surplus", async (req, res) => {
+  console.log("[API] /api/surplus requested");
+  try {
+    const surplusRes = await db.execute(`
+      SELECT 
+        surplus_id, owner_name, address, winning_bid, judgment_amount, 
+        surplus_amount, auction_date, county, state, defendant_phones, defendant_emails
+      FROM surplus_funds
+      ORDER BY surplus_amount DESC
+    `);
+    
+    res.json({ status: "success", count: surplusRes.rows.length, data: surplusRes.rows });
+  } catch (err: any) {
+    console.error("[API ERROR] Failed to fetch surplus funds:", err.message);
     res.status(500).json({ status: "error", message: err.message });
   }
 });

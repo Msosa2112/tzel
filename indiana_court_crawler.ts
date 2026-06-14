@@ -5,10 +5,9 @@ import stealthPlugin from "puppeteer-extra-plugin-stealth";
 import { createClient } from "@libsql/client";
 import * as dotenv from "dotenv";
 import { isHighYieldProperty } from "./underwriting/underwriter";
-
+import { BatchDataClient } from "./scrapers/batchdata_client";
 
 chromium.use(stealthPlugin());
-
 
 // Cargar variables de entorno
 dotenv.config();
@@ -18,6 +17,8 @@ const db = createClient({
   url: process.env.TURSO_DATABASE_URL || "",
   authToken: process.env.TURSO_AUTH_TOKEN || "",
 });
+
+const batchDataClient = new BatchDataClient();
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -56,6 +57,155 @@ function cleanDefendant(name: string): string {
   clean = clean.replace(/\s+/g, " ").trim();
   
   return clean;
+}
+
+function parseAddress(rawAddress: string, state: string, county: string) {
+  let street = rawAddress.trim();
+  let city = "";
+  let zip = "";
+
+  const zipMatches = street.match(/\b\d{5}\b/g);
+  if (zipMatches) {
+    zip = zipMatches[zipMatches.length - 1];
+    const lastIdx = street.lastIndexOf(zip);
+    if (lastIdx !== -1) {
+      street = (street.substring(0, lastIdx) + street.substring(lastIdx + zip.length)).trim();
+    }
+  }
+
+  street = street.replace(/,\s*$/, "").trim();
+
+  // Split street and city first
+  const parts = street.split(",");
+  if (parts.length >= 2) {
+    city = parts[parts.length - 1].trim();
+    street = parts.slice(0, parts.length - 1).join(",").trim();
+  }
+
+  // Override or fallback city based on county/state ONLY if city is empty
+  if (!city) {
+    if (state === "KY" && county.toLowerCase().includes("jeff")) {
+      city = "Louisville";
+    } else if (state === "IN" && county.toLowerCase().includes("floyd")) {
+      city = "New Albany";
+    } else if (state === "IN" && county.toLowerCase().includes("clark")) {
+      city = "Jeffersonville";
+    } else {
+      city = county;
+    }
+  }
+
+  return {
+    street: street.replace(/,\s*$/, "").trim(),
+    city: city,
+    state: state,
+    zip: zip || ""
+  };
+}
+
+async function getOwnerNameFromBatchData(address: string, state: string, county: string): Promise<{ first: string; last: string }[] | null> {
+  const parsed = parseAddress(address, state, county);
+  const apiKey = process.env.SKIP_TRACE_API_KEY || process.env.BATCHDATA_API_KEY || "";
+  if (!apiKey) {
+    console.log("[BATCHDATA] No API Key configured for property lookup.");
+    return null;
+  }
+
+  try {
+    console.log(`[BATCHDATA] Buscando propietario en BatchData para: "${address}"...`);
+    const response = await axios.post(
+      "https://api.batchdata.com/api/v1/property/lookup/all-attributes",
+      {
+        requests: [
+          {
+            address: {
+              street: parsed.street,
+              city: parsed.city,
+              state: parsed.state,
+              zip: parsed.zip
+            }
+          }
+        ]
+      },
+      {
+        headers: {
+          "Authorization": `Bearer ${apiKey}`,
+          "Content-Type": "application/json"
+        }
+      }
+    );
+
+    const properties = response.data?.results?.properties || [];
+    if (properties.length > 0) {
+      const owner = properties[0].owner;
+      if (owner && owner.names && owner.names.length > 0) {
+        console.log(`[BATCHDATA] Propietario(s) encontrado(s): ${JSON.stringify(owner.names)}`);
+        return owner.names.map((n: any) => ({
+          first: n.first || "",
+          last: n.last || ""
+        }));
+      }
+    }
+  } catch (err: any) {
+    console.error(`[BATCHDATA ERROR] Error en property lookup: ${err.message}`);
+  }
+  return null;
+}
+
+async function searchMyCaseByName(first: string, last: string, county: string): Promise<string | null> {
+  console.log(`[MYCASE NAME SEARCH] Buscando caso para ${first} ${last} en condado ${county}...`);
+  
+  const browser = await chromium.launch({ headless: true });
+  const context = await browser.newContext({
+    userAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+    viewport: { width: 1280, height: 800 },
+    locale: "en-US",
+  });
+  const page = await context.newPage();
+  
+  try {
+    await page.goto("https://public.courts.in.gov/mycase/", { waitUntil: "networkidle", timeout: 20000 });
+    
+    // Switch to name search
+    await page.click("#tabByParty");
+    await page.waitForTimeout(1000);
+    
+    // Fill first and last name
+    await page.fill('input[placeholder="last name"]', last);
+    await page.fill('input[placeholder="first name / initial"]', first);
+    
+    // Select county court
+    const courtValue = county.toLowerCase().includes("clark") ? "106" : "115";
+    await page.selectOption("select.form-control", courtValue);
+    
+    // Search
+    await page.click("button.btn-primary");
+    await page.waitForTimeout(4000);
+    
+    const bodyText = await page.innerText("body");
+    if (bodyText.includes("No cases found") || bodyText.includes("0 Cases Found")) {
+      console.log(`[MYCASE NAME SEARCH] No se encontraron casos para ${first} ${last}.`);
+      await browser.close();
+      return null;
+    }
+    
+    // Regex para números de caso de Indiana
+    const countyCodePrefix = courtValue === "106" ? "10" : "22";
+    const caseRegex = new RegExp(`\\b${countyCodePrefix}[A-Z]\\d{2}-\\d{4}-MF-\\d{3,6}\\b`, "gi");
+    const matches = bodyText.match(caseRegex);
+    
+    if (matches && matches.length > 0) {
+      const caseNumber = Array.from(new Set(matches))[0];
+      console.log(`[MYCASE NAME SEARCH] Caso de foreclosure encontrado: ${caseNumber}`);
+      await browser.close();
+      return caseNumber;
+    }
+  } catch (err: any) {
+    console.error(`[MYCASE NAME SEARCH ERROR] ${err.message}`);
+  } finally {
+    await browser.close();
+  }
+  return null;
 }
 
 /**
@@ -239,7 +389,7 @@ async function getCaseDetailsFromMyCase(caseNumber: string): Promise<{ debt: num
     
     // 3. Esperar los resultados
     console.log("[MYCASE] Esperando resultados de búsqueda...");
-    await page.waitForNavigation({ waitUntil: "networkidle", timeout: 15000 }).catch(() => {});
+    await page.waitForTimeout(3000);
     
     // Verificar si hay resultados
     const bodyText = await page.innerText("body");
@@ -257,9 +407,21 @@ async function getCaseDetailsFromMyCase(caseNumber: string): Promise<{ debt: num
     await page.waitForSelector('tr.result-row', { timeout: 10000 });
     await linkLocator.first().click();
     
-    // Esperar a que cargue el expediente
-    await page.waitForSelector(".case-summary", { timeout: 15000 }).catch(() => {});
-    await page.waitForTimeout(3000);
+    // Esperar a que cargue el expediente (esperar a que desaparezca el texto 'loading')
+    console.log("[MYCASE] Esperando que se carguen los detalles del expediente...");
+    let loaded = false;
+    for (let i = 1; i <= 10; i++) {
+      await page.waitForTimeout(1000);
+      const text = await page.innerText("body");
+      if (!text.includes("loading") && text.includes("Case Summary")) {
+        loaded = true;
+        console.log(`[MYCASE] Expediente cargado en ${i} segundos.`);
+        break;
+      }
+    }
+    if (!loaded) {
+      console.log("[MYCASE WARNING] El expediente tardó más de 10 segundos en cargar o sigue en estado loading.");
+    }
     const caseDetailsText = await page.innerText("body");
 
     
@@ -371,15 +533,50 @@ async function runIndianaCrawler() {
           });
         } catch (e) {}
       } else {
-        console.log(`[SKIP] No se pudo encontrar un número de caso en la web para la dirección: "${address}". Marcando para revisión manual.`);
+        console.log(`[DDG FAILED] No se pudo encontrar caso en DDG para "${address}". Intentando fallback de BatchData Property Lookup + MyCase Name Search...`);
+        let fallbackFound = false;
         try {
-          await db.execute({
-            sql: "UPDATE foreclosure_auctions SET needs_manual_review = 1 WHERE auction_id = ?",
-            args: [auctionId]
-          });
-          manualReviewCount++;
-        } catch (e) {}
-        continue;
+          const ownerNames = await getOwnerNameFromBatchData(address, "IN", county);
+          if (ownerNames && ownerNames.length > 0) {
+            for (const nameObj of ownerNames) {
+              if (nameObj.first && nameObj.last) {
+                const foundCase = await searchMyCaseByName(nameObj.first, nameObj.last, county);
+                if (foundCase) {
+                  caseNumber = foundCase;
+                  extractedDefendant = `${nameObj.last}, ${nameObj.first}`;
+                  fallbackFound = true;
+                  
+                  // Actualizar número de caso provisional y deudor en la DB
+                  await db.execute({
+                    sql: `
+                      UPDATE foreclosure_auctions SET 
+                        case_number = ?,
+                        defendant = COALESCE(?, defendant)
+                      WHERE auction_id = ?
+                    `,
+                    args: [caseNumber, extractedDefendant, auctionId]
+                  });
+                  console.log(`[FALLBACK SUCCESS] Caso encontrado vía Name Search: ${caseNumber} para deudor: ${extractedDefendant}`);
+                  break;
+                }
+              }
+            }
+          }
+        } catch (fallbackErr: any) {
+          console.error(`[FALLBACK ERROR] Falló el proceso de fallback: ${fallbackErr.message}`);
+        }
+
+        if (!fallbackFound) {
+          console.log(`[SKIP] No se pudo encontrar caso en DDG ni por fallback de propietario en MyCase para: "${address}". Marcando para revisión manual.`);
+          try {
+            await db.execute({
+              sql: "UPDATE foreclosure_auctions SET needs_manual_review = 1 WHERE auction_id = ?",
+              args: [auctionId]
+            });
+            manualReviewCount++;
+          } catch (e) {}
+          continue;
+        }
       }
     }
     
@@ -405,7 +602,7 @@ async function runIndianaCrawler() {
           console.log(`[MATCH SCORING] Deuda: $${debt.toLocaleString("en-US")} vs ARV: $${mlsEstimatedValue.toLocaleString("en-US")} | Descuento potencial: ${discountPct.toFixed(1)}%`);
           if (isHighYieldProperty(mlsEstimatedValue, debt, hiddenMortgages)) {
             isHighYield = 1;
-            console.log(`[HIGH YIELD] ¡Propiedad marcada como alta rentabilidad (Equity >= 40% del ARV)!`);
+            console.log(`[HIGH YIELD] ¡Propiedad marcada como alta rentabilidad (Equity >= 30% del ARV)!`);
           }
         }
  

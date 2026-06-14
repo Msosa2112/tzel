@@ -156,11 +156,11 @@ export function isJuniorLien(plaintiff: string | null, caseNumber: string | null
 
 /**
  * Determina si una propiedad es de Alta Rentabilidad (High Yield).
- * Criterio: El Equity Neto (ARV - Deuda Primaria - Deudas Ocultas) debe ser de al menos el 40% del ARV.
+ * Criterio: El Equity Neto (ARV - Deuda Primaria - Deudas Ocultas) debe ser de al menos el 30% del ARV.
  */
 export function isHighYieldProperty(arv: number, primaryDebt: number, hiddenMortgages: number = 0): boolean {
   if (arv <= 0) return false;
   const cleanHidden = hiddenMortgages || 0;
   const netEquity = arv - primaryDebt - cleanHidden;
-  return netEquity >= arv * 0.40;
+  return netEquity >= arv * 0.30;
 }

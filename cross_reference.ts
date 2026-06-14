@@ -326,14 +326,14 @@ async function runCrossReference() {
         const mlsValue = await calculateARV(mlsHeaders, zip, beds, sqft, closePrice, listPrice);
         console.log(`[ARV RESULT] Estatus MLS: ${mlsStatus} | Valor ARV (Comps): $${mlsValue.toLocaleString("en-US")}`);
         
-        // Determinar si es de Alta Rentabilidad (Equity Neto >= 40% del ARV)
+        // Determinar si es de Alta Rentabilidad (Equity Neto >= 30% del ARV)
         let isHighYield = 0;
         if (debtAmount && debtAmount > 0 && mlsValue > 0) {
           const discountPct = ((mlsValue - debtAmount) / mlsValue) * 100;
           console.log(`[MATCH SCORING] Deuda: $${debtAmount.toLocaleString("en-US")} vs ARV: $${mlsValue.toLocaleString("en-US")} | Descuento potencial: ${discountPct.toFixed(1)}%`);
           if (isHighYieldProperty(mlsValue, debtAmount, 0)) {
             isHighYield = 1;
-            console.log(`[HIGH YIELD] ¡Propiedad marcada como alta rentabilidad (Equity >= 40% del ARV)!`);
+            console.log(`[HIGH YIELD] ¡Propiedad marcada como alta rentabilidad (Equity >= 30% del ARV)!`);
           }
         }
 
@@ -543,6 +543,11 @@ async function runCrossReference() {
     // Respetar límites de rate limiting
     await sleep(500);
   }
+
+  // 5. Cruzar las nuevas tablas del Omni-Crawler
+  await crossReferenceGeneric("physical_distress", "distress_id", "address", "state", mlsHeaders);
+  await crossReferenceGeneric("financial_distress", "record_id", "address", "state", mlsHeaders);
+  await crossReferenceGeneric("life_events", "event_id", "address", "state", mlsHeaders);
   
   console.log("\n========================================================");
   console.log("RESUMEN GENERAL DEL MOTOR DE CRUCE:");
@@ -553,6 +558,118 @@ async function runCrossReference() {
   console.log(`- Violaciones No encontradas en MLS: ${violationNotFoundCount}`);
   console.log(`- Violaciones con Errores: ${violationErrorCount}`);
   console.log("========================================================\n");
+}
+
+async function crossReferenceGeneric(tableName: string, idCol: string, addressCol: string, stateCol: string | null, mlsHeaders: any) {
+  let pendingRes;
+  try {
+    const queryStr = stateCol 
+      ? `SELECT ${idCol}, ${addressCol}, ${stateCol} FROM ${tableName} WHERE mls_status = 'pending_check'`
+      : `SELECT ${idCol}, ${addressCol} FROM ${tableName} WHERE mls_status = 'pending_check'`;
+    pendingRes = await db.execute(queryStr);
+  } catch (err: any) {
+    console.error(`[DB ERROR] No se pudieron consultar registros pendientes para ${tableName}:`, err.message);
+    return;
+  }
+
+  const rows = pendingRes.rows;
+  console.log(`\n[CRUCE GENERICO] Se encontraron ${rows.length} registros en ${tableName} pendientes para cruzar con el MLS.`);
+
+  for (const row of rows) {
+    const idVal = row[idCol] as string;
+    const address = row[addressCol] as string;
+    const state = stateCol ? (row[stateCol] as string || "KY") : "KY";
+
+    const { houseNumber, coreWords } = parseAddress(address);
+    if (!houseNumber) {
+      console.log(`[SKIP] No se encontró número de casa para ${address}.`);
+      try {
+        await db.execute({
+          sql: `UPDATE ${tableName} SET mls_status = 'not_found' WHERE ${idCol} = ?`,
+          args: [idVal]
+        });
+      } catch (e) {}
+      continue;
+    }
+
+    const mlsUrl = "https://replication.sparkapi.com/Reso/OData/Property";
+    const zipMatches = address.match(/\b\d{5}\b/g);
+    const zipCode = zipMatches ? zipMatches[zipMatches.length - 1] : null;
+
+    let odataFilter = `contains(UnparsedAddress, '${houseNumber}') and StateOrProvince eq '${state}'`;
+    if (zipCode) {
+      odataFilter += ` and PostalCode eq '${zipCode}'`;
+    } else if (coreWords.length > 0) {
+      odataFilter += ` and contains(UnparsedAddress, '${coreWords[0]}')`;
+    }
+
+    try {
+      console.log(`[MLS QUERY] Buscando ${tableName} en MLS: ${odataFilter}...`);
+      const response = await axios.get(mlsUrl, {
+        headers: mlsHeaders,
+        params: {
+          "$filter": odataFilter,
+          "$select": "ListingKey,ListingId,UnparsedAddress,PostalCode,ListPrice,ClosePrice,MlsStatus,StandardStatus,CountyOrParish,StateOrProvince,BedroomsTotal,BathroomsTotalDecimal,LivingArea,YearBuilt",
+          "$top": 20
+        },
+        timeout: 15000
+      });
+
+      const properties = response.data.value || [];
+      let matchedProp: any = null;
+
+      for (const prop of properties) {
+        const mlsAddress = prop.UnparsedAddress || "";
+        const mlsCleaned = mlsAddress.toLowerCase().replace(/[^a-z0-9\s]/g, " ");
+        const mlsWords = mlsCleaned.split(/\s+/).filter((w: string) => w.length > 0);
+        const isMatch = coreWords.every(word => mlsWords.includes(word));
+        if (isMatch) {
+          matchedProp = prop;
+          break;
+        }
+      }
+
+      if (matchedProp) {
+        const mlsId = matchedProp.ListingId;
+        const mlsStatus = matchedProp.StandardStatus || matchedProp.MlsStatus || "Active";
+        const closePrice = matchedProp.ClosePrice || 0;
+        const listPrice = matchedProp.ListPrice || 0;
+        const zip = matchedProp.PostalCode || "";
+        const beds = matchedProp.BedroomsTotal || null;
+        const baths = matchedProp.BathroomsTotalDecimal || null;
+        const sqft = matchedProp.LivingArea || null;
+
+        const mlsValue = await calculateARV(mlsHeaders, zip, beds, sqft, closePrice, listPrice);
+        const isHighYield = mlsValue > 0 ? 1 : 0;
+
+        await db.execute({
+          sql: `
+            UPDATE ${tableName} SET
+              mls_id = ?,
+              mls_status = ?,
+              mls_estimated_value = ?,
+              is_high_yield = ?,
+              sqft = ?,
+              beds = ?,
+              baths = ?
+            WHERE ${idCol} = ?
+          `,
+          args: [mlsId, mlsStatus, mlsValue, isHighYield, sqft, beds, baths, idVal]
+        });
+        console.log(`[MATCH FOUND] ¡Coincidencia MLS para ${tableName}! ID: ${mlsId} | Valor: $${mlsValue}`);
+      } else {
+        await db.execute({
+          sql: `UPDATE ${tableName} SET mls_status = 'not_found' WHERE ${idCol} = ?`,
+          args: [idVal]
+        });
+        console.log(`[NOT FOUND] No se encontró coincidencia MLS para ${address}.`);
+      }
+    } catch (err: any) {
+      console.error(`[ERROR QUERYING MLS] Falló para ${tableName} id ${idVal}:`, err.message);
+    }
+
+    await sleep(500);
+  }
 }
 
 // Ejecutar si se corre directamente

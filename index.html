@@ -26,12 +26,22 @@
       
       /* Accent Colors (GTA / Cyber style) */
       --color-radar-green: #10b981;
-      --color-high-motivation: #ef4444; /* 🔥 */
-      --color-foreclosure: #06b6d4;      /* ⏳ */
-      --color-violation: #f59e0b;        /* ⚠️ */
-      --color-divorce: #ec4899;          /* 💔 */
-      --color-probate: #8b5cf6;          /* 🪦 */
-      --color-bankruptcy: #10b981;       /* 💸 */
+      --color-high-motivation: #ef4444;   /* 🔥 */
+      --color-execution-red: #ef4444;     /* 🚨 Subasta Programada */
+      --color-execution-orange: #f97316;  /* ⏳ Pre-Subasta */
+      --color-physical-amber: #ea580c;    /* 🔥 Estrés Físico */
+      --color-financial-yellow: #eab308;  /* ⚖️ Financiero */
+      --color-others-purple: #8b5cf6;     /* 👤 Sucesión/Divorcio/Eventos */
+
+      /* Legacy / Detail-specific colors (still used in logs timeline, etc.) */
+      --color-foreclosure: #06b6d4;
+      --color-violation: #f59e0b;
+      --color-divorce: #ec4899;
+      --color-probate: #8b5cf6;
+      --color-bankruptcy: #10b981;
+      --color-physical-distress: #ea580c;
+      --color-financial-distress: #eab308;
+      --color-life-event: #db2777;
     }
 
     * {
@@ -857,6 +867,34 @@
       background: radial-gradient(circle, transparent 40%, rgba(16, 185, 129, 0.02) 100%);
       box-shadow: inset 0 0 100px rgba(0,0,0,0.8);
     }
+
+    /* Surplus modal & button styles */
+    .surplus-vault-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 16px rgba(16, 185, 129, 0.4) !important;
+      filter: brightness(1.1);
+    }
+    .surplus-vault-btn:active {
+      transform: translateY(1px);
+    }
+    .ledger-table tr {
+      border-bottom: 1px solid rgba(255,255,255,0.05);
+      transition: background 0.15s;
+    }
+    .ledger-table tbody tr:hover {
+      background: rgba(255,255,255,0.02);
+    }
+    .ledger-table th, .ledger-table td {
+      padding: 14px 16px;
+      vertical-align: middle;
+    }
+    .surplus-modal-header button:hover {
+      background: rgba(255,255,255,0.15) !important;
+      transform: scale(1.05);
+    }
+    .surplus-modal-header button:active {
+      transform: scale(0.95);
+    }
   </style>
 </head>
 <body>
@@ -898,23 +936,30 @@
         <h3>Foco de Distress</h3>
         <div class="pill-selectors">
           <div>
-            <input type="checkbox" id="pill-foreclosure" class="pill-checkbox" checked>
-            <label for="pill-foreclosure" class="pill-label">
-              <span>⏳</span>
-              <span>Subasta</span>
+            <input type="checkbox" id="pill-execution" class="pill-checkbox" checked>
+            <label for="pill-execution" class="pill-label" style="border-color: rgba(239,68,68,0.2)">
+              <span>🛑</span>
+              <span>Ejecución</span>
             </label>
           </div>
           <div>
-            <input type="checkbox" id="pill-violation" class="pill-checkbox" checked>
-            <label for="pill-violation" class="pill-label">
+            <input type="checkbox" id="pill-physical" class="pill-checkbox" checked>
+            <label for="pill-physical" class="pill-label" style="border-color: rgba(249,115,22,0.2)">
+              <span>🔥</span>
+              <span>Físico</span>
+            </label>
+          </div>
+          <div>
+            <input type="checkbox" id="pill-others" class="pill-checkbox" checked>
+            <label for="pill-others" class="pill-label" style="border-color: rgba(139,92,246,0.2)">
               <span>⚠️</span>
-              <span>Violación</span>
+              <span>Otros</span>
             </label>
           </div>
           <div>
             <input type="checkbox" id="pill-stack" class="pill-checkbox">
-            <label for="pill-stack" class="pill-label" style="border-color: rgba(239,68,68,0.2)">
-              <span>🔥</span>
+            <label for="pill-stack" class="pill-label" style="border-color: rgba(16,185,129,0.2)">
+              <span>⚡</span>
               <span>Stacked</span>
             </label>
           </div>
@@ -925,13 +970,23 @@
       <div class="sidebar-section">
         <h3>Estatus Financiero</h3>
         <div class="segment-selector" style="display: flex; background: rgba(0,0,0,0.25); border: 1px solid var(--border-glass); border-radius: 6px; padding: 3px; gap: 4px;">
-          <button id="btn-deals" class="segment-btn active" style="flex: 1; background: rgba(16, 185, 129, 0.15); border: 1px solid var(--color-radar-green); color: #ffffff; padding: 8px 4px; border-radius: 4px; font-size: 0.7rem; font-family: 'Orbitron', sans-serif; cursor: pointer; transition: all 0.2s; text-align: center; font-weight: bold; border: 1px solid var(--color-radar-green); outline: none;">
+          <button id="btn-deals" class="segment-btn active" style="flex: 1; background: rgba(16, 185, 129, 0.15); border: 1px solid var(--color-radar-green); color: #ffffff; padding: 8px 4px; border-radius: 4px; font-size: 0.65rem; font-family: 'Orbitron', sans-serif; cursor: pointer; transition: all 0.2s; text-align: center; font-weight: bold; border: 1px solid var(--color-radar-green); outline: none;">
             🟢 BUENOS DEALS
           </button>
-          <button id="btn-underwater" class="segment-btn" style="flex: 1; background: transparent; border: 1px solid transparent; color: var(--text-muted); padding: 8px 4px; border-radius: 4px; font-size: 0.7rem; font-family: 'Orbitron', sans-serif; cursor: pointer; transition: all 0.2s; text-align: center; font-weight: bold; border: 1px solid transparent; outline: none;">
+          <button id="btn-underwater" class="segment-btn" style="flex: 1; background: transparent; border: 1px solid transparent; color: var(--text-muted); padding: 8px 4px; border-radius: 4px; font-size: 0.65rem; font-family: 'Orbitron', sans-serif; cursor: pointer; transition: all 0.2s; text-align: center; font-weight: bold; outline: none;">
             🔴 BAJO EL AGUA
           </button>
+          <button id="btn-unvalued" class="segment-btn" style="flex: 1; background: transparent; border: 1px solid transparent; color: var(--text-muted); padding: 8px 4px; border-radius: 4px; font-size: 0.65rem; font-family: 'Orbitron', sans-serif; cursor: pointer; transition: all 0.2s; text-align: center; font-weight: bold; outline: none;">
+            ⚪ SIN VALORAR
+          </button>
         </div>
+      </div>
+
+      <!-- Surplus Funds Action Button -->
+      <div class="sidebar-section">
+        <button id="btn-surplus-vault" class="surplus-vault-btn" style="width: 100%; background: linear-gradient(135deg, #10b981 0%, #059669 100%); border: 1px solid rgba(255,255,255,0.15); color: #ffffff; padding: 12px; border-radius: 8px; font-size: 0.9rem; font-family: 'Orbitron', sans-serif; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; font-weight: bold; box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3); transition: all 0.2s; outline: none;">
+          <span>💰</span> Bóveda de Excedentes
+        </button>
       </div>
 
       <!-- Prospect List -->
@@ -1015,6 +1070,14 @@
           <div class="uw-alert-banner" id="uw-alert" style="display: none;">
             <span>⚠️</span>
             <span id="uw-alert-text">Alerta Crítica: Propiedad Bajo el Agua</span>
+          </div>
+          <div id="uw-manual-search" style="display: none; margin-top: 12px; font-size: 0.7rem; color: var(--text-muted); background: rgba(255,255,255,0.02); padding: 8px; border-radius: 4px; border: 1px solid rgba(255,255,255,0.05); justify-content: space-between; align-items: center;">
+            <span>🔍 Buscar valor comercial:</span>
+            <div style="display: flex; gap: 8px;">
+              <a id="zillow-link" href="#" target="_blank" style="color: #006aff; font-weight: bold; text-decoration: none;">Zillow 🔗</a>
+              <span style="color: rgba(255,255,255,0.1)">|</span>
+              <a id="redfin-link" href="#" target="_blank" style="color: #e60000; font-weight: bold; text-decoration: none;">Redfin 🔗</a>
+            </div>
           </div>
         </div>
 
@@ -1105,6 +1168,44 @@
     </div>
   </footer>
 
+  <!-- Fullscreen Modal / View for Surplus Funds Vault -->
+  <div id="surplus-vault-modal" class="surplus-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background-color: var(--bg-darker); z-index: 9999; overflow-y: auto; padding: 40px; box-sizing: border-box; font-family: 'Inter', sans-serif;">
+    <div class="surplus-modal-header" style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid var(--border-glass); padding-bottom: 20px; margin-bottom: 30px;">
+      <div style="display: flex; align-items: center; gap: 15px;">
+        <span style="font-size: 2rem;">💰</span>
+        <div>
+          <h1 style="font-family: 'Orbitron', sans-serif; font-size: 1.8rem; color: #ffffff; text-shadow: 0 0 10px rgba(16, 185, 129, 0.4); margin: 0;">BÓVEDA DE EXCEDENTES</h1>
+          <p style="color: var(--text-muted); font-size: 0.85rem; margin: 4px 0 0 0;">Auditoría de Fondos Excedentes (Surplus Funds) Post-Subasta</p>
+        </div>
+      </div>
+      <button id="close-surplus-btn" style="background: rgba(255,255,255,0.05); border: 1px solid var(--border-glass); color: #ffffff; font-size: 1.5rem; width: 45px; height: 45px; border-radius: 50%; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; justify-content: center; outline: none;">&times;</button>
+    </div>
+
+    <!-- Ledger Table Wrapper -->
+    <div class="ledger-container" style="background: var(--bg-glass); border: 1px solid var(--border-glass); border-radius: 12px; padding: 24px; box-shadow: 0 8px 32px rgba(0,0,0,0.5); backdrop-filter: blur(10px);">
+      <table class="ledger-table" style="width: 100%; border-collapse: collapse; text-align: left; font-size: 0.9rem; color: var(--text-main);">
+        <thead>
+          <tr style="border-bottom: 2px solid rgba(255,255,255,0.1); color: var(--text-muted); font-family: 'Orbitron', sans-serif; font-size: 0.8rem; letter-spacing: 0.5px;">
+            <th style="padding: 12px 16px;">EX-PROPIETARIO</th>
+            <th style="padding: 12px 16px;">DIRECCIÓN ORIGINAL</th>
+            <th style="padding: 12px 16px; text-align: right;">JUDGMENT AMOUNT</th>
+            <th style="padding: 12px 16px; text-align: right;">WINNING BID</th>
+            <th style="padding: 12px 16px; text-align: right; color: var(--color-radar-green);">EXCEDENTE A RECLAMAR</th>
+            <th style="padding: 12px 16px;">TELÉFONO CELULAR</th>
+            <th style="padding: 12px 16px; text-align: center;">DÍAS DESDE SUBASTA</th>
+            <th style="padding: 12px 16px; text-align: center;">ACCIONES</th>
+          </tr>
+        </thead>
+        <tbody id="surplus-tbody">
+          <!-- Dynamically populated via JS -->
+        </tbody>
+      </table>
+      <div id="surplus-empty-state" style="display: none; text-align: center; color: var(--text-muted); padding: 40px; font-size: 1rem;">
+        No hay registros de fondos excedentes disponibles. Ejecuta el scraper de excedentes para poblar esta base.
+      </div>
+    </div>
+  </div>
+
   <!-- Leaflet JS CDN -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
   
@@ -1125,9 +1226,12 @@
       // Wire up event listeners
       document.getElementById('address-search').addEventListener('input', applyFilters);
       document.getElementById('state-filter').addEventListener('change', applyFilters);
-      document.getElementById('pill-foreclosure').addEventListener('change', applyFilters);
-      document.getElementById('pill-violation').addEventListener('change', applyFilters);
+      document.getElementById('pill-execution').addEventListener('change', applyFilters);
+      document.getElementById('pill-physical').addEventListener('change', applyFilters);
+      document.getElementById('pill-others').addEventListener('change', applyFilters);
       document.getElementById('pill-stack').addEventListener('change', applyFilters);
+      document.getElementById('btn-surplus-vault').addEventListener('click', openSurplusVault);
+      document.getElementById('close-surplus-btn').addEventListener('click', closeSurplusVault);
       
       document.getElementById('btn-deals').addEventListener('click', () => {
         setFinancialFilter('deals');
@@ -1135,34 +1239,42 @@
       document.getElementById('btn-underwater').addEventListener('click', () => {
         setFinancialFilter('underwater');
       });
+      document.getElementById('btn-unvalued').addEventListener('click', () => {
+        setFinancialFilter('unvalued');
+      });
     });
 
     function setFinancialFilter(filter) {
       financialFilter = filter;
       const btnDeals = document.getElementById('btn-deals');
       const btnUnder = document.getElementById('btn-underwater');
+      const btnUnvalued = document.getElementById('btn-unvalued');
+      
+      // Reset all buttons to default inactive style
+      [btnDeals, btnUnder, btnUnvalued].forEach(b => {
+        b.classList.remove('active');
+        b.style.background = 'transparent';
+        b.style.borderColor = 'transparent';
+        b.style.color = 'var(--text-muted)';
+      });
+      
+      const activeBtn = filter === 'deals' ? btnDeals : (filter === 'underwater' ? btnUnder : btnUnvalued);
+      activeBtn.classList.add('active');
       
       if (filter === 'deals') {
-        btnDeals.classList.add('active');
-        btnDeals.style.background = 'rgba(16, 185, 129, 0.15)';
-        btnDeals.style.borderColor = 'var(--color-radar-green)';
-        btnDeals.style.color = '#ffffff';
-        
-        btnUnder.classList.remove('active');
-        btnUnder.style.background = 'transparent';
-        btnUnder.style.borderColor = 'transparent';
-        btnUnder.style.color = 'var(--text-muted)';
-      } else {
-        btnUnder.classList.add('active');
-        btnUnder.style.background = 'rgba(239, 68, 68, 0.15)';
-        btnUnder.style.borderColor = 'var(--color-high-motivation)';
-        btnUnder.style.color = '#ffffff';
-        
-        btnDeals.classList.remove('active');
-        btnDeals.style.background = 'transparent';
-        btnDeals.style.borderColor = 'transparent';
-        btnDeals.style.color = 'var(--text-muted)';
+        activeBtn.style.background = 'rgba(16, 185, 129, 0.15)';
+        activeBtn.style.borderColor = 'var(--color-radar-green)';
+        activeBtn.style.color = '#ffffff';
+      } else if (filter === 'underwater') {
+        activeBtn.style.background = 'rgba(239, 68, 68, 0.15)';
+        activeBtn.style.borderColor = 'var(--color-high-motivation)';
+        activeBtn.style.color = '#ffffff';
+      } else if (filter === 'unvalued') {
+        activeBtn.style.background = 'rgba(148, 163, 184, 0.15)';
+        activeBtn.style.borderColor = 'var(--text-muted)';
+        activeBtn.style.color = '#ffffff';
       }
+      
       applyFilters();
     }
 
@@ -1242,12 +1354,68 @@
       document.getElementById('metric-avg-roi').textContent = `${avgRoi}%`;
     }
 
+    function getDaysRemaining(dateStr) {
+      if (!dateStr) return null;
+      try {
+        let cleanDate = dateStr.toLowerCase().replace(/\s+/g, " ").trim();
+        const months = {
+          jan: 0, january: 0, feb: 1, february: 1, mar: 2, march: 2,
+          apr: 3, april: 3, may: 4, jun: 5, june: 5, jul: 6, july: 6,
+          aug: 7, august: 7, sep: 8, september: 8, oct: 9, october: 9,
+          nov: 10, november: 10, dec: 11, december: 11
+        };
+        
+        let dateObj = null;
+        
+        if (/^\d+\/\d+\/\d+$/.test(cleanDate)) {
+          const [m, d, y] = cleanDate.split("/").map(Number);
+          dateObj = new Date(y, m - 1, d);
+        }
+        else if (cleanDate.includes("/")) {
+          const parts = cleanDate.split("/");
+          const monthName = parts[0].trim();
+          const dayAndYear = parts[1].trim();
+          const dayYearParts = dayAndYear.split(" ");
+          const day = parseInt(dayYearParts[0]);
+          const year = parseInt(dayYearParts[1] || "2026");
+          
+          if (months[monthName] !== undefined && !isNaN(day)) {
+            dateObj = new Date(year, months[monthName], day);
+          }
+        }
+        else {
+          cleanDate = cleanDate.replace(/,/g, "");
+          const parts = cleanDate.split(" ");
+          if (parts.length >= 3) {
+            const monthName = parts[0];
+            const day = parseInt(parts[1]);
+            const year = parseInt(parts[2]);
+            if (months[monthName] !== undefined && !isNaN(day) && !isNaN(year)) {
+              dateObj = new Date(year, months[monthName], day);
+            }
+          }
+        }
+        
+        if (dateObj && !isNaN(dateObj.getTime())) {
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+          dateObj.setHours(0, 0, 0, 0);
+          const diffTime = dateObj.getTime() - today.getTime();
+          return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        }
+      } catch (e) {
+        // Fallback
+      }
+      return null;
+    }
+
     function getFilteredLeads() {
       const searchVal = document.getElementById('address-search').value.toLowerCase().trim();
       const stateVal = document.getElementById('state-filter').value;
       
-      const showForeclosure = document.getElementById('pill-foreclosure').checked;
-      const showViolation = document.getElementById('pill-violation').checked;
+      const showExecution = document.getElementById('pill-execution').checked;
+      const showPhysical = document.getElementById('pill-physical').checked;
+      const showOthers = document.getElementById('pill-others').checked;
       const showStackOnly = document.getElementById('pill-stack').checked;
 
       return allLeads.filter(lead => {
@@ -1261,23 +1429,35 @@
         // State filter
         if (stateVal !== 'ALL' && lead.state !== stateVal) return false;
 
-        // Filtro Financiero (Buenos Deals vs Bajo el Agua)
-        // Definición: Un Buen Deal tiene mlsValue > 0 y netEquity >= 40% del mlsValue
-        const isGoodDeal = lead.mlsValue > 0 && lead.netEquity >= lead.mlsValue * 0.40;
-        if (financialFilter === 'deals' && !isGoodDeal) return false;
-        if (financialFilter === 'underwater' && isGoodDeal) return false;
+        // Filtro Financiero (Buenos Deals vs Bajo el Agua vs Sin Valorar)
+        const isGoodDeal = lead.mlsValue > 0 && lead.netEquity >= lead.mlsValue * 0.30;
+        const isUnvalued = lead.mlsValue === 0 || lead.mlsValue === null || lead.mlsValue === undefined;
+        
+        if (financialFilter === 'deals') {
+          if (isUnvalued || !isGoodDeal) return false;
+        } else if (financialFilter === 'underwater') {
+          if (isUnvalued || isGoodDeal) return false;
+        } else if (financialFilter === 'unvalued') {
+          if (!isUnvalued) return false;
+        }
 
         // Distress Stacking / Type Filter
-        const hasAuctions = lead.auctions.length > 0;
-        const hasViolations = lead.violations.length > 0;
+        const hasAuctions = lead.auctions && lead.auctions.length > 0;
+        const hasPhysical = lead.physicalDistress && lead.physicalDistress.length > 0;
+        const hasOthers = (lead.financialDistress && lead.financialDistress.length > 0) || 
+                          (lead.lifeEvents && lead.lifeEvents.length > 0) || 
+                          (lead.violations && lead.violations.length > 0) || 
+                          (lead.probates && lead.probates.length > 0) || 
+                          (lead.divorces && lead.divorces.length > 0) || 
+                          (lead.bankruptcies && lead.bankruptcies.length > 0);
 
         if (showStackOnly && !lead.isHighMotivation) return false;
         
         // Check if it matches any of the active category filters
         let matchesCategory = false;
-        if (showForeclosure && hasAuctions) matchesCategory = true;
-        if (showViolation && hasViolations) matchesCategory = true;
-        if (showStackOnly && lead.isHighMotivation) matchesCategory = true;
+        if (showExecution && hasAuctions) matchesCategory = true;
+        if (showPhysical && hasPhysical) matchesCategory = true;
+        if (showOthers && hasOthers) matchesCategory = true;
 
         if (!matchesCategory) return false;
 
@@ -1338,7 +1518,7 @@
           <div class="lead-comps">
             <div class="comp-item">
               <span class="comp-label">ARV (MLS)</span>
-              <span class="comp-val">$${(lead.mlsValue || 0).toLocaleString()}</span>
+              <span class="comp-val">${lead.mlsValue > 0 ? '$' + lead.mlsValue.toLocaleString() : 'N/A'}</span>
             </div>
             <div class="comp-item">
               <span class="comp-label">Deuda</span>
@@ -1346,11 +1526,11 @@
             </div>
             <div class="comp-item">
               <span class="comp-label">Oferta MAO</span>
-              <span class="comp-val">$${(lead.mao || 0).toLocaleString()}</span>
+              <span class="comp-val">${lead.mlsValue > 0 ? '$' + (lead.mao || 0).toLocaleString() : 'N/A'}</span>
             </div>
             <div class="comp-item">
               <span class="comp-label">Retorno (ROI)</span>
-              <span class="comp-val ${lead.roi > 0 ? 'roi-positive' : ''}">${lead.roi}%</span>
+              <span class="comp-val ${lead.roi > 0 && lead.mlsValue > 0 ? 'roi-positive' : ''}">${lead.mlsValue > 0 ? lead.roi + '%' : 'N/A'}</span>
             </div>
           </div>
         `;
@@ -1363,34 +1543,40 @@
 
         // 2. Render marker on Map (only if geocoded successfully)
         if (hasCoords && !isNaN(lead.lat) && !isNaN(lead.lon)) {
-          let markerColor = 'var(--color-foreclosure)';
-          let emoji = '⏳';
-          let markerClass = 'foreclosure';
+          let markerColor = 'var(--color-others-purple)';
+          let emoji = '👤';
+          let markerClass = 'others';
 
-          if (lead.isHighMotivation) {
-            markerColor = 'var(--color-high-motivation)';
-            emoji = '🔥';
-            markerClass = 'high-motivation';
-          } else if (lead.auctions.length > 0) {
-            markerColor = 'var(--color-foreclosure)';
+          // Precedence logic:
+          // 1. Subasta Programada (🚨)
+          // 2. Pre-Subasta (⏳)
+          // 3. Estrés Físico (🔥)
+          // 4. Financiero (⚖️)
+          // 5. Sucesión/Divorcio/Eventos (👤)
+          
+          const hasAuctions = lead.auctions && lead.auctions.length > 0;
+          const hasScheduledAuction = hasAuctions && lead.auctions.some(auc => getDaysRemaining(auc.auction_date) !== null);
+
+          if (hasScheduledAuction) {
+            markerColor = 'var(--color-execution-red)';
+            emoji = '🚨';
+            markerClass = 'execution-scheduled';
+          } else if (hasAuctions) {
+            markerColor = 'var(--color-execution-orange)';
             emoji = '⏳';
-            markerClass = 'foreclosure';
-          } else if (lead.violations.length > 0) {
-            markerColor = 'var(--color-violation)';
-            emoji = '⚠️';
-            markerClass = 'violation';
-          } else if (lead.divorces.length > 0) {
-            markerColor = 'var(--color-divorce)';
-            emoji = '💔';
-            markerClass = 'divorce';
-          } else if (lead.probates.length > 0) {
-            markerColor = 'var(--color-probate)';
-            emoji = '🪦';
-            markerClass = 'probate';
-          } else if (lead.bankruptcies.length > 0) {
-            markerColor = 'var(--color-bankruptcy)';
-            emoji = '💸';
-            markerClass = 'bankruptcy';
+            markerClass = 'execution-pre';
+          } else if (lead.physicalDistress && lead.physicalDistress.length > 0) {
+            markerColor = 'var(--color-physical-amber)';
+            emoji = '🔥';
+            markerClass = 'physical';
+          } else if ((lead.financialDistress && lead.financialDistress.length > 0) || (lead.bankruptcies && lead.bankruptcies.length > 0)) {
+            markerColor = 'var(--color-financial-yellow)';
+            emoji = '⚖️';
+            markerClass = 'financial';
+          } else {
+            markerColor = 'var(--color-others-purple)';
+            emoji = '👤';
+            markerClass = 'others';
           }
 
           // Custom Leaflet HTML Pin
@@ -1422,7 +1608,7 @@
               </div>
               <div class="popup-row">
                 <span class="popup-row-label">MLS ARV:</span>
-                <span class="popup-row-value">$${(lead.mlsValue || 0).toLocaleString()}</span>
+                <span class="popup-row-value">${lead.mlsValue > 0 ? '$' + lead.mlsValue.toLocaleString() : 'N/A'}</span>
               </div>
               <div class="popup-row">
                 <span class="popup-row-label">Costo Rehab:</span>
@@ -1434,7 +1620,7 @@
               </div>
               <div class="popup-row">
                 <span class="popup-row-label">ROI Estimado:</span>
-                <span class="popup-row-value" style="color: var(--color-radar-green)">${lead.roi}%</span>
+                <span class="popup-row-value" style="color: ${lead.roi > 0 && lead.mlsValue > 0 ? 'var(--color-radar-green)' : 'var(--text-muted)'}">${lead.mlsValue > 0 ? lead.roi + '%' : 'N/A'}</span>
               </div>
               <button class="popup-btn" onclick="openLeadDrawer('${lead.groupingKey}')">Ver Ficha Táctica</button>
             </div>
@@ -1504,12 +1690,32 @@
       document.getElementById('prop-owner-type').textContent = lead.isAbsentee ? 'Propietario Ausente (Absentee)' : 'Residente';
 
       // Underwriting
-      document.getElementById('uw-arv').textContent = `$${(lead.mlsValue || 0).toLocaleString()}`;
-      document.getElementById('uw-mao').textContent = `$${(lead.mao || 0).toLocaleString()}`;
+      if (lead.mlsValue > 0) {
+        document.getElementById('uw-arv').textContent = `$${lead.mlsValue.toLocaleString()}`;
+        document.getElementById('uw-mao').textContent = `$${(lead.mao || 0).toLocaleString()}`;
+        document.getElementById('uw-mao').classList.add('highlight-green');
+        document.getElementById('uw-roi').textContent = `${lead.roi}%`;
+        document.getElementById('uw-roi').classList.add('highlight-green');
+      } else {
+        document.getElementById('uw-arv').textContent = 'N/A';
+        document.getElementById('uw-mao').textContent = 'N/A';
+        document.getElementById('uw-mao').classList.remove('highlight-green');
+        document.getElementById('uw-roi').textContent = 'N/A';
+        document.getElementById('uw-roi').classList.remove('highlight-green');
+      }
       document.getElementById('uw-debt').textContent = `$${(lead.primaryDebt || 0).toLocaleString()}`;
       document.getElementById('uw-hidden').textContent = `$${(lead.hiddenMortgages || 0).toLocaleString()}`;
       document.getElementById('uw-rehab').textContent = `$${(lead.rehab || 0).toLocaleString()}`;
-      document.getElementById('uw-roi').textContent = `${lead.roi}%`;
+
+      // Toggle Zillow/Redfin manual search links
+      const manualSearchDiv = document.getElementById('uw-manual-search');
+      if (lead.mlsValue === 0) {
+        manualSearchDiv.style.display = 'flex';
+        document.getElementById('zillow-link').href = `https://www.zillow.com/homes/${encodeURIComponent(lead.displayAddress)}`;
+        document.getElementById('redfin-link').href = `https://www.redfin.com/property/search?queryString=${encodeURIComponent(lead.displayAddress)}`;
+      } else {
+        manualSearchDiv.style.display = 'none';
+      }
 
       // Underwater check
       const totalDebt = (lead.primaryDebt || 0) + (lead.hiddenMortgages || 0);
@@ -1542,6 +1748,47 @@
             mcaSuggestedArv.textContent = `$${res.mcaArv.toLocaleString()}`;
             mcaCompsCount.textContent = `(${res.compsCount} comparables)`;
             
+            // If the property is unvalued, calculate and override values using MCA-derived ARV
+            if (lead.mlsValue === 0 && res.mcaArv > 0) {
+              const arv = res.mcaArv;
+              const rehab = lead.rehab || 0;
+              const hidden = lead.hiddenMortgages || 0;
+              const primaryDebt = lead.primaryDebt || 0;
+              
+              // MAO = ARV * 0.70 - Rehab - 3% ARV - Hidden
+              const acquisitionCosts = arv * 0.03;
+              const mao = Math.max(0, Math.round((arv * 0.70) - rehab - acquisitionCosts - hidden));
+              
+              // ROI
+              const purchasePrice = primaryDebt > 0 ? primaryDebt : mao;
+              const transactionCosts = (purchasePrice * 0.03) + (arv * 0.05);
+              const totalCost = purchasePrice + rehab + transactionCosts;
+              const netProfit = arv - totalCost;
+              const roiVal = totalCost > 0 ? (netProfit / totalCost) * 100 : 0;
+              const roi = Math.round(roiVal * 10) / 10;
+              
+              document.getElementById('uw-arv').innerHTML = `$${arv.toLocaleString()} <span style="font-size: 0.6rem; color: var(--text-muted); font-weight: normal; display: block; margin-top: 2px;">(Valor Aprox. MCA)</span>`;
+              document.getElementById('uw-mao').innerHTML = `$${mao.toLocaleString()} <span style="font-size: 0.6rem; color: var(--text-muted); font-weight: normal; display: block; margin-top: 2px;">(Aprox. MCA)</span>`;
+              document.getElementById('uw-mao').classList.add('highlight-green');
+              document.getElementById('uw-roi').innerHTML = `${roi}% <span style="font-size: 0.6rem; color: var(--text-muted); font-weight: normal; display: block; margin-top: 2px;">(Aprox. MCA)</span>`;
+              if (roi > 0) {
+                document.getElementById('uw-roi').classList.add('highlight-green');
+              } else {
+                document.getElementById('uw-roi').classList.remove('highlight-green');
+              }
+              
+              // Update Underwater check banner
+              const totalDebt = primaryDebt + hidden;
+              const isUnderwater = totalDebt > arv;
+              const alertBanner = document.getElementById('uw-alert');
+              if (isUnderwater) {
+                alertBanner.style.display = 'flex';
+                document.getElementById('uw-alert-text').textContent = `Alerta Crítica: Propiedad Bajo el Agua (Deuda Total $${totalDebt.toLocaleString()} > ARV Aprox. MCA $${arv.toLocaleString()})`;
+              } else {
+                alertBanner.style.display = 'none';
+              }
+            }
+
             const t = res.target;
             let lastClosedText = t.lastClosedPrice ? `$${t.lastClosedPrice.toLocaleString()} (${t.lastClosedDate})` : 'Sin registros de cierre';
             mcaTargetProfile.innerHTML = `
@@ -1590,17 +1837,24 @@
         lead.auctions.forEach(auc => {
           const div = document.createElement('div');
           div.className = 'distress-log-item';
-          div.style.borderLeftColor = 'var(--color-foreclosure)';
+          
+          const daysRemaining = getDaysRemaining(auc.auction_date);
+          const isScheduled = daysRemaining !== null;
+          const borderClr = isScheduled ? 'var(--color-execution-red)' : 'var(--color-execution-orange)';
+          const emoji = isScheduled ? '🚨' : '⏳';
+          const titleStr = isScheduled ? 'ZONA DE EJECUCIÓN: SUBASTA PROGRAMADA' : 'ZONA DE EJECUCIÓN: DETECCIÓN PRE-SUBASTA';
+          
+          div.style.borderLeftColor = borderClr;
           
           let pdfLink = '';
           if (auc.pdf_url) {
-            pdfLink = `<a href="${auc.pdf_url}" target="_blank" style="color: var(--color-foreclosure); margin-left: 10px; font-weight: bold;">[Ver PDF]</a>`;
+            pdfLink = `<a href="${auc.pdf_url}" target="_blank" style="color: ${borderClr}; margin-left: 10px; font-weight: bold;">[Ver PDF]</a>`;
           }
 
           div.innerHTML = `
             <div class="distress-log-header">
-              <span>⏳ Ejecución Hipotecaria (Subasta)</span>
-              <span style="color: var(--color-foreclosure)">${auc.auction_date}</span>
+              <span style="color: ${borderClr}; font-weight: bold;">${emoji} ${titleStr}</span>
+              <span style="color: ${borderClr}">${auc.auction_date}</span>
             </div>
             <div><strong>Caso Judicial:</strong> ${auc.case_number}</div>
             <div><strong>Demandante:</strong> ${auc.plaintiff || 'No especificado'}</div>
@@ -1616,11 +1870,11 @@
         lead.violations.forEach(v => {
           const div = document.createElement('div');
           div.className = 'distress-log-item';
-          div.style.borderLeftColor = 'var(--color-violation)';
+          div.style.borderLeftColor = 'var(--color-others-purple)';
           div.innerHTML = `
             <div class="distress-log-header">
-              <span>⚠️ Violación de Código Activa</span>
-              <span style="color: var(--color-violation)">${v.report_date || 'Reciente'}</span>
+              <span style="color: var(--color-others-purple); font-weight: bold;">⚠️ Otros: Violación de Código Activa</span>
+              <span style="color: var(--color-others-purple)">${v.report_date || 'Reciente'}</span>
             </div>
             <div><strong>Caso Violación:</strong> ${v.case_number}</div>
             <div><strong>Infracción:</strong> ${v.violation_type}</div>
@@ -1636,11 +1890,11 @@
         lead.probates.forEach(p => {
           const div = document.createElement('div');
           div.className = 'distress-log-item';
-          div.style.borderLeftColor = 'var(--color-probate)';
+          div.style.borderLeftColor = 'var(--color-others-purple)';
           div.innerHTML = `
             <div class="distress-log-header">
-              <span>🪦 Sucesiones (Probate)</span>
-              <span>Caso: ${p.case_number}</span>
+              <span style="color: var(--color-others-purple); font-weight: bold;">👤 Otros: Sucesiones (Probate)</span>
+              <span style="color: var(--color-others-purple)">Caso: ${p.case_number}</span>
             </div>
             <div><strong>De Cujus (Fallecido):</strong> ${p.deceased_name}</div>
             <div><strong>Heredero Designado:</strong> ${p.heir_name}</div>
@@ -1655,11 +1909,11 @@
         lead.divorces.forEach(d => {
           const div = document.createElement('div');
           div.className = 'distress-log-item';
-          div.style.borderLeftColor = 'var(--color-divorce)';
+          div.style.borderLeftColor = 'var(--color-others-purple)';
           div.innerHTML = `
             <div class="distress-log-header">
-              <span>💔 Demanda de Divorcio</span>
-              <span>Caso: ${d.case_number}</span>
+              <span style="color: var(--color-others-purple); font-weight: bold;">👤 Otros: Demanda de Divorcio</span>
+              <span style="color: var(--color-others-purple)">Caso: ${d.case_number}</span>
             </div>
             <div><strong>Cónyuge A:</strong> ${d.spouse_a}</div>
             <div><strong>Cónyuge B:</strong> ${d.spouse_b}</div>
@@ -1674,14 +1928,75 @@
         lead.bankruptcies.forEach(b => {
           const div = document.createElement('div');
           div.className = 'distress-log-item';
-          div.style.borderLeftColor = 'var(--color-bankruptcy)';
+          div.style.borderLeftColor = 'var(--color-financial-yellow)';
           div.innerHTML = `
             <div class="distress-log-header">
-              <span>💸 Declaración de Bancarrota</span>
-              <span>Caso: ${b.case_number}</span>
+              <span style="color: var(--color-financial-yellow); font-weight: bold;">💸 Otros: Declaración de Bancarrota</span>
+              <span style="color: var(--color-financial-yellow)">Caso: ${b.case_number}</span>
             </div>
             <div><strong>Deudor Principal:</strong> ${b.debtor_name}</div>
             <div><strong>Tipo / Capítulo:</strong> ${b.bankruptcy_type || 'Capítulo 7/13'}</div>
+          `;
+          logsContainer.appendChild(div);
+        });
+      }
+
+      // F. Physical Distress
+      if (lead.physicalDistress && lead.physicalDistress.length > 0) {
+        activeDistressCategories.push('physical');
+        lead.physicalDistress.forEach(pd => {
+          const div = document.createElement('div');
+          div.className = 'distress-log-item';
+          div.style.borderLeftColor = 'var(--color-physical-amber)';
+          div.innerHTML = `
+            <div class="distress-log-header">
+              <span style="color: var(--color-physical-amber); font-weight: bold;">🔥 Estrés Físico / Abandono Municipal</span>
+              <span style="color: var(--color-physical-amber)">${pd.report_date || 'Reciente'}</span>
+            </div>
+            <div><strong>Infracción:</strong> ${pd.distress_type}</div>
+            <div><strong>Detalles:</strong> _${pd.details || 'Sin detalles adicionales'}_</div>
+          `;
+          logsContainer.appendChild(div);
+        });
+      }
+
+      // G. Financial Distress
+      if (lead.financialDistress && lead.financialDistress.length > 0) {
+        activeDistressCategories.push('financial');
+        lead.financialDistress.forEach(fd => {
+          const div = document.createElement('div');
+          div.className = 'distress-log-item';
+          div.style.borderLeftColor = 'var(--color-financial-yellow)';
+          const debtStr = fd.debt_amount ? `$${fd.debt_amount.toLocaleString()}` : 'No especificada';
+          div.innerHTML = `
+            <div class="distress-log-header">
+              <span style="color: var(--color-financial-yellow); font-weight: bold;">⚖️ Otros: Gravamen / Demanda Financiera</span>
+              <span style="color: var(--color-financial-yellow)">${fd.report_date || 'Reciente'}</span>
+            </div>
+            <div><strong>Tipo:</strong> ${fd.record_type}</div>
+            <div><strong>Caso:</strong> ${fd.case_number || 'N/A'}</div>
+            <div><strong>Acreedor:</strong> ${fd.plaintiff || 'No especificado'}</div>
+            <div><strong>Monto:</strong> ${debtStr}</div>
+          `;
+          logsContainer.appendChild(div);
+        });
+      }
+
+      // H. Life Events
+      if (lead.lifeEvents && lead.lifeEvents.length > 0) {
+        activeDistressCategories.push('life-event');
+        lead.lifeEvents.forEach(le => {
+          const div = document.createElement('div');
+          div.className = 'distress-log-item';
+          div.style.borderLeftColor = 'var(--color-others-purple)';
+          div.innerHTML = `
+            <div class="distress-log-header">
+              <span style="color: var(--color-others-purple); font-weight: bold;">👤 Otros: Evento de Vida Crítico</span>
+              <span style="color: var(--color-others-purple)">${le.report_date || 'Reciente'}</span>
+            </div>
+            <div><strong>Tipo:</strong> ${le.event_type}</div>
+            <div><strong>Sujeto:</strong> ${le.subject_name}</div>
+            <div><strong>Detalles:</strong> _${le.details || 'Sin detalles adicionales'}_</div>
           `;
           logsContainer.appendChild(div);
         });
@@ -1788,6 +2103,27 @@
         };
       }
 
+      if (categories.includes('physical')) {
+        scripts['physical'] = {
+          name: '🔥 Físico',
+          text: `[GUION DE ESTRÉS FÍSICO / DAÑO SEVERO]\nHola, buenas tardes. ¿Hablo con \${lead.ownerName}? Le contacto respecto a la propiedad en \${lead.displayAddress}.\nRevisando los registros de seguridad e inspección urbana, notamos reportes por daños o suspensión de servicios. Nos especializamos en adquirir propiedades con problemas de mantenimiento severos en efectivo.\nNosotros nos encargamos de vaciar el inmueble, resolver problemas estructurales y liquidar adeudos de servicios municipales. Usted recibe su pago en efectivo sin tener que invertir dinero ni tiempo en reparaciones.\n¿Consideraría evaluar una oferta en efectivo en las condiciones actuales de la casa?`
+        };
+      }
+
+      if (categories.includes('financial')) {
+        scripts['financial'] = {
+          name: '⚖️ Finanzas',
+          text: `[GUION DE ESTRÉS FINANCIERO / GRAVAMENES]\nHola, buenas tardes. ¿Hablo con \${lead.ownerName}? Le llamo en relación a la propiedad en \${lead.displayAddress}.\nRevisando los registros del condado, notamos algunos gravámenes pendientes o reclamaciones comerciales. Nuestro fondo adquiere propiedades directamente haciéndose cargo de saldar estas deudas pendientes en el momento de la compra.\nEsto le permite liberar el título de la casa de inmediato, detener recargos y recuperar una parte sustancial de su dinero en efectivo.\n¿Le interesaría recibir una oferta para liquidar la propiedad y saldar estos saldos pendientes de forma directa?`
+        };
+      }
+
+      if (categories.includes('life-event')) {
+        scripts['life-event'] = {
+          name: '🚨 Evento Vida',
+          text: `[GUION DE EVENTOS DE VIDA CRÍTICOS]\nHola, buenas tardes. ¿Hablo con \${lead.ownerName}? Le contacto en relación al inmueble en \${lead.displayAddress}.\nCompramos propiedades al contado de forma rápida y confidencial en su condado. Sabemos que a veces surgen situaciones imprevistas o cambios familiares que requieren liquidez de forma inmediata.\nPodemos formalizar un contrato de compra en 24 horas y cerrar la transacción en pocos días sin intermediarios, comisiones, ni visitas públicas al inmueble.\n¿Le gustaría evaluar una propuesta de compra rápida en efectivo hoy de forma totalmente privada?`
+        };
+      }
+
       // Default script (Always available)
       scripts['general'] = {
         name: '📞 General',
@@ -1834,6 +2170,90 @@
         console.error('Failed to copy text: ', err);
       });
     };
+
+    async function openSurplusVault() {
+      document.getElementById('surplus-vault-modal').style.display = 'block';
+      document.body.style.overflow = 'hidden';
+      
+      const tbody = document.getElementById('surplus-tbody');
+      const emptyState = document.getElementById('surplus-empty-state');
+      tbody.innerHTML = `<tr><td colspan="8" style="text-align: center; color: var(--text-muted); padding: 40px;">Cargando excedentes de Turso DB...</td></tr>`;
+      emptyState.style.display = 'none';
+      
+      try {
+        const res = await fetch('/api/surplus');
+        const json = await res.json();
+        
+        if (json.status === 'success' && json.data.length > 0) {
+          tbody.innerHTML = '';
+          json.data.forEach(item => {
+            const tr = document.createElement('tr');
+            
+            // Calculate days since auction
+            const daysRemaining = getDaysRemaining(item.auction_date);
+            const daysAgo = daysRemaining !== null ? Math.abs(daysRemaining) : 'N/A';
+            const daysStr = daysRemaining !== null ? `${daysAgo} días` : 'Fecha indefinida';
+            
+            const surplusVal = item.surplus_amount || 0;
+            const winningBid = item.winning_bid || 0;
+            const judgmentAmt = item.judgment_amount || 0;
+            
+            tr.innerHTML = `
+              <td style="font-weight: bold; color: #ffffff; padding: 14px 16px;">${item.owner_name}</td>
+              <td style="color: var(--text-muted); padding: 14px 16px;">${item.address}</td>
+              <td style="text-align: right; color: var(--text-muted); padding: 14px 16px;">$${judgmentAmt.toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
+              <td style="text-align: right; color: var(--text-muted); padding: 14px 16px;">$${winningBid.toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
+              <td style="text-align: right; font-weight: bold; color: var(--color-radar-green); font-size: 1rem; padding: 14px 16px;">$${surplusVal.toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
+              <td style="padding: 14px 16px;">
+                <code style="background: rgba(255,255,255,0.05); padding: 4px 8px; border-radius: 4px; color: var(--color-financial-yellow); font-family: monospace; font-size: 0.85rem;">
+                  ${item.defendant_phones || 'Sin teléfono'}
+                </code>
+              </td>
+              <td style="text-align: center; color: var(--text-muted); padding: 14px 16px;">${daysStr}</td>
+              <td style="text-align: center; padding: 14px 16px;">
+                <button class="copy-surplus-script-btn" onclick="copySurplusScript('${item.owner_name.replace(/'/g, "\\'")}', '${item.address.replace(/'/g, "\\'")}', '${item.county ? item.county.replace(/'/g, "\\'") : 'Jefferson'}', ${winningBid}, ${judgmentAmt}, ${surplusVal}, this)" style="background: rgba(16, 185, 129, 0.1); border: 1px solid var(--color-radar-green); color: var(--color-radar-green); padding: 6px 12px; border-radius: 4px; font-size: 0.75rem; cursor: pointer; transition: all 0.2s; font-family: 'Orbitron', sans-serif; font-weight: bold; outline: none;">
+                  Copiar Guión
+                </button>
+              </td>
+            `;
+            tbody.appendChild(tr);
+          });
+        } else {
+          tbody.innerHTML = '';
+          emptyState.style.display = 'block';
+        }
+      } catch (err) {
+        console.error("Failed to fetch surplus funds:", err);
+        tbody.innerHTML = `<tr><td colspan="8" style="text-align: center; color: var(--color-high-motivation); padding: 40px;">Error al conectar con la base de datos de excedentes.</td></tr>`;
+      }
+    }
+
+    function closeSurplusVault() {
+      document.getElementById('surplus-vault-modal').style.display = 'none';
+      document.body.style.overflow = '';
+    }
+
+    window.copySurplusScript = function(ownerName, address, county, winningBid, judgmentAmt, surplusVal, btn) {
+      const script = `[GUION DE RECLAMACIÓN DE EXCEDENTES]
+Hola, buenas tardes. ¿Hablo con ${ownerName}? Le llamo en relación a la propiedad que tenía en ${address}.
+Mi nombre es de TZEL. Hemos realizado una auditoría de fondos excedentes en el condado de ${county} y descubrimos que la subasta de su propiedad se cerró por un valor de $${winningBid.toLocaleString('en-US', { minimumFractionDigits: 2 })} dólares, lo cual superó la deuda reclamada por el juzgado de $${judgmentAmt.toLocaleString('en-US', { minimumFractionDigits: 2 })} dólares. Esto generó un excedente a su favor por $${surplusVal.toLocaleString('en-US', { minimumFractionDigits: 2 })} dólares que se encuentra actualmente retenido en la tesorería del juzgado.
+Este dinero le pertenece legalmente a usted, pero si no se reclama a tiempo puede pasar al estado de forma definitiva (caducidad). Nosotros le ayudamos a tramitar y recuperar el 100% de estos fondos sin costo inicial, cobrando solo a contra-resultado.
+¿Le interesaría que iniciemos el reclamo de sus fondos hoy mismo?`;
+
+      navigator.clipboard.writeText(script).then(() => {
+        const originalText = btn.innerHTML;
+        btn.innerHTML = '¡Copiado!';
+        btn.style.background = 'var(--color-radar-green)';
+        btn.style.color = '#ffffff';
+        setTimeout(() => {
+          btn.innerHTML = originalText;
+          btn.style.background = 'rgba(16, 185, 129, 0.1)';
+          btn.style.color = 'var(--color-radar-green)';
+        }, 1500);
+      }).catch(err => {
+        console.error('Failed to copy surplus script: ', err);
+      });
+    }
   </script>
 </body>
 </html>

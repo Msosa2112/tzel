@@ -219,6 +219,9 @@ interface GroupedLead {
   probates: any[];
   divorces: any[];
   bankruptcies: any[];
+  physicalDistress: any[];
+  financialDistress: any[];
+  lifeEvents: any[];
   hiddenMortgages: number;
   
   // Nuevos campos del catastro y la MLS
@@ -324,7 +327,7 @@ async function notifyOpportunities() {
       // Si no se puede parsear la fecha, lo mantenemos como medida de seguridad (por ejemplo, Indiana manual review)
       return true;
     }
-    return daysRemaining >= 0 && daysRemaining <= 30;
+    return daysRemaining >= 0 && daysRemaining <= 60;
   });
 
 
@@ -387,9 +390,54 @@ async function notifyOpportunities() {
   }
   const bankruptcies = bankruptciesRes.rows;
 
-  console.log(`[NOTIFICAR] Pendientes: Subastas: ${opportunities.length}, Violaciones: ${violations.length}, Herencias: ${probates.length}, Divorcios: ${divorces.length}, Quiebras: ${bankruptcies.length}`);
+  // 6. Consultar estrés físico no notificado
+  let physicalRes;
+  try {
+    physicalRes = await db.execute(`
+      SELECT distress_id, address, county, state, distress_type, report_date, details, owner_name,
+             mls_estimated_value, mls_id, defendant_phones, defendant_emails, mailing_address, absentee_owner, sqft, beds, baths, hidden_mortgages
+      FROM physical_distress
+      WHERE telegram_sent = 0
+    `);
+  } catch (dbErr: any) {
+    console.error("[DB ERROR] Error al consultar physical_distress:", dbErr.message);
+    process.exit(1);
+  }
+  const physicalDistressList = physicalRes.rows;
 
-  if (opportunities.length === 0 && violations.length === 0 && probates.length === 0 && divorces.length === 0 && bankruptcies.length === 0) {
+  // 7. Consultar estrés financiero extra no notificado
+  let financialRes;
+  try {
+    financialRes = await db.execute(`
+      SELECT record_id, case_number, address, county, state, record_type, debt_amount, owner_name, plaintiff, report_date,
+             mls_estimated_value, mls_id, defendant_phones, defendant_emails, mailing_address, absentee_owner, sqft, beds, baths, hidden_mortgages
+      FROM financial_distress
+      WHERE telegram_sent = 0
+    `);
+  } catch (dbErr: any) {
+    console.error("[DB ERROR] Error al consultar financial_distress:", dbErr.message);
+    process.exit(1);
+  }
+  const financialDistressList = financialRes.rows;
+
+  // 8. Consultar eventos de vida críticos no notificados
+  let lifeEventsRes;
+  try {
+    lifeEventsRes = await db.execute(`
+      SELECT event_id, event_type, subject_name, address, county, state, details, report_date,
+             mls_estimated_value, mls_id, defendant_phones, defendant_emails, mailing_address, absentee_owner, sqft, beds, baths, hidden_mortgages
+      FROM life_events
+      WHERE telegram_sent = 0
+    `);
+  } catch (dbErr: any) {
+    console.error("[DB ERROR] Error al consultar life_events:", dbErr.message);
+    process.exit(1);
+  }
+  const lifeEventsList = lifeEventsRes.rows;
+
+  console.log(`[NOTIFICAR] Pendientes: Subastas: ${opportunities.length}, Violaciones: ${violations.length}, Herencias: ${probates.length}, Divorcios: ${divorces.length}, Quiebras: ${bankruptcies.length}, Físico: ${physicalDistressList.length}, Fin: ${financialDistressList.length}, Eventos: ${lifeEventsList.length}`);
+
+  if (opportunities.length === 0 && violations.length === 0 && probates.length === 0 && divorces.length === 0 && bankruptcies.length === 0 && physicalDistressList.length === 0 && financialDistressList.length === 0 && lifeEventsList.length === 0) {
     console.log("[NOTIFICAR] No hay nuevas notificaciones pendientes.");
     return;
   }
@@ -421,6 +469,9 @@ async function notifyOpportunities() {
         probates: [],
         divorces: [],
         bankruptcies: [],
+        physicalDistress: [],
+        financialDistress: [],
+        lifeEvents: [],
         hiddenMortgages: row.hidden_mortgages as number || 0,
         mailingAddress: row.mailing_address as string || undefined,
         isAbsentee: (row.absentee_owner as number) === 1,
@@ -493,6 +544,9 @@ async function notifyOpportunities() {
         probates: [],
         divorces: [],
         bankruptcies: [],
+        physicalDistress: [],
+        financialDistress: [],
+        lifeEvents: [],
         hiddenMortgages: row.hidden_mortgages as number || 0,
         mailingAddress: row.mailing_address as string || undefined,
         isAbsentee: (row.absentee_owner as number) === 1,
@@ -565,6 +619,9 @@ async function notifyOpportunities() {
         probates: [],
         divorces: [],
         bankruptcies: [],
+        physicalDistress: [],
+        financialDistress: [],
+        lifeEvents: [],
         hiddenMortgages: 0,
         isAbsentee: false
       });
@@ -609,6 +666,9 @@ async function notifyOpportunities() {
         probates: [],
         divorces: [],
         bankruptcies: [],
+        physicalDistress: [],
+        financialDistress: [],
+        lifeEvents: [],
         hiddenMortgages: 0,
         isAbsentee: false
       });
@@ -644,6 +704,9 @@ async function notifyOpportunities() {
         probates: [],
         divorces: [],
         bankruptcies: [],
+        physicalDistress: [],
+        financialDistress: [],
+        lifeEvents: [],
         hiddenMortgages: 0,
         isAbsentee: false
       });
@@ -658,10 +721,229 @@ async function notifyOpportunities() {
     groupedMap.get(key)!.bankruptcies.push(row);
   }
 
+  // F. Agrupar estrés físico (physical_distress)
+  for (const row of physicalDistressList) {
+    const address = row.address as string;
+    const key = getGroupingKey(address);
+
+    const rowPhones = (row.defendant_phones as string || "").split(/,\s*|;\s*/).map(p => p.trim()).filter(Boolean);
+    const rowEmails = (row.defendant_emails as string || "").split(/,\s*|;\s*/).map(e => e.trim()).filter(Boolean);
+
+    if (!groupedMap.has(key)) {
+      groupedMap.set(key, {
+        groupingKey: key,
+        displayAddress: address,
+        state: row.state as string || "KY",
+        county: row.county as string || "Jefferson",
+        ownerName: row.owner_name as string || "DUEÑO DESCONOCIDO",
+        phones: new Set(rowPhones),
+        emails: new Set(rowEmails),
+        mlsValue: row.mls_estimated_value as number || 0,
+        mlsId: row.mls_id as string || "N/A",
+        auctions: [],
+        violations: [],
+        probates: [],
+        divorces: [],
+        bankruptcies: [],
+        physicalDistress: [],
+        financialDistress: [],
+        lifeEvents: [],
+        hiddenMortgages: row.hidden_mortgages as number || 0,
+        mailingAddress: row.mailing_address as string || undefined,
+        isAbsentee: (row.absentee_owner as number) === 1,
+        sqft: row.sqft as number || undefined,
+        beds: row.beds as number || undefined,
+        baths: row.baths as number || undefined
+      });
+    } else {
+      const existing = groupedMap.get(key)!;
+      if (row.owner_name && row.owner_name !== "DUEÑO DESCONOCIDO" && (existing.ownerName === "No especificado" || existing.ownerName === "DUEÑO DESCONOCIDO")) {
+        existing.ownerName = row.owner_name as string;
+      }
+      if (row.mls_estimated_value && (row.mls_estimated_value as number) > existing.mlsValue) {
+        existing.mlsValue = row.mls_estimated_value as number;
+      }
+      if (row.mls_id && row.mls_id !== "N/A") {
+        existing.mlsId = row.mls_id as string;
+      }
+      if (!existing.mailingAddress && row.mailing_address) {
+        existing.mailingAddress = row.mailing_address as string;
+      }
+      if ((row.absentee_owner as number) === 1) {
+        existing.isAbsentee = true;
+      }
+      if (!existing.sqft && row.sqft) {
+        existing.sqft = row.sqft as number;
+      }
+      if (!existing.beds && row.beds) {
+        existing.beds = row.beds as number;
+      }
+      if (!existing.baths && row.baths) {
+        existing.baths = row.baths as number;
+      }
+      if (row.hidden_mortgages && (row.hidden_mortgages as number) > existing.hiddenMortgages) {
+        existing.hiddenMortgages = row.hidden_mortgages as number;
+      }
+      rowPhones.forEach(p => existing.phones.add(p));
+      rowEmails.forEach(e => existing.emails.add(e));
+      if (address.length > existing.displayAddress.length) {
+        existing.displayAddress = address;
+      }
+    }
+    groupedMap.get(key)!.physicalDistress.push(row);
+  }
+
+  // G. Agrupar estrés financiero extra (financial_distress)
+  for (const row of financialDistressList) {
+    const address = row.address as string;
+    const key = getGroupingKey(address);
+
+    const rowPhones = (row.defendant_phones as string || "").split(/,\s*|;\s*/).map(p => p.trim()).filter(Boolean);
+    const rowEmails = (row.defendant_emails as string || "").split(/,\s*|;\s*/).map(e => e.trim()).filter(Boolean);
+
+    if (!groupedMap.has(key)) {
+      groupedMap.set(key, {
+        groupingKey: key,
+        displayAddress: address,
+        state: row.state as string || "KY",
+        county: row.county as string || "Jefferson",
+        ownerName: row.owner_name as string || "DUEÑO DESCONOCIDO",
+        phones: new Set(rowPhones),
+        emails: new Set(rowEmails),
+        mlsValue: row.mls_estimated_value as number || 0,
+        mlsId: row.mls_id as string || "N/A",
+        auctions: [],
+        violations: [],
+        probates: [],
+        divorces: [],
+        bankruptcies: [],
+        physicalDistress: [],
+        financialDistress: [],
+        lifeEvents: [],
+        hiddenMortgages: row.hidden_mortgages as number || 0,
+        mailingAddress: row.mailing_address as string || undefined,
+        isAbsentee: (row.absentee_owner as number) === 1,
+        sqft: row.sqft as number || undefined,
+        beds: row.beds as number || undefined,
+        baths: row.baths as number || undefined
+      });
+    } else {
+      const existing = groupedMap.get(key)!;
+      if (row.owner_name && row.owner_name !== "DUEÑO DESCONOCIDO" && (existing.ownerName === "No especificado" || existing.ownerName === "DUEÑO DESCONOCIDO")) {
+        existing.ownerName = row.owner_name as string;
+      }
+      if (row.mls_estimated_value && (row.mls_estimated_value as number) > existing.mlsValue) {
+        existing.mlsValue = row.mls_estimated_value as number;
+      }
+      if (row.mls_id && row.mls_id !== "N/A") {
+        existing.mlsId = row.mls_id as string;
+      }
+      if (!existing.mailingAddress && row.mailing_address) {
+        existing.mailingAddress = row.mailing_address as string;
+      }
+      if ((row.absentee_owner as number) === 1) {
+        existing.isAbsentee = true;
+      }
+      if (!existing.sqft && row.sqft) {
+        existing.sqft = row.sqft as number;
+      }
+      if (!existing.beds && row.beds) {
+        existing.beds = row.beds as number;
+      }
+      if (!existing.baths && row.baths) {
+        existing.baths = row.baths as number;
+      }
+      if (row.hidden_mortgages && (row.hidden_mortgages as number) > existing.hiddenMortgages) {
+        existing.hiddenMortgages = row.hidden_mortgages as number;
+      }
+      rowPhones.forEach(p => existing.phones.add(p));
+      rowEmails.forEach(e => existing.emails.add(e));
+      if (address.length > existing.displayAddress.length) {
+        existing.displayAddress = address;
+      }
+    }
+    groupedMap.get(key)!.financialDistress.push(row);
+  }
+
+  // H. Agrupar eventos de vida críticos (life_events)
+  for (const row of lifeEventsList) {
+    const address = row.address as string;
+    const key = getGroupingKey(address);
+
+    const rowPhones = (row.defendant_phones as string || "").split(/,\s*|;\s*/).map(p => p.trim()).filter(Boolean);
+    const rowEmails = (row.defendant_emails as string || "").split(/,\s*|;\s*/).map(e => e.trim()).filter(Boolean);
+
+    if (!groupedMap.has(key)) {
+      groupedMap.set(key, {
+        groupingKey: key,
+        displayAddress: address,
+        state: row.state as string || "KY",
+        county: row.county as string || "Jefferson",
+        ownerName: row.subject_name as string || "No especificado",
+        phones: new Set(rowPhones),
+        emails: new Set(rowEmails),
+        mlsValue: row.mls_estimated_value as number || 0,
+        mlsId: row.mls_id as string || "N/A",
+        auctions: [],
+        violations: [],
+        probates: [],
+        divorces: [],
+        bankruptcies: [],
+        physicalDistress: [],
+        financialDistress: [],
+        lifeEvents: [],
+        hiddenMortgages: row.hidden_mortgages as number || 0,
+        mailingAddress: row.mailing_address as string || undefined,
+        isAbsentee: (row.absentee_owner as number) === 1,
+        sqft: row.sqft as number || undefined,
+        beds: row.beds as number || undefined,
+        baths: row.baths as number || undefined
+      });
+    } else {
+      const existing = groupedMap.get(key)!;
+      if (row.subject_name && row.subject_name !== "No especificado" && (existing.ownerName === "No especificado" || existing.ownerName === "DUEÑO DESCONOCIDO")) {
+        existing.ownerName = row.subject_name as string;
+      }
+      if (row.mls_estimated_value && (row.mls_estimated_value as number) > existing.mlsValue) {
+        existing.mlsValue = row.mls_estimated_value as number;
+      }
+      if (row.mls_id && row.mls_id !== "N/A") {
+        existing.mlsId = row.mls_id as string;
+      }
+      if (!existing.mailingAddress && row.mailing_address) {
+        existing.mailingAddress = row.mailing_address as string;
+      }
+      if ((row.absentee_owner as number) === 1) {
+        existing.isAbsentee = true;
+      }
+      if (!existing.sqft && row.sqft) {
+        existing.sqft = row.sqft as number;
+      }
+      if (!existing.beds && row.beds) {
+        existing.beds = row.beds as number;
+      }
+      if (!existing.baths && row.baths) {
+        existing.baths = row.baths as number;
+      }
+      if (row.hidden_mortgages && (row.hidden_mortgages as number) > existing.hiddenMortgages) {
+        existing.hiddenMortgages = row.hidden_mortgages as number;
+      }
+      rowPhones.forEach(p => existing.phones.add(p));
+      rowEmails.forEach(e => existing.emails.add(e));
+      if (address.length > existing.displayAddress.length) {
+        existing.displayAddress = address;
+      }
+    }
+    groupedMap.get(key)!.lifeEvents.push(row);
+  }
+
   console.log(`[NOTIFICAR] Direcciones agrupadas únicas a notificar: ${groupedMap.size}`);
 
   let notifiedAuctionsCount = 0;
   let notifiedViolationsCount = 0;
+  let notifiedPhysicalCount = 0;
+  let notifiedFinancialCount = 0;
+  let notifiedLifeCount = 0;
 
   // 4. Construir y enviar notificaciones
   for (const lead of groupedMap.values()) {
@@ -695,18 +977,63 @@ async function notifyOpportunities() {
     if (hasAuctions) {
       const firstAuction = lead.auctions[0];
       const daysRemaining = getDaysRemaining(firstAuction.auction_date);
-      if (daysRemaining !== null && daysRemaining >= 0 && daysRemaining <= 30) {
+      if (daysRemaining !== null && daysRemaining >= 0 && daysRemaining <= 60) {
         if (hasViolations || primaryDebt > 0 || hiddenDebt > 0) {
           isHighMotivation = true;
         }
       }
     }
 
+    let painBanners: string[] = [];
+    let isPrimaryObjective = false;
+    
+    // CATEGORÍA 1: ZONA DE EJECUCIÓN (Prioridad Máxima)
+    if (lead.auctions.length > 0) {
+      const hasScheduled = lead.auctions.some(auc => getDaysRemaining(auc.auction_date) !== null);
+      if (hasScheduled) {
+        painBanners.push(`🛑 *ZONA DE EJECUCIÓN: SUBASTA PROGRAMADA* 🚨`);
+      } else {
+        painBanners.push(`🛑 *ZONA DE EJECUCIÓN: DETECCIÓN PRE-SUBASTA* ⏳`);
+      }
+      isPrimaryObjective = true;
+    }
+    
+    // CATEGORÍA 2: ESTRÉS FÍSICO
+    if (lead.physicalDistress.length > 0) {
+      painBanners.push(`🔥 *ESTRÉS FÍSICO: CASA QUEMADA / CONDENADA*`);
+    }
+    
+    // CATEGORÍA 3: OTROS ESTRESORES (Estrés Acumulado)
+    const hasFinancialDistress = lead.financialDistress.length > 0 || lead.bankruptcies.length > 0;
+    const hasLifeEventDistress = lead.lifeEvents.length > 0 || lead.probates.length > 0 || lead.divorces.length > 0 || lead.violations.length > 0;
+    if (hasFinancialDistress || hasLifeEventDistress) {
+      let details: string[] = [];
+      if (lead.financialDistress.some(d => d.record_type === "Eviction")) details.push("DESALOJO EN CURSO");
+      if (lead.financialDistress.some(d => d.record_type && d.record_type !== "Eviction")) details.push("TAX LIEN/SENTENCIA");
+      if (lead.lifeEvents.length > 0) details.push("ARRESTO/OBITUARIO");
+      if (lead.probates.length > 0) details.push("SUCESIÓN");
+      if (lead.divorces.length > 0) details.push("DIVORCIO");
+      if (lead.violations.length > 0) details.push("VIOLACIÓN DE CÓDIGO");
+      
+      const detailsStr = details.length > 0 ? ` (${details.join(" / ")})` : "";
+      painBanners.push(`⚠️ *OTROS ESTRESORES: ESTRÉS ACUMULADO${detailsStr}*`);
+    }
+
     let msg = "";
+    if (isPrimaryObjective) {
+      msg += `🎯 *[OBJETIVO PRINCIPAL DEL DÍA]* 🎯\n`;
+    }
+    if (painBanners.length > 0) {
+      msg += painBanners.join("\n") + "\n\n";
+    }
     if (isHighMotivation) {
       msg += `🔥 *ALTA MOTIVACIÓN* 🔥\n\n`;
     }
 
+    if (hiddenDebt > 0) {
+      msg += `🏦 *HIPOTECAS OCULTAS DETECTADAS* 🏦\n`;
+      msg += `_Se detectaron deudas o gravámenes secundarios adicionales por $${hiddenDebt.toLocaleString("en-US", { minimumFractionDigits: 2 })}_\n\n`;
+    }
 
     const hasProbates = lead.probates && lead.probates.length > 0;
     const hasDivorces = lead.divorces && lead.divorces.length > 0;
@@ -724,7 +1051,7 @@ async function notifyOpportunities() {
         msg += `_El crawler no pudo extraer automáticamente la deuda de este expediente._\n\n`;
       } else {
         msg += `🚨 *OPORTUNIDAD DE ADQUISICIÓN PRE-SUBASTA* 🚨\n`;
-        msg += `_Propiedad identificada con margen de ganancia >= 40% del valor comercial MLS_\n\n`;
+        msg += `_Propiedad identificada con margen de ganancia >= 30% del valor comercial MLS_\n\n`;
       }
     } else if (hasViolations) {
       msg += `🚨 *OPORTUNIDAD PRE-PÚBLICA: VIOLACIÓN DE CÓDIGO* 🚨\n`;
@@ -892,6 +1219,42 @@ async function notifyOpportunities() {
       }
     }
 
+    // Detalles de Estrés Físico (si existen)
+    if (lead.physicalDistress.length > 0) {
+      msg += `\n---\n`;
+      msg += `🔥 *ESTRÉS FÍSICO / ABANDONO MUNICIPAL*:\n`;
+      for (const pd of lead.physicalDistress) {
+        const reportDate = pd.report_date || "No especificada";
+        msg += `• *Tipo: ${pd.distress_type}* (Reportado: ${reportDate}):\n`;
+        if (pd.details) msg += `  - Detalles: _${pd.details}_\n`;
+      }
+    }
+
+    // Detalles de Estrés Financiero Extra (si existen)
+    if (lead.financialDistress.length > 0) {
+      msg += `\n---\n`;
+      msg += `⚖️ *ESTRÉS FINANCIERO (CLERK / COURTS)*:\n`;
+      for (const fd of lead.financialDistress) {
+        const reportDate = fd.report_date || "No especificada";
+        const debt = fd.debt_amount as number || 0;
+        msg += `• *Caso/Registro:* ${fd.case_number || "N/A"} (Tipo: ${fd.record_type}, Reportado: ${reportDate}):\n`;
+        if (debt > 0) msg += `  - Monto de Deuda: $${debt.toLocaleString("en-US", { minimumFractionDigits: 2 })}\n`;
+        if (fd.plaintiff) msg += `  - Acreedor/Demandante: ${fd.plaintiff}\n`;
+      }
+    }
+
+    // Detalles de Eventos de Vida Críticos (si existen)
+    if (lead.lifeEvents.length > 0) {
+      msg += `\n---\n`;
+      msg += `💔 *EVENTOS DE VIDA CRÍTICOS*:\n`;
+      for (const le of lead.lifeEvents) {
+        const reportDate = le.report_date || "No especificada";
+        msg += `• *Tipo: ${le.event_type}* (Fecha: ${reportDate}):\n`;
+        if (le.subject_name) msg += `  - Sujeto: ${le.subject_name}\n`;
+        if (le.details) msg += `  - Detalles: _${le.details}_\n`;
+      }
+    }
+
     // Detalles de Herencias (si existen)
     if (hasProbates) {
       msg += `\n---\n`;
@@ -1022,6 +1385,45 @@ async function notifyOpportunities() {
           console.error(`[DB ERROR] No se pudo marcar como notificado el bankruptcy ${b.bankruptcy_id}:`, dbErr.message);
         }
       }
+
+      // Marcar physical_distress asociadas como notificadas
+      for (const pd of lead.physicalDistress) {
+        try {
+          await db.execute({
+            sql: "UPDATE physical_distress SET telegram_sent = 1 WHERE distress_id = ?",
+            args: [pd.distress_id]
+          });
+          notifiedPhysicalCount++;
+        } catch (dbErr: any) {
+          console.error(`[DB ERROR] No se pudo marcar como notificado el physical_distress ${pd.distress_id}:`, dbErr.message);
+        }
+      }
+
+      // Marcar financial_distress asociadas como notificadas
+      for (const fd of lead.financialDistress) {
+        try {
+          await db.execute({
+            sql: "UPDATE financial_distress SET telegram_sent = 1 WHERE record_id = ?",
+            args: [fd.record_id]
+          });
+          notifiedFinancialCount++;
+        } catch (dbErr: any) {
+          console.error(`[DB ERROR] No se pudo marcar como notificado el financial_distress ${fd.record_id}:`, dbErr.message);
+        }
+      }
+
+      // Marcar life_events asociados como notificados
+      for (const le of lead.lifeEvents) {
+        try {
+          await db.execute({
+            sql: "UPDATE life_events SET telegram_sent = 1 WHERE event_id = ?",
+            args: [le.event_id]
+          });
+          notifiedLifeCount++;
+        } catch (dbErr: any) {
+          console.error(`[DB ERROR] No se pudo marcar como notificado el life_event ${le.event_id}:`, dbErr.message);
+        }
+      }
     }
 
     // Respetar límites de rate limiting de Telegram
@@ -1032,6 +1434,9 @@ async function notifyOpportunities() {
   console.log("RESUMEN DE NOTIFICACIONES TELEGRAM CONSOLIDADAS:");
   console.log(`- Subastas individuales notificadas: ${notifiedAuctionsCount}`);
   console.log(`- Violaciones individuales notificadas: ${notifiedViolationsCount}`);
+  console.log(`- Estrés Físico individual notificado: ${notifiedPhysicalCount}`);
+  console.log(`- Estrés Financiero individual notificado: ${notifiedFinancialCount}`);
+  console.log(`- Eventos de Vida individual notificado: ${notifiedLifeCount}`);
   console.log("========================================================\n");
 }
 

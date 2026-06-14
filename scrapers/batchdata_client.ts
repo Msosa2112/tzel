@@ -33,16 +33,15 @@ export interface BatchDataSkipTraceResponse {
 
 /**
  * Cliente de Integración de BatchData API
- * Listo para ser activado la próxima semana.
  */
 export class BatchDataClient {
   private apiKey: string;
-  private baseUrl = "https://api.batchdata.com/api/v1"; // Confirmar endpoint oficial en documentación
+  private baseUrl = "https://api.batchdata.com/api/v1";
 
   constructor() {
-    this.apiKey = process.env.BATCHDATA_API_KEY || "";
+    this.apiKey = process.env.SKIP_TRACE_API_KEY || process.env.BATCHDATA_API_KEY || "";
     if (!this.apiKey) {
-      console.warn("[BATCHDATA WARN] BATCHDATA_API_KEY no está configurada en el archivo .env");
+      console.warn("[BATCHDATA WARN] Ni SKIP_TRACE_API_KEY ni BATCHDATA_API_KEY están configuradas en el archivo .env");
     }
   }
 
@@ -60,19 +59,35 @@ export class BatchDataClient {
       return this.getSimulatedResponse(name);
     }
 
+    // Dividir el nombre en nombre de pila y apellido para el esquema de BatchData
+    const cleanName = name.replace(/,\s*et\s*al\.?/gi, "")
+                          .replace(/,\s*llc\.?/gi, "")
+                          .replace(/,\s*inc\.?/gi, "")
+                          .trim();
+    const nameParts = cleanName.split(/\s+/);
+    let firstName = cleanName;
+    let lastName = "";
+    if (nameParts.length > 1) {
+      lastName = nameParts.pop() || "";
+      firstName = nameParts.join(" ");
+    }
+
     try {
-      // Endpoint oficial de BatchData skip-trace
+      console.log(`[BATCHDATA API] Consultando Skip Trace real para "${cleanName}" (${firstName} ${lastName})...`);
       const response = await axios.post(
-        `${this.baseUrl}/skip-trace`, 
+        `${this.baseUrl}/property/skip-trace`, 
         {
-          persons: [
+          requests: [
             {
-              name: name,
-              address: {
+              propertyAddress: {
                 street: propertyAddress.street,
                 city: propertyAddress.city,
                 state: propertyAddress.state,
                 zip: propertyAddress.zip
+              },
+              name: {
+                first: firstName,
+                last: lastName
               }
             }
           ]
@@ -85,17 +100,61 @@ export class BatchDataClient {
         }
       );
 
-      // La próxima semana mapearemos la respuesta JSON real de la API de BatchData aquí.
       console.log("[BATCHDATA SUCCESS] Skip trace ejecutado exitosamente.");
+      const persons = response.data?.results?.persons || [];
+      const phones: SkipTracePhone[] = [];
+      const emails: SkipTraceEmail[] = [];
+      let mailingAddress: BatchDataAddress | undefined = undefined;
+      let vacant = false;
+
+      if (persons.length > 0) {
+        const person = persons[0];
+        const apiPhones = person.phoneNumbers || [];
+        const apiEmails = person.emails || [];
+
+        for (const p of apiPhones) {
+          phones.push({
+            number: p.number || p.phone,
+            type: p.type || "Unknown",
+            isDNC: p.dnc || p.tcpa || false,
+            carrier: p.carrier
+          });
+        }
+
+        for (const e of apiEmails) {
+          const emailStr = typeof e === "string" ? e : (e.email || "");
+          if (emailStr) {
+            emails.push({
+              email: emailStr,
+              deliverability: e.deliverability || "Unknown"
+            });
+          }
+        }
+
+        if (person.mailingAddress) {
+          mailingAddress = {
+            street: person.mailingAddress.street,
+            city: person.mailingAddress.city,
+            state: person.mailingAddress.state,
+            zip: person.mailingAddress.zip
+          };
+        }
+        if (person.property?.vacant !== undefined) {
+          vacant = person.property.vacant;
+        }
+      }
+
       return {
         success: true,
-        phones: [], // Mapear teléfonos reales
-        emails: [], // Mapear correos reales
+        phones,
+        emails,
+        mailingAddress,
+        vacant,
         rawResponse: response.data
       };
 
     } catch (error: any) {
-      console.error("[BATCHDATA ERROR] Error al realizar Skip Trace en BatchData:", error.message);
+      console.error("[BATCHDATA ERROR] Error al realizar Skip Trace en BatchData:", error.response?.data || error.message);
       return {
         success: false,
         phones: [],

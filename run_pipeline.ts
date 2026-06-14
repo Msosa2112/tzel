@@ -4,6 +4,9 @@ import { scrapeCodeViolations } from "./scrapers/scrapeCodeViolations";
 import { scrapePVA } from "./scrapers/scrapePVA";
 import { scrapeProbates } from "./scrapers/scrape_probates";
 import { scrapeDivorces } from "./scrapers/scrape_divorces";
+import { scrapePhysicalDistress } from "./scrapers/scrape_physical_distress";
+import { scrapeFinancialDistress } from "./scrapers/scrape_financial_distress";
+import { scrapeLifeEvents } from "./scrapers/scrape_life_events";
 import { runCrossReference } from "./cross_reference";
 import { runTitleLienCheck } from "./check_title_liens";
 import { runIndianaCrawler } from "./indiana_court_crawler";
@@ -61,6 +64,27 @@ async function runPipeline() {
     console.error("[PIPELINE ERROR] Falló el scraper de divorcios (Divorces):", err.message);
   }
 
+  try {
+    console.log("\n[FASE 1G] Scraping Physical Distress (Municipal alerts)...");
+    await scrapePhysicalDistress();
+  } catch (err: any) {
+    console.error("[PIPELINE ERROR] Falló el scraper de estrés físico:", err.message);
+  }
+
+  try {
+    console.log("\n[FASE 1H] Scraping Financial Distress (Tax Liens, Evictions, etc.)...");
+    await scrapeFinancialDistress();
+  } catch (err: any) {
+    console.error("[PIPELINE ERROR] Falló el scraper de estrés financiero:", err.message);
+  }
+
+  try {
+    console.log("\n[FASE 1I] Scraping Life Events (Arrests, Obituaries, etc.)...");
+    await scrapeLifeEvents();
+  } catch (err: any) {
+    console.error("[PIPELINE ERROR] Falló el scraper de eventos de vida:", err.message);
+  }
+
   // Esperar 3 segundos para garantizar que todos los registros asíncronos no-promisificados de Floyd County se escriban en Turso
   console.log("\n[WAIT] Esperando 3 segundos a que se asienten las escrituras en la base de datos...");
   await sleep(3000);
@@ -73,16 +97,14 @@ async function runPipeline() {
     console.error("[PIPELINE ERROR] Falló el motor de cruce MLS:", err.message);
   }
 
-  // FASE 2.5: Verificación de Títulos y Deudas Ocultas (Desactivado temporalmente por bypass de API)
-  /*
+  // FASE 2.5: Verificación de Títulos y Deudas Ocultas (Doble Validación)
   try {
-    console.log("\n[FASE 2.5] Verificando Gravámenes y Hipotecas Ocultas (DataTree API)...");
+    console.log("\n[FASE 2.5] Verificando Gravámenes y Hipotecas Ocultas (Spark API + Fallback County Clerk)...");
     await runTitleLienCheck();
   } catch (err: any) {
     console.error("[PIPELINE ERROR] Falló el verificador de deudas ocultas (Fallo Fuerte):", err.message);
     throw err; // Relanzar para detener el pipeline si falla (Hard Fail)
   }
-  */
 
   // FASE 3: Enriquecimiento de Casos de Indiana sin Deuda a través de MyCase
   try {
