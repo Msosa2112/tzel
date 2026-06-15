@@ -228,4 +228,13 @@ CREATE TABLE IF NOT EXISTS surplus_funds (
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
+CREATE TABLE IF NOT EXISTS portfolio_clusters (
+    cluster_id TEXT PRIMARY KEY,
+    primary_owner_name TEXT NOT NULL,
+    associated_properties TEXT NOT NULL, -- JSON array of objects: '[{"id": "...", "table": "...", "address": "...", "debt": 123}]'
+    total_debt_estimated REAL DEFAULT 0,
+    risk_score REAL DEFAULT 0,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
 

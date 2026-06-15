@@ -415,6 +415,70 @@
       background-color: var(--bg-darker);
     }
 
+    /* Floating map legend */
+    .map-legend {
+      position: absolute;
+      bottom: 25px;
+      right: 15px;
+      z-index: 950;
+      background: var(--bg-glass);
+      border: 1px solid var(--border-glass);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border-radius: 8px;
+      padding: 12px 16px;
+      box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.4);
+      max-width: 250px;
+      font-size: 11px;
+      color: var(--text-main);
+      pointer-events: auto;
+    }
+
+    .map-legend-title {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--color-radar-green);
+      margin-bottom: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      padding-bottom: 6px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .map-legend-item {
+      display: flex;
+      align-items: flex-start;
+      margin-bottom: 8px;
+      gap: 8px;
+    }
+
+    .map-legend-item:last-child {
+      margin-bottom: 0;
+    }
+
+    .legend-color-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      margin-top: 4px;
+      flex-shrink: 0;
+      display: inline-block;
+    }
+
+    .legend-label {
+      color: var(--text-muted);
+      line-height: 1.3;
+    }
+
+    .legend-label strong {
+      color: var(--text-main);
+      font-weight: 600;
+    }
+
     /* Custom Leaflet Map Pin (Radar Ping style) */
     .radar-ping-icon {
       display: flex;
@@ -1005,6 +1069,31 @@
     <main class="map-container">
       <div id="map"></div>
       <div class="radar-scan-overlay"></div>
+      
+      <!-- Leyenda de Mapa -->
+      <div class="map-legend">
+        <div class="map-legend-title">Leyenda del Radar</div>
+        <div class="map-legend-item">
+          <span class="legend-color-dot" style="background-color: var(--color-execution-red); box-shadow: 0 0 6px var(--color-execution-red)"></span>
+          <span class="legend-label">🚨 <strong>Subasta Programada</strong><br>Venta judicial en &lt; 60 días</span>
+        </div>
+        <div class="map-legend-item">
+          <span class="legend-color-dot" style="background-color: var(--color-execution-orange); box-shadow: 0 0 6px var(--color-execution-orange)"></span>
+          <span class="legend-label">⏳ <strong>Pre-Subasta</strong><br>Ejecución activa sin fecha</span>
+        </div>
+        <div class="map-legend-item">
+          <span class="legend-color-dot" style="background-color: var(--color-physical-amber); box-shadow: 0 0 6px var(--color-physical-amber)"></span>
+          <span class="legend-label">🔥 <strong>Estrés Físico</strong><br>Daños o violaciones de código</span>
+        </div>
+        <div class="map-legend-item">
+          <span class="legend-color-dot" style="background-color: var(--color-financial-yellow); box-shadow: 0 0 6px var(--color-financial-yellow)"></span>
+          <span class="legend-label">⚖️ <strong>Estrés Financiero</strong><br>Bancarrota, impuestos o deudas</span>
+        </div>
+        <div class="map-legend-item">
+          <span class="legend-color-dot" style="background-color: var(--color-others-purple); box-shadow: 0 0 6px var(--color-others-purple)"></span>
+          <span class="legend-label">👤 <strong>Sucesión / Divorcio</strong><br>Herencias y eventos de vida</span>
+        </div>
+      </div>
     </main>
 
     <!-- Right Drawer: Tactical details of selected property -->

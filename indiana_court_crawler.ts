@@ -6,6 +6,7 @@ import { createClient } from "@libsql/client";
 import * as dotenv from "dotenv";
 import { isHighYieldProperty } from "./underwriting/underwriter";
 import { BatchDataClient } from "./scrapers/batchdata_client";
+import { scrapeIndianaCaseWithCrawlee } from "./scrapers/crawlee_court_scraper";
 
 chromium.use(stealthPlugin());
 
@@ -155,7 +156,9 @@ async function getOwnerNameFromBatchData(address: string, state: string, county:
 async function searchMyCaseByName(first: string, last: string, county: string): Promise<string | null> {
   console.log(`[MYCASE NAME SEARCH] Buscando caso para ${first} ${last} en condado ${county}...`);
   
-  const browser = await chromium.launch({ headless: true });
+  const browser = await chromium.launch({
+    headless: process.env.HEADLESS ? process.env.HEADLESS === "true" : false,
+  });
   const context = await browser.newContext({
     userAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
     viewport: { width: 1280, height: 800 },
@@ -164,9 +167,32 @@ async function searchMyCaseByName(first: string, last: string, county: string): 
   const page = await context.newPage();
   
   try {
-    await page.goto("https://public.courts.in.gov/mycase/", { waitUntil: "networkidle", timeout: 20000 });
+    await page.goto("https://public.courts.in.gov/mycase/", { waitUntil: "networkidle", timeout: 25000 });
+    await page.waitForTimeout(3000);
+    
+    const title = await page.title();
+    // Detección y manejo defensivo del desafío de Cloudflare / Turnstile
+    const cfIframe = page.locator('iframe[src*="challenges.cloudflare.com"]');
+    const count = await cfIframe.count();
+    if (count > 0 || title.includes("Just a moment") || title.includes("Cloudflare")) {
+      console.log("[MYCASE NAME SEARCH] Desafío de Cloudflare detectado. Intentando resolver...");
+      try {
+        const frame = page.frame({ url: /challenges\.cloudflare\.com/ });
+        if (frame) {
+          const checkbox = frame.locator('#challenge-stage');
+          if (await checkbox.isVisible()) {
+            await checkbox.click();
+            console.log("[MYCASE NAME SEARCH] Se hizo clic en el checkbox de Turnstile.");
+          }
+        }
+      } catch (e: any) {
+        console.warn(`[MYCASE NAME SEARCH] No se pudo hacer clic en el iframe de Turnstile: ${e.message}`);
+      }
+      await page.waitForSelector("#SearchValue", { timeout: 15000 }).catch(() => {});
+    }
     
     // Switch to name search
+    await page.waitForSelector("#tabByParty", { timeout: 10000 });
     await page.click("#tabByParty");
     await page.waitForTimeout(1000);
     
@@ -183,7 +209,7 @@ async function searchMyCaseByName(first: string, last: string, county: string): 
     await page.waitForTimeout(4000);
     
     const bodyText = await page.innerText("body");
-    if (bodyText.includes("No cases found") || bodyText.includes("0 Cases Found")) {
+    if (bodyText.includes("No cases found") || bodyText.includes("0 Cases Found") || bodyText.includes("0 cases found")) {
       console.log(`[MYCASE NAME SEARCH] No se encontraron casos para ${first} ${last}.`);
       await browser.close();
       return null;
@@ -202,6 +228,15 @@ async function searchMyCaseByName(first: string, last: string, county: string): 
     }
   } catch (err: any) {
     console.error(`[MYCASE NAME SEARCH ERROR] ${err.message}`);
+    // Save diagnostic screenshot
+    try {
+      const fs = require("fs");
+      if (!fs.existsSync("./storage")) {
+        fs.mkdirSync("./storage", { recursive: true });
+      }
+      await page.screenshot({ path: "./storage/mycase_name_search_fail.png", fullPage: true });
+      console.log("[MYCASE NAME SEARCH ERROR] Diagnóstico guardado en ./storage/mycase_name_search_fail.png");
+    } catch (e) {}
   } finally {
     await browser.close();
   }
@@ -478,6 +513,12 @@ async function getCaseDetailsFromMyCase(caseNumber: string): Promise<{ debt: num
 async function runIndianaCrawler() {
   console.log("[INICIO] Iniciando Crawler de Expedientes de Indiana (MyCase)...");
   
+  // Limpiar storage de Crawlee al inicio del proceso para evitar colisiones de colas de peticiones
+  try {
+    const fs = require("fs");
+    fs.rmSync("./storage", { recursive: true, force: true });
+  } catch (e) {}
+  
   // 1. Consultar subastas de Indiana que no tengan deuda asociada
   let auctionsRes;
   try {
@@ -580,11 +621,11 @@ async function runIndianaCrawler() {
       }
     }
     
-    // 3. Consultar MyCase usando Playwright Stealth
+    // 3. Consultar MyCase usando Crawlee
     try {
-      const details = await getCaseDetailsFromMyCase(caseNumber);
+      const details = await scrapeIndianaCaseWithCrawlee(caseNumber);
       
-      const debt = details ? details.debt : null;
+      const debt = details ? details.debtAmount : null;
       let finalPlaintiff = details?.plaintiff || extractedPlaintiff || "Unknown";
       let finalDefendant = details?.defendant || extractedDefendant || "Unknown";
       
@@ -592,6 +633,15 @@ async function runIndianaCrawler() {
       if (finalDefendant === "No especificado") finalDefendant = "Unknown";
  
       if (details) {
+        if (details.isDismissed) {
+          console.log(`\x1b[33m[LIMPIEZA] Caso ${caseNumber} desestimado por la corte. Eliminando de Turso para evitar falsos positivos de subasta.\x1b[0m`);
+          await db.execute({
+            sql: "DELETE FROM foreclosure_auctions WHERE case_number = ?",
+            args: [caseNumber]
+          });
+          continue;
+        }
+
         // Si no se extrajeron nombres pero hay una deuda válida, omitimos la revisión manual
         const needsManual = debt && debt > 0 ? 0 : 1;
         

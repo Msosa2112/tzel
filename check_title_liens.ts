@@ -99,7 +99,10 @@ async function scrapeCountyClerk(ownerName: string, county: string, state: strin
       timeout: 15000
     });
 
-    const bodyText = await page.innerText("body");
+    const bodyText = await page.evaluate(() => {
+      const elements = Array.from(document.querySelectorAll(".result-snippet, .result-link"));
+      return elements.map(el => el.textContent || "").join("\n");
+    });
     const lowerBody = bodyText.toLowerCase();
 
     const redFlags = ["mortgage", "lien", "judgment", "mechanic's lien", "gravamen", "hipoteca", "ejecución"];
@@ -126,18 +129,17 @@ async function scrapeCountyClerk(ownerName: string, county: string, state: strin
       }
 
       if (foundAmounts.length > 0) {
-        // Encontrar montos que parezcan deudas/gravámenes secundarios razonables (excluyendo deudas primarias masivas si se duplican)
         const relevantAmounts = foundAmounts.filter(a => a >= 1000 && a <= 250000);
         if (relevantAmounts.length > 0) {
           totalSecondaryDebt = relevantAmounts.reduce((a, b) => a + b, 0);
           console.log(`[FALLBACK CLERK SUCCESS] Deudas secundarias extraídas de registros públicos: $${totalSecondaryDebt.toLocaleString()}`);
         } else {
-          totalSecondaryDebt = 99999;
-          console.log(`[FALLBACK CLERK WARNING] Se detectó gravamen activo pero sin monto visible en rango. Asignando deuda de riesgo simbólico: $99,999`);
+          totalSecondaryDebt = 0;
+          console.log(`[FALLBACK CLERK WARNING] Se detectó gravamen activo pero sin monto visible en rango. Asignando deuda: $0`);
         }
       } else {
-        totalSecondaryDebt = 99999;
-        console.log(`[FALLBACK CLERK WARNING] Se detectó gravamen activo pero sin monto visible. Asignando deuda de riesgo simbólico: $99,999`);
+        totalSecondaryDebt = 0;
+        console.log(`[FALLBACK CLERK WARNING] Se detectó gravamen activo pero sin monto visible. Asignando deuda: $0`);
       }
     } else {
       console.log(`[FALLBACK CLERK CLEAN] No se detectaron alertas de deudas secundarias para "${cleanOwner}".`);

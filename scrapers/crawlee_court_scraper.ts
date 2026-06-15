@@ -1,10 +1,11 @@
-import { PlaywrightCrawler } from "crawlee";
+import { PlaywrightCrawler, RequestQueue } from "crawlee";
 import { createClient } from "@libsql/client";
 import { getProxyConfiguration } from "./proxy_helper";
 import { chromium } from "playwright-extra";
 import stealthPlugin from "puppeteer-extra-plugin-stealth";
 import * as dotenv from "dotenv";
 import * as fs from "fs";
+import { analyzeTextWithGemma } from "./llm_underwriter";
 
 chromium.use(stealthPlugin());
 
@@ -62,6 +63,7 @@ export interface ScrapedCourtDetails {
   plaintiff: string | null;
   defendant: string | null;
   debtAmount: number | null;
+  isDismissed?: boolean;
 }
 
 /**
@@ -70,17 +72,17 @@ export interface ScrapedCourtDetails {
  */
 export async function scrapeIndianaCaseWithCrawlee(caseNumber: string): Promise<ScrapedCourtDetails | null> {
   console.log(`[CRAWLEE CRAWLER] Inicializando búsqueda MyCase para expediente: ${caseNumber}...`);
-  try {
-    fs.rmSync("./storage", { recursive: true, force: true });
-  } catch (err) {}
   
   let result: ScrapedCourtDetails | null = null;
   
   // 1. Obtener la configuración del proxy (si existe en el .env)
   const proxyConfiguration = getProxyConfiguration();
   
+  const requestQueue = await RequestQueue.open(`queue-${caseNumber.replace(/[^a-zA-Z0-9]/g, "-")}-${Date.now()}`);
+  
   // 2. Definir el crawler de Playwright
   const crawler = new PlaywrightCrawler({
+    requestQueue,
     proxyConfiguration,
     maxRequestRetries: 3,
     requestHandlerTimeoutSecs: 60,
@@ -88,7 +90,7 @@ export async function scrapeIndianaCaseWithCrawlee(caseNumber: string): Promise<
       launcher: chromium,
       useChrome: true,
       launchOptions: {
-        headless: false,
+        headless: process.env.HEADLESS ? process.env.HEADLESS === "true" : false,
       }
     },
     // Handler que procesa la página web
@@ -128,7 +130,10 @@ export async function scrapeIndianaCaseWithCrawlee(caseNumber: string): Promise<
         await page.waitForSelector("#SearchCaseNumber", { timeout: 10000 });
       } catch (err: any) {
         log.error(`Fallo al esperar #SearchCaseNumber. Guardando captura de pantalla de diagnóstico...`);
-        const screenshotPath = "C:/Users/migue/.gemini/antigravity-ide/brain/683533b3-6893-461f-a192-bf6b0b842495/mycase_crawlee_fail.png";
+        const screenshotPath = "./storage/mycase_crawlee_fail.png";
+        if (!fs.existsSync("./storage")) {
+          fs.mkdirSync("./storage", { recursive: true });
+        }
         await page.screenshot({ path: screenshotPath, fullPage: true }).catch(e => log.error(`Fallo al capturar pantalla: ${e.message}`));
         log.info(`Diagnóstico: Captura guardada en ${screenshotPath}`);
         throw err;
@@ -147,7 +152,11 @@ export async function scrapeIndianaCaseWithCrawlee(caseNumber: string): Promise<
         ]);
       } catch (e: any) {
         log.error("Error al esperar resultados de búsqueda. Guardando diagnóstico...");
-        await page.screenshot({ path: "C:/Users/migue/.gemini/antigravity-ide/brain/683533b3-6893-461f-a192-bf6b0b842495/mycase_crawlee_fail_results.png", fullPage: true });
+        const screenshotPath = "./storage/mycase_crawlee_fail_results.png";
+        if (!fs.existsSync("./storage")) {
+          fs.mkdirSync("./storage", { recursive: true });
+        }
+        await page.screenshot({ path: screenshotPath, fullPage: true }).catch(err2 => log.error(`Fallo al capturar: ${err2.message}`));
         throw e;
       }
       
@@ -261,11 +270,15 @@ export async function scrapeIndianaCaseWithCrawlee(caseNumber: string): Promise<
         }
       }
       
+      const llmAnalysis = await analyzeTextWithGemma(caseDetailsText);
+      const isDismissed = llmAnalysis.isDismissed;
+
       result = {
         caseNumber,
         plaintiff,
         defendant,
-        debtAmount: debt
+        debtAmount: debt,
+        isDismissed
       };
       
       log.info(`Extracción finalizada con éxito.`);
@@ -278,6 +291,8 @@ export async function scrapeIndianaCaseWithCrawlee(caseNumber: string): Promise<
 
   // 3. Ejecutar el crawler pasándole la URL inicial
   await crawler.run(["https://public.courts.in.gov/mycase/"]);
+  
+  await requestQueue.drop().catch(() => {});
   
   return result;
 }
@@ -321,8 +336,8 @@ export async function updateDatabaseWithScrapedDetails(auctionId: string, detail
 // Ejecutar prueba si se corre directamente
 if (require.main === module) {
   async function runTest() {
-    const caseNum = "10C01-2507-MF-000119";
-    const auctionId = "IN_CLARK_305_E_CHARLESTOWN_AVE_JUNE/18_2026";
+    const caseNum = "22D03-2507-MF-001239";
+    const auctionId = "IN_FLOYD_335_MARY_DR_August_13,_2026";
     const details = await scrapeIndianaCaseWithCrawlee(caseNum);
     if (details) {
       console.log("=== DATOS EXTRAÍDOS ===");
