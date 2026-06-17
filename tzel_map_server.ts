@@ -1166,13 +1166,17 @@ async function initializeServer() {
     console.error("[DB ERROR] Error al inicializar geocode_cache:", err.message);
   }
 
-  app.listen(PORT, () => {
-    console.log(`\n========================================================`);
-    console.log(`🚀 TZEL TACTICAL MAP SERVER STARTED ON PORT ${PORT}`);
-    console.log(`👉 Open http://localhost:${PORT} in your browser`);
-    console.log(`========================================================\n`);
-  });
+  if (!process.env.VERCEL) {
+    app.listen(PORT, () => {
+      console.log(`\n========================================================`);
+      console.log(`🚀 TZEL TACTICAL MAP SERVER STARTED ON PORT ${PORT}`);
+      console.log(`👉 Open http://localhost:${PORT} in your browser`);
+      console.log(`========================================================\n`);
+    });
+  }
 }
 
 initializeServer();
+
+export default app;
 
