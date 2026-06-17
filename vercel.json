@@ -4,12 +4,28 @@
     {
       "src": "tzel_map_server.ts",
       "use": "@vercel/node"
+    },
+    {
+      "src": "index.html",
+      "use": "@vercel/static"
+    },
+    {
+      "src": "logo.jpg",
+      "use": "@vercel/static"
     }
   ],
   "routes": [
     {
-      "src": "/(.*)",
+      "src": "/api/(.*)",
       "dest": "tzel_map_server.ts"
+    },
+    {
+      "src": "/logo.jpg",
+      "dest": "logo.jpg"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "index.html"
     }
   ]
 }
