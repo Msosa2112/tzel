@@ -3,6 +3,10 @@ import * as cheerio from "cheerio";
 import { createClient } from "@libsql/client";
 import * as dotenv from "dotenv";
 import { isAddressInJurisdiction } from "./geo_fencing";
+import { chromium } from "playwright-extra";
+import stealthPlugin from "puppeteer-extra-plugin-stealth";
+
+chromium.use(stealthPlugin());
 
 // Cargar variables de entorno
 dotenv.config();
@@ -517,7 +521,158 @@ async function scrapeFloydCounty() {
 }
 
 /**
- * Función principal para correr ambos scrapers de Indiana
+ * Scraper para las subastas del Sheriff de Harrison County, IN (a través de SRI Services)
+ */
+async function scrapeHarrisonCounty() {
+  console.log("[SCRAPER HARRISON] Iniciando extracción de subastas de Harrison County, IN...");
+  
+  const browser = await chromium.launch({ headless: true });
+  const context = await browser.newContext({
+    userAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+    viewport: { width: 1280, height: 800 },
+    locale: "en-US",
+  });
+  const page = await context.newPage();
+  
+  let activeSavedCount = 0;
+  
+  try {
+    const url = "https://www.sriservices.com/properties?state=IN&county=Harrison&saleType=foreclosure";
+    console.log(`[SCRAPER HARRISON] Navegando a ${url}...`);
+    await page.goto(url, { waitUntil: "networkidle", timeout: 30000 });
+    
+    // Esperar a que carguen las tarjetas de propiedad
+    await page.waitForSelector(".card-body", { timeout: 15000 }).catch(() => {
+      console.log("[SCRAPER HARRISON] No se encontraron tarjetas de propiedades.");
+    });
+    
+    const cardCount = await page.locator(".card-body").count();
+    console.log(`[SCRAPER HARRISON] Se encontraron ${cardCount} tarjetas.`);
+    
+    for (let idx = 0; idx < cardCount; idx++) {
+      const card = page.locator(".card-body").nth(idx);
+      
+      // Extraer Dirección
+      const street = await card.locator(".card-title span.truncate").innerText().catch(() => "");
+      const subtitle = await card.locator(".card-subtitle").innerText().catch(() => "");
+      
+      if (!street) continue;
+      
+      const fullAddress = `${street.trim()}, ${subtitle.trim()}`;
+      
+      // Extraer Cause #, Defendant, Sale Date, Status de las filas de texto
+      let caseNumber = "PENDING";
+      let defendant = "Unknown";
+      let saleDate = "Unknown";
+      let status = "";
+      
+      const rowsCount = await card.locator(".card-text-row").count();
+      for (let r = 0; r < rowsCount; r++) {
+        const row = card.locator(".card-text-row").nth(r);
+        const label = await row.locator(".card-text-label").innerText().catch(() => "");
+        const value = await row.locator(".card-text-value").innerText().catch(() => "");
+        
+        const cleanLabel = label.toLowerCase().trim();
+        if (cleanLabel.includes("cause")) {
+          caseNumber = value.trim();
+        } else if (cleanLabel.includes("defendant")) {
+          defendant = cleanDefendant(value.trim());
+        } else if (cleanLabel.includes("sale date")) {
+          saleDate = value.trim();
+        } else if (cleanLabel.includes("status")) {
+          status = value.trim();
+        }
+      }
+      
+      // Filtros
+      if (status.toLowerCase().includes("cancel") || status.toLowerCase().includes("retirada")) {
+        console.log(`[SCRAPER HARRISON] Propiedad cancelada/retirada saltada: ${fullAddress}`);
+        continue;
+      }
+      
+      if (!isAuctionDateValid(saleDate)) {
+        console.log(`[FILTRO VIGENCIA] Descartando subasta pasada de Harrison County: ${fullAddress} | Fecha: ${saleDate}`);
+        continue;
+      }
+      
+      if (!isAddressInJurisdiction(fullAddress, "IN")) {
+        console.log(`[SKIP] Propiedad fuera de jurisdicción detectada: ${fullAddress}`);
+        continue;
+      }
+      
+      // Hacer clic en el botón de detalles para obtener el Plaintiff (Demandante) del modal
+      let plaintiff = "Unknown";
+      try {
+        const detailsBtn = card.locator('button:has-text("Map/Details"), a:has-text("Map/Details"), button:has-text("Details"), a:has-text("Details")');
+        if (await detailsBtn.count() > 0) {
+          await detailsBtn.first().click();
+          await page.waitForSelector(".modal.show, .modal-body", { timeout: 5000 });
+          
+          const modalBodyText = await page.innerText(".modal-body").catch(() => "");
+          const lines = modalBodyText.split("\n");
+          for (const line of lines) {
+            if (line.toLowerCase().includes("plaintiff")) {
+              const parts = line.split(":");
+              if (parts.length >= 2) {
+                plaintiff = parts[1].trim();
+              }
+            }
+          }
+          
+          // Cerrar modal
+          const closeBtn = page.locator('.modal.show button:has-text("Close"), .modal.show .btn-close');
+          if (await closeBtn.count() > 0) {
+            await closeBtn.first().click();
+            await page.waitForSelector(".modal.show", { state: "detached", timeout: 3000 }).catch(() => {});
+          }
+        }
+      } catch (modalErr: any) {
+        console.log(`[SCRAPER HARRISON WARNING] No se pudo extraer Plaintiff del modal: ${modalErr.message}`);
+      }
+      
+      const auctionId = `IN_HARRISON_${street.trim().replace(/\s+/g, "_")}_${saleDate.trim().replace(/\s+/g, "_")}`;
+      
+      try {
+        await db.execute({
+          sql: `
+            INSERT INTO foreclosure_auctions (
+              auction_id, case_number, address, county, state, auction_date,
+              plaintiff, defendant, mls_status
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending_check')
+            ON CONFLICT(auction_id) DO UPDATE SET
+              address = excluded.address,
+              auction_date = excluded.auction_date,
+              plaintiff = COALESCE(excluded.plaintiff, foreclosure_auctions.plaintiff),
+              defendant = COALESCE(excluded.defendant, foreclosure_auctions.defendant)
+          `,
+          args: [
+            auctionId,
+            caseNumber,
+            fullAddress,
+            "Harrison",
+            "IN",
+            saleDate,
+            plaintiff,
+            defendant
+          ]
+        });
+        activeSavedCount++;
+        console.log(`[SUBASTA HARRISON GUARDADA] Dirección: ${fullAddress} | Defendant: ${defendant} | Fecha: ${saleDate} | Plaintiff: ${plaintiff}`);
+      } catch (dbErr: any) {
+        console.error(`[DB ERROR] Error al guardar subasta de Harrison County:`, dbErr.message);
+      }
+    }
+  } catch (err: any) {
+    console.error(`[SCRAPER HARRISON ERROR] Falló la extracción en Harrison County:`, err.message);
+  } finally {
+    await browser.close();
+  }
+  
+  console.log(`[SCRAPER HARRISON] Finalizado. Guardadas/Actualizadas: ${activeSavedCount} subastas.`);
+}
+
+/**
+ * Función principal para correr todos los scrapers de Indiana
  */
 async function scrapeIndiana() {
   console.log("\n========================================================");
@@ -526,6 +681,7 @@ async function scrapeIndiana() {
   
   await scrapeClarkCounty();
   await scrapeFloydCounty();
+  await scrapeHarrisonCounty();
 }
 
 // Ejecutar si se corre directamente
@@ -533,4 +689,4 @@ if (require.main === module) {
   scrapeIndiana();
 }
 
-export { scrapeIndiana };
+export { scrapeIndiana, scrapeHarrisonCounty };

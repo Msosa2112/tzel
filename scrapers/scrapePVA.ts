@@ -157,7 +157,7 @@ async function scrapePVA() {
   let pendingRes;
   try {
     pendingRes = await db.execute(
-      "SELECT violation_id, address FROM code_violations WHERE owner_name = 'DUEÑO DESCONOCIDO'"
+      "SELECT violation_id, address FROM code_violations WHERE owner_name = 'DUEÑO DESCONOCIDO' OR owner_name IS NULL OR owner_name = '' OR owner_name = 'Unknown' OR owner_name = 'UNKNOWN' OR owner_name = 'No especificado'"
     );
   } catch (dbErr: any) {
     console.error("[PVA SCRAPER ERROR] Falló la consulta a la base de datos:", dbErr.message);
@@ -214,11 +214,11 @@ async function scrapePVA() {
   console.log(`- Registros de dueño de violación actualizados: ${resolvedCount}`);
   console.log("========================================================\n");
 
-  // 4. Obtener todas las subastas judiciales sin dirección postal o con nombre de demandado inválido
+  // 4. Obtener todas las subastas judiciales sin dirección postal o con nombre de demandado inválido o 'Unknown'
   let pendingAuctionsRes;
   try {
     pendingAuctionsRes = await db.execute(
-      "SELECT auction_id, address, defendant FROM foreclosure_auctions WHERE mailing_address IS NULL OR defendant IS NULL OR defendant = '' OR defendant = 'No especificado' OR defendant = 'null'"
+      "SELECT auction_id, address, defendant FROM foreclosure_auctions WHERE mailing_address IS NULL OR defendant IS NULL OR defendant = '' OR defendant = 'No especificado' OR defendant = 'null' OR UPPER(defendant) = 'UNKNOWN' OR UPPER(defendant) = 'DUEÑO DESCONOCIDO'"
     );
   } catch (dbErr: any) {
     console.error("[PVA SCRAPER ERROR] Falló la consulta a la base de datos para subastas:", dbErr.message);
@@ -265,7 +265,7 @@ async function scrapePVA() {
               mailing_address = ?, 
               absentee_owner = ?,
               defendant = CASE 
-                WHEN defendant IS NULL OR defendant = '' OR defendant = 'No especificado' OR defendant = 'null'
+                WHEN defendant IS NULL OR defendant = '' OR defendant = 'No especificado' OR defendant = 'null' OR UPPER(defendant) = 'UNKNOWN' OR UPPER(defendant) = 'DUEÑO DESCONOCIDO'
                 THEN ? 
                 ELSE defendant 
               END

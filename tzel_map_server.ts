@@ -153,6 +153,7 @@ interface GroupedLead {
   sqft?: number;
   beds?: number;
   baths?: number;
+  photoUrls: string[];
 }
 
 let rateLimitCooldownUntil = 0;
@@ -258,7 +259,8 @@ app.get("/api/prospectos", async (req, res) => {
         plaintiff, defendant, debt_amount, appraisal_value, 
         mls_estimated_value, mls_id, pdf_url,
         defendant_phones, defendant_emails, needs_manual_review,
-        mailing_address, absentee_owner, sqft, beds, baths, hidden_mortgages
+        mailing_address, absentee_owner, sqft, beds, baths, hidden_mortgages, hidden_liens_amount, photo_urls,
+        title_check_status, next_retry_date
       FROM foreclosure_auctions
     `);
     
@@ -277,7 +279,7 @@ app.get("/api/prospectos", async (req, res) => {
       SELECT 
         violation_id, case_number, address, violation_type, report_date, status, 
         owner_name, mls_estimated_value, mls_id, defendant_phones, defendant_emails,
-        mailing_address, absentee_owner, sqft, beds, baths, hidden_mortgages
+        mailing_address, absentee_owner, sqft, beds, baths, hidden_mortgages, hidden_liens_amount, photo_urls
       FROM code_violations
     `);
     const violations = violationsRes.rows;
@@ -315,7 +317,7 @@ app.get("/api/prospectos", async (req, res) => {
     // 6. Fetch physical distress
     const physicalRes = await db.execute(`
       SELECT distress_id, address, county, state, distress_type, report_date, details, owner_name,
-             mls_estimated_value, mls_id, defendant_phones, defendant_emails, mailing_address, absentee_owner, sqft, beds, baths, hidden_mortgages
+             mls_estimated_value, mls_id, defendant_phones, defendant_emails, mailing_address, absentee_owner, sqft, beds, baths, hidden_mortgages, hidden_liens_amount, photo_urls
       FROM physical_distress
     `);
     const physicalDistressList = physicalRes.rows.filter(row => {
@@ -326,7 +328,7 @@ app.get("/api/prospectos", async (req, res) => {
     // 7. Fetch financial distress
     const financialRes = await db.execute(`
       SELECT record_id, case_number, address, county, state, record_type, debt_amount, owner_name, plaintiff, report_date,
-             mls_estimated_value, mls_id, defendant_phones, defendant_emails, mailing_address, absentee_owner, sqft, beds, baths, hidden_mortgages
+             mls_estimated_value, mls_id, defendant_phones, defendant_emails, mailing_address, absentee_owner, sqft, beds, baths, hidden_mortgages, hidden_liens_amount, photo_urls
       FROM financial_distress
     `);
     const financialDistressList = financialRes.rows.filter(row => {
@@ -337,7 +339,7 @@ app.get("/api/prospectos", async (req, res) => {
     // 8. Fetch life events
     const lifeEventsRes = await db.execute(`
       SELECT event_id, event_type, subject_name, address, county, state, details, report_date,
-             mls_estimated_value, mls_id, defendant_phones, defendant_emails, mailing_address, absentee_owner, sqft, beds, baths, hidden_mortgages
+             mls_estimated_value, mls_id, defendant_phones, defendant_emails, mailing_address, absentee_owner, sqft, beds, baths, hidden_mortgages, hidden_liens_amount, photo_urls
       FROM life_events
     `);
     const lifeEventsList = lifeEventsRes.rows.filter(row => {
@@ -374,12 +376,13 @@ app.get("/api/prospectos", async (req, res) => {
           physicalDistress: [],
           financialDistress: [],
           lifeEvents: [],
-          hiddenMortgages: row.hidden_mortgages as number || 0,
+          hiddenMortgages: (row.hidden_mortgages as number || 0) + (row.hidden_liens_amount as number || 0),
           mailingAddress: row.mailing_address as string || undefined,
           isAbsentee: (row.absentee_owner as number) === 1,
           sqft: row.sqft as number || undefined,
           beds: row.beds as number || undefined,
-          baths: row.baths as number || undefined
+          baths: row.baths as number || undefined,
+          photoUrls: []
         });
       } else {
         const existing = groupedMap.get(key)!;
@@ -393,14 +396,28 @@ app.get("/api/prospectos", async (req, res) => {
         if (!existing.sqft && row.sqft) existing.sqft = row.sqft as number;
         if (!existing.beds && row.beds) existing.beds = row.beds as number;
         if (!existing.baths && row.baths) existing.baths = row.baths as number;
-        if (row.hidden_mortgages && (row.hidden_mortgages as number) > existing.hiddenMortgages) {
-          existing.hiddenMortgages = row.hidden_mortgages as number;
+        const rowHidden = (row.hidden_mortgages as number || 0) + (row.hidden_liens_amount as number || 0);
+        if (rowHidden > existing.hiddenMortgages) {
+          existing.hiddenMortgages = rowHidden;
         }
         rowPhones.forEach(p => existing.phones.add(p));
         rowEmails.forEach(e => existing.emails.add(e));
         if (address.length > existing.displayAddress.length) existing.displayAddress = address;
       }
-      groupedMap.get(key)!.auctions.push(row);
+
+      const lead = groupedMap.get(key)!;
+      if (row.photo_urls) {
+        try {
+          const parsed = JSON.parse(row.photo_urls as string);
+          if (Array.isArray(parsed)) {
+            parsed.forEach((url: string) => {
+              if (url && !lead.photoUrls.includes(url)) lead.photoUrls.push(url);
+            });
+          }
+        } catch (e) {}
+      }
+
+      lead.auctions.push(row);
     }
 
     // B. Group violations
@@ -429,12 +446,13 @@ app.get("/api/prospectos", async (req, res) => {
           physicalDistress: [],
           financialDistress: [],
           lifeEvents: [],
-          hiddenMortgages: row.hidden_mortgages as number || 0,
+          hiddenMortgages: (row.hidden_mortgages as number || 0) + (row.hidden_liens_amount as number || 0),
           mailingAddress: row.mailing_address as string || undefined,
           isAbsentee: (row.absentee_owner as number) === 1,
           sqft: row.sqft as number || undefined,
           beds: row.beds as number || undefined,
-          baths: row.baths as number || undefined
+          baths: row.baths as number || undefined,
+          photoUrls: []
         });
       } else {
         const existing = groupedMap.get(key)!;
@@ -450,14 +468,28 @@ app.get("/api/prospectos", async (req, res) => {
         if (!existing.sqft && row.sqft) existing.sqft = row.sqft as number;
         if (!existing.beds && row.beds) existing.beds = row.beds as number;
         if (!existing.baths && row.baths) existing.baths = row.baths as number;
-        if (row.hidden_mortgages && (row.hidden_mortgages as number) > existing.hiddenMortgages) {
-          existing.hiddenMortgages = row.hidden_mortgages as number;
+        const rowHidden = (row.hidden_mortgages as number || 0) + (row.hidden_liens_amount as number || 0);
+        if (rowHidden > existing.hiddenMortgages) {
+          existing.hiddenMortgages = rowHidden;
         }
         rowPhones.forEach(p => existing.phones.add(p));
         rowEmails.forEach(e => existing.emails.add(e));
         if (address.length > existing.displayAddress.length) existing.displayAddress = address;
       }
-      groupedMap.get(key)!.violations.push(row);
+
+      const lead = groupedMap.get(key)!;
+      if (row.photo_urls) {
+        try {
+          const parsed = JSON.parse(row.photo_urls as string);
+          if (Array.isArray(parsed)) {
+            parsed.forEach((url: string) => {
+              if (url && !lead.photoUrls.includes(url)) lead.photoUrls.push(url);
+            });
+          }
+        } catch (e) {}
+      }
+
+      lead.violations.push(row);
     }
 
     // C. Group probates
@@ -487,7 +519,8 @@ app.get("/api/prospectos", async (req, res) => {
           financialDistress: [],
           lifeEvents: [],
           hiddenMortgages: 0,
-          isAbsentee: false
+          isAbsentee: false,
+          photoUrls: []
         });
       } else {
         const existing = groupedMap.get(key)!;
@@ -533,7 +566,8 @@ app.get("/api/prospectos", async (req, res) => {
           financialDistress: [],
           lifeEvents: [],
           hiddenMortgages: 0,
-          isAbsentee: false
+          isAbsentee: false,
+          photoUrls: []
         });
       } else {
         const existing = groupedMap.get(key)!;
@@ -570,7 +604,8 @@ app.get("/api/prospectos", async (req, res) => {
           financialDistress: [],
           lifeEvents: [],
           hiddenMortgages: 0,
-          isAbsentee: false
+          isAbsentee: false,
+          photoUrls: []
         });
       } else {
         const existing = groupedMap.get(key)!;
@@ -609,12 +644,13 @@ app.get("/api/prospectos", async (req, res) => {
           physicalDistress: [],
           financialDistress: [],
           lifeEvents: [],
-          hiddenMortgages: row.hidden_mortgages as number || 0,
+          hiddenMortgages: (row.hidden_mortgages as number || 0) + (row.hidden_liens_amount as number || 0),
           mailingAddress: row.mailing_address as string || undefined,
           isAbsentee: (row.absentee_owner as number) === 1,
           sqft: row.sqft as number || undefined,
           beds: row.beds as number || undefined,
-          baths: row.baths as number || undefined
+          baths: row.baths as number || undefined,
+          photoUrls: []
         });
       } else {
         const existing = groupedMap.get(key)!;
@@ -630,14 +666,28 @@ app.get("/api/prospectos", async (req, res) => {
         if (!existing.sqft && row.sqft) existing.sqft = row.sqft as number;
         if (!existing.beds && row.beds) existing.beds = row.beds as number;
         if (!existing.baths && row.baths) existing.baths = row.baths as number;
-        if (row.hidden_mortgages && (row.hidden_mortgages as number) > existing.hiddenMortgages) {
-          existing.hiddenMortgages = row.hidden_mortgages as number;
+        const rowHidden = (row.hidden_mortgages as number || 0) + (row.hidden_liens_amount as number || 0);
+        if (rowHidden > existing.hiddenMortgages) {
+          existing.hiddenMortgages = rowHidden;
         }
         rowPhones.forEach(p => existing.phones.add(p));
         rowEmails.forEach(e => existing.emails.add(e));
         if (address.length > existing.displayAddress.length) existing.displayAddress = address;
       }
-      groupedMap.get(key)!.physicalDistress.push(row);
+
+      const lead = groupedMap.get(key)!;
+      if (row.photo_urls) {
+        try {
+          const parsed = JSON.parse(row.photo_urls as string);
+          if (Array.isArray(parsed)) {
+            parsed.forEach((url: string) => {
+              if (url && !lead.photoUrls.includes(url)) lead.photoUrls.push(url);
+            });
+          }
+        } catch (e) {}
+      }
+
+      lead.physicalDistress.push(row);
     }
 
     // G. Group financial distress
@@ -666,12 +716,13 @@ app.get("/api/prospectos", async (req, res) => {
           physicalDistress: [],
           financialDistress: [],
           lifeEvents: [],
-          hiddenMortgages: row.hidden_mortgages as number || 0,
+          hiddenMortgages: (row.hidden_mortgages as number || 0) + (row.hidden_liens_amount as number || 0),
           mailingAddress: row.mailing_address as string || undefined,
           isAbsentee: (row.absentee_owner as number) === 1,
           sqft: row.sqft as number || undefined,
           beds: row.beds as number || undefined,
-          baths: row.baths as number || undefined
+          baths: row.baths as number || undefined,
+          photoUrls: []
         });
       } else {
         const existing = groupedMap.get(key)!;
@@ -687,14 +738,28 @@ app.get("/api/prospectos", async (req, res) => {
         if (!existing.sqft && row.sqft) existing.sqft = row.sqft as number;
         if (!existing.beds && row.beds) existing.beds = row.beds as number;
         if (!existing.baths && row.baths) existing.baths = row.baths as number;
-        if (row.hidden_mortgages && (row.hidden_mortgages as number) > existing.hiddenMortgages) {
-          existing.hiddenMortgages = row.hidden_mortgages as number;
+        const rowHidden = (row.hidden_mortgages as number || 0) + (row.hidden_liens_amount as number || 0);
+        if (rowHidden > existing.hiddenMortgages) {
+          existing.hiddenMortgages = rowHidden;
         }
         rowPhones.forEach(p => existing.phones.add(p));
         rowEmails.forEach(e => existing.emails.add(e));
         if (address.length > existing.displayAddress.length) existing.displayAddress = address;
       }
-      groupedMap.get(key)!.financialDistress.push(row);
+
+      const lead = groupedMap.get(key)!;
+      if (row.photo_urls) {
+        try {
+          const parsed = JSON.parse(row.photo_urls as string);
+          if (Array.isArray(parsed)) {
+            parsed.forEach((url: string) => {
+              if (url && !lead.photoUrls.includes(url)) lead.photoUrls.push(url);
+            });
+          }
+        } catch (e) {}
+      }
+
+      lead.financialDistress.push(row);
     }
 
     // H. Group life events
@@ -723,12 +788,13 @@ app.get("/api/prospectos", async (req, res) => {
           physicalDistress: [],
           financialDistress: [],
           lifeEvents: [],
-          hiddenMortgages: row.hidden_mortgages as number || 0,
+          hiddenMortgages: (row.hidden_mortgages as number || 0) + (row.hidden_liens_amount as number || 0),
           mailingAddress: row.mailing_address as string || undefined,
           isAbsentee: (row.absentee_owner as number) === 1,
           sqft: row.sqft as number || undefined,
           beds: row.beds as number || undefined,
-          baths: row.baths as number || undefined
+          baths: row.baths as number || undefined,
+          photoUrls: []
         });
       } else {
         const existing = groupedMap.get(key)!;
@@ -744,14 +810,28 @@ app.get("/api/prospectos", async (req, res) => {
         if (!existing.sqft && row.sqft) existing.sqft = row.sqft as number;
         if (!existing.beds && row.beds) existing.beds = row.beds as number;
         if (!existing.baths && row.baths) existing.baths = row.baths as number;
-        if (row.hidden_mortgages && (row.hidden_mortgages as number) > existing.hiddenMortgages) {
-          existing.hiddenMortgages = row.hidden_mortgages as number;
+        const rowHidden = (row.hidden_mortgages as number || 0) + (row.hidden_liens_amount as number || 0);
+        if (rowHidden > existing.hiddenMortgages) {
+          existing.hiddenMortgages = rowHidden;
         }
         rowPhones.forEach(p => existing.phones.add(p));
         rowEmails.forEach(e => existing.emails.add(e));
         if (address.length > existing.displayAddress.length) existing.displayAddress = address;
       }
-      groupedMap.get(key)!.lifeEvents.push(row);
+
+      const lead = groupedMap.get(key)!;
+      if (row.photo_urls) {
+        try {
+          const parsed = JSON.parse(row.photo_urls as string);
+          if (Array.isArray(parsed)) {
+            parsed.forEach((url: string) => {
+              if (url && !lead.photoUrls.includes(url)) lead.photoUrls.push(url);
+            });
+          }
+        } catch (e) {}
+      }
+
+      lead.lifeEvents.push(row);
     }
 
     // Pre-cargar la caché de geocodificación en memoria para evitar el problema de consultas N+1
@@ -830,7 +910,8 @@ app.get("/api/prospectos", async (req, res) => {
         totalCost,
         isHighMotivation,
         lat: coords ? coords.lat : null,
-        lon: coords ? coords.lon : null
+        lon: coords ? coords.lon : null,
+        photoUrls: lead.photoUrls
       });
     }
 

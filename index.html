@@ -102,6 +102,21 @@
       gap: 12px;
     }
 
+    .brand-logo {
+      height: 38px;
+      border-radius: 6px;
+      border: 1px solid rgba(16, 185, 129, 0.3);
+      box-shadow: 0 0 10px rgba(16, 185, 129, 0.2);
+      transition: all 0.3s ease;
+      cursor: pointer;
+    }
+
+    .brand-logo:hover {
+      transform: scale(1.05);
+      border-color: var(--color-radar-green);
+      box-shadow: 0 0 15px rgba(16, 185, 129, 0.5);
+    }
+
     .radar-icon {
       width: 24px;
       height: 24px;
@@ -169,6 +184,7 @@
       flex-direction: column;
       z-index: 999;
       transition: transform 0.3s ease;
+      overflow-y: auto;
     }
 
     .sidebar-section {
@@ -959,6 +975,80 @@
     .surplus-modal-header button:active {
       transform: scale(0.95);
     }
+
+    /* Property Photos Styling */
+    .lead-card-photo {
+      width: 60px;
+      height: 60px;
+      border-radius: 6px;
+      object-fit: cover;
+      border: 1px solid var(--border-glass);
+      flex-shrink: 0;
+    }
+    .lead-card-photo-placeholder {
+      width: 60px;
+      height: 60px;
+      border-radius: 6px;
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px dashed var(--border-glass);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.2rem;
+      color: var(--text-muted);
+      flex-shrink: 0;
+    }
+    
+    .popup-photo {
+      width: 100%;
+      height: 100px;
+      object-fit: cover;
+      border-radius: 6px;
+      margin-bottom: 8px;
+      border: 1px solid var(--border-glass);
+    }
+    
+    .drawer-photo-container {
+      position: relative;
+      width: 100%;
+      height: 220px;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--border-glass);
+      background: rgba(0, 0, 0, 0.4);
+      margin-bottom: 12px;
+    }
+    .drawer-photo {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      transition: transform 0.3s;
+    }
+    .drawer-photo:hover {
+      transform: scale(1.05);
+    }
+    .drawer-photo-nav {
+      position: absolute;
+      bottom: 10px;
+      left: 0;
+      right: 0;
+      display: flex;
+      justify-content: center;
+      gap: 6px;
+      z-index: 10;
+    }
+    .drawer-photo-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.4);
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .drawer-photo-dot.active {
+      background: var(--color-radar-green);
+      box-shadow: 0 0 6px var(--color-radar-green);
+    }
   </style>
 </head>
 <body>
@@ -966,7 +1056,7 @@
   <!-- Header HUD -->
   <header>
     <div class="brand-container">
-      <div class="radar-icon"></div>
+      <img src="logo.jpg" alt="TZEL Logo" class="brand-logo">
       <h1 class="brand-title">TZEL TACTICAL RADAR v1.2</h1>
     </div>
     
@@ -1054,7 +1144,7 @@
       </div>
 
       <!-- Prospect List -->
-      <div class="sidebar-section" style="flex: 1; display: flex; flex-direction: column; overflow: hidden; padding-bottom: 0;">
+      <div class="sidebar-section" style="flex: 1; display: flex; flex-direction: column; overflow: hidden; padding-bottom: 0; min-height: 300px; flex-shrink: 0;">
         <h3>Lista de Objetivos (<span id="count-indicator">0</span>)</h3>
         <div class="leads-list" id="leads-list-container">
           <!-- Dynamically populated via JS -->
@@ -1104,6 +1194,16 @@
       </div>
       
       <div class="drawer-content" id="drawer-content-pane">
+        <!-- Photos Card -->
+        <div class="detail-card" id="drawer-photos-card" style="display: none; padding: 0; overflow: hidden; position: relative; height: 220px; margin-bottom: 12px; flex-shrink: 0;">
+          <div id="drawer-photos-slider" style="width: 100%; height: 100%; display: flex; transition: transform 0.3s ease;">
+            <!-- Photos will be inserted dynamically -->
+          </div>
+          <div id="drawer-photos-nav" class="drawer-photo-nav">
+            <!-- Navigation dots -->
+          </div>
+        </div>
+
         <!-- Target Overview -->
         <div class="detail-card">
           <div class="detail-card-title">🌐 Resumen del Objetivo</div>
@@ -1587,22 +1687,36 @@
         const isAbsentee = lead.isAbsentee;
         const isHigh = lead.isHighMotivation;
         const hasCoords = lead.lat !== null && lead.lon !== null;
+        const hasHibernated = lead.auctions && lead.auctions.some(a => a.needs_manual_review === 2);
+        const hasManualReview = lead.auctions && lead.auctions.some(a => a.needs_manual_review === 1);
         
         let badgesHtml = '';
         if (isHigh) badgesHtml += `<span class="badge badge-high">🔥 ALTA MOTIVACIÓN</span>`;
         if (isAbsentee) badgesHtml += `<span class="badge badge-absentee">Absentee</span>`;
+        if (hasHibernated) badgesHtml += `<span class="badge" style="background: rgba(139, 92, 246, 0.15); color: #c084fc; border: 1px solid rgba(139, 92, 246, 0.3)">🤖 Hibernado</span>`;
+        if (hasManualReview) badgesHtml += `<span class="badge" style="background: rgba(239, 68, 68, 0.15); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.3)">⚠️ Review</span>`;
         if (!hasCoords) {
           badgesHtml += `<span class="badge" style="background: rgba(255,255,255,0.05); color: var(--text-muted); border: 1px solid var(--border-glass)">⏳ Geocodificando</span>`;
         }
 
+        const firstPhoto = lead.photoUrls && lead.photoUrls.length > 0 ? lead.photoUrls[0] : null;
+        const photoHtml = firstPhoto
+          ? `<img class="lead-card-photo" src="${firstPhoto}" alt="Foto Propiedad">`
+          : `<div class="lead-card-photo-placeholder">🏠</div>`;
+
         card.innerHTML = `
-          <div class="lead-header">
-            <div class="lead-address">${lead.displayAddress}</div>
-            <div class="lead-badges">${badgesHtml}</div>
-          </div>
-          <div class="lead-details">
-            <span>👤 ${lead.ownerName}</span>
-            <span>📍 ${lead.county}, ${lead.state}</span>
+          <div style="display: flex; gap: 12px; align-items: flex-start; margin-bottom: 8px;">
+            <div style="flex: 1; min-width: 0;">
+              <div class="lead-header" style="margin-bottom: 4px;">
+                <div class="lead-address" style="max-width: 180px;">${lead.displayAddress}</div>
+                <div class="lead-badges">${badgesHtml}</div>
+              </div>
+              <div class="lead-details" style="margin-top: 4px;">
+                <span>👤 ${lead.ownerName}</span>
+                <span>📍 ${lead.county}, ${lead.state}</span>
+              </div>
+            </div>
+            ${photoHtml}
           </div>
           <div class="lead-comps">
             <div class="comp-item">
@@ -1687,10 +1801,16 @@
           const marker = L.marker([lead.lat, lead.lon], { icon: customIcon })
             .addTo(markersLayer);
 
+          const popupPhotoUrl = lead.photoUrls && lead.photoUrls.length > 0 ? lead.photoUrls[0] : null;
+          const popupPhotoHtml = popupPhotoUrl
+            ? `<img class="popup-photo" src="${popupPhotoUrl}" alt="Foto Propiedad">`
+            : '';
+
           // Popup Content
           const popupContent = `
             <div class="popup-title">${lead.displayAddress}</div>
             <div class="popup-body">
+              ${popupPhotoHtml}
               <div class="popup-row">
                 <span class="popup-row-label">Dueño:</span>
                 <span class="popup-row-value">${lead.ownerName}</span>
@@ -1771,8 +1891,63 @@
       drawer.classList.remove('open');
     }
 
+    window.switchDrawerPhoto = function(index) {
+      const slider = document.getElementById('drawer-photos-slider');
+      if (slider) {
+        slider.style.transform = `translateX(-${index * 100}%)`;
+      }
+      const dots = document.querySelectorAll('.drawer-photo-dot');
+      dots.forEach((dot, idx) => {
+        if (idx === index) {
+          dot.classList.add('active');
+        } else {
+          dot.classList.remove('active');
+        }
+      });
+    };
+
     function hydrateDrawer(lead) {
       document.getElementById('drawer-address').textContent = lead.displayAddress;
+
+      // Hydrate Photos Carousel
+      const photosCard = document.getElementById('drawer-photos-card');
+      const photosSlider = document.getElementById('drawer-photos-slider');
+      const photosNav = document.getElementById('drawer-photos-nav');
+      
+      photosSlider.innerHTML = '';
+      photosNav.innerHTML = '';
+      
+      if (lead.photoUrls && lead.photoUrls.length > 0) {
+        photosCard.style.display = 'block';
+        lead.photoUrls.forEach((url, index) => {
+          const img = document.createElement('img');
+          img.src = url;
+          img.className = 'drawer-photo';
+          img.style.width = '100%';
+          img.style.height = '100%';
+          img.style.objectFit = 'cover';
+          img.style.flexShrink = '0';
+          photosSlider.appendChild(img);
+          
+          if (lead.photoUrls.length > 1) {
+            const dot = document.createElement('span');
+            dot.className = `drawer-photo-dot ${index === 0 ? 'active' : ''}`;
+            dot.onclick = () => switchDrawerPhoto(index);
+            photosNav.appendChild(dot);
+          }
+        });
+        // reset position
+        photosSlider.style.transform = 'translateX(0)';
+      } else {
+        photosCard.style.display = 'block';
+        photosSlider.innerHTML = `
+          <div style="width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; background: linear-gradient(135deg, rgba(255,255,255,0.01) 0%, rgba(255,255,255,0.03) 100%); border: 1px dashed var(--border-glass); border-radius: 8px; color: var(--text-muted);">
+            <span style="font-size: 2.5rem; margin-bottom: 8px;">🏠</span>
+            <span style="font-size: 0.8rem; font-family: 'Orbitron', sans-serif;">Sin foto de propiedad</span>
+          </div>
+        `;
+      }
+
       document.getElementById('prop-owner').textContent = lead.ownerName;
       document.getElementById('prop-county').textContent = `${lead.county}, ${lead.state}`;
       document.getElementById('prop-mls-id').textContent = lead.mlsId || 'N/A';
@@ -1940,14 +2115,44 @@
             pdfLink = `<a href="${auc.pdf_url}" target="_blank" style="color: ${borderClr}; margin-left: 10px; font-weight: bold;">[Ver PDF]</a>`;
           }
 
+          let manualReviewAlert = '';
+          if (auc.needs_manual_review === 2) {
+            manualReviewAlert = `
+              <div style="margin-top: 8px; padding: 8px; background: rgba(139, 92, 246, 0.15); border: 1px solid rgba(139, 92, 246, 0.3); border-radius: 4px; font-size: 0.72rem; color: #d8b4fe; display: flex; align-items: flex-start; gap: 6px; line-height: 1.4;">
+                <span>🤖</span>
+                <div>
+                  <strong>Sinceridad del Sistema (Hibernación):</strong> Búsqueda gratuita falló o datos incompletos. Al faltar más de 30 días, se programó un reintento para el <strong>${auc.next_retry_date || 'dentro de 15 días'}</strong> para optimizar costos de API de pago.
+                </div>
+              </div>
+            `;
+          } else if (auc.needs_manual_review === 1) {
+            manualReviewAlert = `
+              <div style="margin-top: 8px; padding: 8px; background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.3); border-radius: 4px; font-size: 0.72rem; color: #fca5a5; display: flex; align-items: flex-start; gap: 6px; line-height: 1.4;">
+                <span>⚠️</span>
+                <div>
+                  <strong>Revisión Manual Requerida:</strong> La extracción automática no pudo resolver detalles críticos de esta propiedad. Requiere inspección manual del PDF o registros de la corte.
+                </div>
+              </div>
+            `;
+          }
+
+          // Title check status badge
+          let titleCheckBadge = '';
+          if (auc.title_check_status) {
+            const tcColor = auc.title_check_status === 'success' ? 'var(--color-radar-green)' : (auc.title_check_status === 'failed' ? 'var(--color-execution-red)' : 'var(--text-muted)');
+            const tcText = auc.title_check_status === 'success' ? 'Verificado' : (auc.title_check_status === 'failed' ? 'Error / Sin Deuda' : 'Pendiente');
+            titleCheckBadge = `<span class="badge" style="background: rgba(255,255,255,0.05); color: ${tcColor}; border: 1px solid ${tcColor}; font-size: 0.62rem; margin-left: 8px;">Audit: ${tcText}</span>`;
+          }
+
           div.innerHTML = `
             <div class="distress-log-header">
-              <span style="color: ${borderClr}; font-weight: bold;">${emoji} ${titleStr}</span>
+              <span style="color: ${borderClr}; font-weight: bold;">${emoji} ${titleStr} ${titleCheckBadge}</span>
               <span style="color: ${borderClr}">${auc.auction_date}</span>
             </div>
             <div><strong>Caso Judicial:</strong> ${auc.case_number}</div>
             <div><strong>Demandante:</strong> ${auc.plaintiff || 'No especificado'}</div>
             <div><strong>Monto del Reclamo:</strong> $${(auc.debt_amount || 0).toLocaleString()} ${pdfLink}</div>
+            ${manualReviewAlert}
           `;
           logsContainer.appendChild(div);
         });

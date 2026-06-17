@@ -175,7 +175,7 @@ async function checkPdfUrl(pdfUrl: string): Promise<string> {
 /**
  * Envía un mensaje estructurado premium a Telegram, soportando botones interactivos (inline keyboard).
  */
-async function sendTelegramNotification(message: string, replyMarkup?: any): Promise<boolean> {
+async function sendTelegramNotification(message: string, replyMarkup?: any, photoUrl: string | null = null): Promise<boolean> {
   const token = process.env.TELEGRAM_BOT_TOKEN;
   const chatId = process.env.TELEGRAM_CHAT_ID;
   if (!token || !chatId) {
@@ -183,6 +183,42 @@ async function sendTelegramNotification(message: string, replyMarkup?: any): Pro
     return false;
   }
   
+  if (photoUrl) {
+    if (message.length <= 1024) {
+      console.log("[TELEGRAM] Enviando foto única con caption (longitud <= 1024)...");
+      const url = `https://api.telegram.org/bot${token}/sendPhoto`;
+      const payload: any = {
+        chat_id: chatId,
+        photo: photoUrl,
+        caption: message,
+        parse_mode: "Markdown"
+      };
+      if (replyMarkup) {
+        payload.reply_markup = replyMarkup;
+      }
+      try {
+        const response = await axios.post(url, payload, { timeout: 10000 });
+        if (response.status === 200) return true;
+      } catch (err: any) {
+        console.warn(`[TELEGRAM PHOTO WARNING] Falló el envío de foto con caption: ${err.message}. Reintentando texto...`);
+      }
+    } else {
+      console.log("[TELEGRAM] Reporte largo detectado (> 1024). Enviando foto primero y luego el reporte...");
+      const urlPhoto = `https://api.telegram.org/bot${token}/sendPhoto`;
+      const title = `📸 *Foto de Propiedad para:* ${message.split("\n")[0] || "Reporte de Oportunidad"}`;
+      try {
+        await axios.post(urlPhoto, {
+          chat_id: chatId,
+          photo: photoUrl,
+          caption: title,
+          parse_mode: "Markdown"
+        }, { timeout: 10000 });
+      } catch (err: any) {
+        console.warn(`[TELEGRAM PHOTO WARNING] Falló el envío de la foto previa: ${err.message}`);
+      }
+    }
+  }
+
   const url = `https://api.telegram.org/bot${token}/sendMessage`;
   const payload: any = {
     chat_id: chatId,
@@ -230,6 +266,9 @@ interface GroupedLead {
   sqft?: number;
   beds?: number;
   baths?: number;
+  stressScore?: number;
+  photoUrls: string[];
+  nextRetryDate?: string;
 }
 
 /**
@@ -312,9 +351,9 @@ async function notifyOpportunities() {
         plaintiff, defendant, debt_amount, appraisal_value, 
         mls_estimated_value, mls_id, pdf_url,
         defendant_phones, defendant_emails, needs_manual_review,
-        mailing_address, absentee_owner, sqft, beds, baths, hidden_mortgages
+        mailing_address, absentee_owner, sqft, beds, baths, hidden_mortgages, hidden_liens_amount, stress_score, photo_urls, next_retry_date
       FROM foreclosure_auctions 
-      WHERE (is_high_yield = 1 OR (state = 'IN' AND needs_manual_review = 1)) AND telegram_sent = 0
+      WHERE (is_high_yield = 1 OR (state = 'IN' AND (needs_manual_review = 1 OR needs_manual_review = 2))) AND telegram_sent = 0
     `);
   } catch (dbErr: any) {
     console.error("[DB ERROR] Error al consultar subastas:", dbErr.message);
@@ -338,7 +377,7 @@ async function notifyOpportunities() {
       SELECT 
         violation_id, case_number, address, violation_type, report_date, status, 
         owner_name, mls_estimated_value, mls_id, defendant_phones, defendant_emails,
-        mailing_address, absentee_owner, sqft, beds, baths, hidden_mortgages
+        mailing_address, absentee_owner, sqft, beds, baths, hidden_mortgages, hidden_liens_amount, stress_score, photo_urls
       FROM code_violations 
       WHERE is_high_yield = 1 AND telegram_sent = 0
     `);
@@ -395,7 +434,7 @@ async function notifyOpportunities() {
   try {
     physicalRes = await db.execute(`
       SELECT distress_id, address, county, state, distress_type, report_date, details, owner_name,
-             mls_estimated_value, mls_id, defendant_phones, defendant_emails, mailing_address, absentee_owner, sqft, beds, baths, hidden_mortgages
+             mls_estimated_value, mls_id, defendant_phones, defendant_emails, mailing_address, absentee_owner, sqft, beds, baths, hidden_mortgages, hidden_liens_amount, stress_score, photo_urls
       FROM physical_distress
       WHERE telegram_sent = 0
     `);
@@ -410,7 +449,7 @@ async function notifyOpportunities() {
   try {
     financialRes = await db.execute(`
       SELECT record_id, case_number, address, county, state, record_type, debt_amount, owner_name, plaintiff, report_date,
-             mls_estimated_value, mls_id, defendant_phones, defendant_emails, mailing_address, absentee_owner, sqft, beds, baths, hidden_mortgages
+             mls_estimated_value, mls_id, defendant_phones, defendant_emails, mailing_address, absentee_owner, sqft, beds, baths, hidden_mortgages, hidden_liens_amount, stress_score, photo_urls
       FROM financial_distress
       WHERE telegram_sent = 0
     `);
@@ -425,7 +464,7 @@ async function notifyOpportunities() {
   try {
     lifeEventsRes = await db.execute(`
       SELECT event_id, event_type, subject_name, address, county, state, details, report_date,
-             mls_estimated_value, mls_id, defendant_phones, defendant_emails, mailing_address, absentee_owner, sqft, beds, baths, hidden_mortgages
+             mls_estimated_value, mls_id, defendant_phones, defendant_emails, mailing_address, absentee_owner, sqft, beds, baths, hidden_mortgages, hidden_liens_amount, stress_score, photo_urls
       FROM life_events
       WHERE telegram_sent = 0
     `);
@@ -472,12 +511,14 @@ async function notifyOpportunities() {
         physicalDistress: [],
         financialDistress: [],
         lifeEvents: [],
-        hiddenMortgages: row.hidden_mortgages as number || 0,
+        hiddenMortgages: (row.hidden_mortgages as number || 0) + (row.hidden_liens_amount as number || 0),
         mailingAddress: row.mailing_address as string || undefined,
         isAbsentee: (row.absentee_owner as number) === 1,
         sqft: row.sqft as number || undefined,
         beds: row.beds as number || undefined,
-        baths: row.baths as number || undefined
+        baths: row.baths as number || undefined,
+        photoUrls: [],
+        nextRetryDate: row.next_retry_date as string || undefined
       });
     } else {
       const existing = groupedMap.get(key)!;
@@ -494,6 +535,9 @@ async function notifyOpportunities() {
       if (!existing.mailingAddress && row.mailing_address) {
         existing.mailingAddress = row.mailing_address as string;
       }
+      if (!existing.nextRetryDate && row.next_retry_date) {
+        existing.nextRetryDate = row.next_retry_date as string;
+      }
       if ((row.absentee_owner as number) === 1) {
         existing.isAbsentee = true;
       }
@@ -506,8 +550,9 @@ async function notifyOpportunities() {
       if (!existing.baths && row.baths) {
         existing.baths = row.baths as number;
       }
-      if (row.hidden_mortgages && (row.hidden_mortgages as number) > existing.hiddenMortgages) {
-        existing.hiddenMortgages = row.hidden_mortgages as number;
+      const rowHidden = (row.hidden_mortgages as number || 0) + (row.hidden_liens_amount as number || 0);
+      if (rowHidden > existing.hiddenMortgages) {
+        existing.hiddenMortgages = rowHidden;
       }
       rowPhones.forEach(p => existing.phones.add(p));
       rowEmails.forEach(e => existing.emails.add(e));
@@ -517,7 +562,18 @@ async function notifyOpportunities() {
         existing.displayAddress = address;
       }
     }
-    groupedMap.get(key)!.auctions.push(row);
+    const lead = groupedMap.get(key)!;
+    if (row.photo_urls) {
+      try {
+        const parsed = JSON.parse(row.photo_urls as string);
+        if (Array.isArray(parsed)) {
+          parsed.forEach((url: string) => {
+            if (url && !lead.photoUrls.includes(url)) lead.photoUrls.push(url);
+          });
+        }
+      } catch (e) {}
+    }
+    lead.auctions.push(row);
   }
 
   // B. Agrupar violaciones de código
@@ -547,12 +603,13 @@ async function notifyOpportunities() {
         physicalDistress: [],
         financialDistress: [],
         lifeEvents: [],
-        hiddenMortgages: row.hidden_mortgages as number || 0,
+        hiddenMortgages: (row.hidden_mortgages as number || 0) + (row.hidden_liens_amount as number || 0),
         mailingAddress: row.mailing_address as string || undefined,
         isAbsentee: (row.absentee_owner as number) === 1,
         sqft: row.sqft as number || undefined,
         beds: row.beds as number || undefined,
-        baths: row.baths as number || undefined
+        baths: row.baths as number || undefined,
+        photoUrls: []
       });
     } else {
       const existing = groupedMap.get(key)!;
@@ -582,8 +639,9 @@ async function notifyOpportunities() {
       if (!existing.baths && row.baths) {
         existing.baths = row.baths as number;
       }
-      if (row.hidden_mortgages && (row.hidden_mortgages as number) > existing.hiddenMortgages) {
-        existing.hiddenMortgages = row.hidden_mortgages as number;
+      const rowHidden = (row.hidden_mortgages as number || 0) + (row.hidden_liens_amount as number || 0);
+      if (rowHidden > existing.hiddenMortgages) {
+        existing.hiddenMortgages = rowHidden;
       }
       rowPhones.forEach(p => existing.phones.add(p));
       rowEmails.forEach(e => existing.emails.add(e));
@@ -592,7 +650,18 @@ async function notifyOpportunities() {
         existing.displayAddress = address;
       }
     }
-    groupedMap.get(key)!.violations.push(row);
+    const lead = groupedMap.get(key)!;
+    if (row.photo_urls) {
+      try {
+        const parsed = JSON.parse(row.photo_urls as string);
+        if (Array.isArray(parsed)) {
+          parsed.forEach((url: string) => {
+            if (url && !lead.photoUrls.includes(url)) lead.photoUrls.push(url);
+          });
+        }
+      } catch (e) {}
+    }
+    lead.violations.push(row);
   }
 
   // C. Agrupar herencias (probates)
@@ -623,7 +692,8 @@ async function notifyOpportunities() {
         financialDistress: [],
         lifeEvents: [],
         hiddenMortgages: 0,
-        isAbsentee: false
+        isAbsentee: false,
+        photoUrls: []
       });
     } else {
       const existing = groupedMap.get(key)!;
@@ -670,7 +740,8 @@ async function notifyOpportunities() {
         financialDistress: [],
         lifeEvents: [],
         hiddenMortgages: 0,
-        isAbsentee: false
+        isAbsentee: false,
+        photoUrls: []
       });
     } else {
       const existing = groupedMap.get(key)!;
@@ -708,7 +779,8 @@ async function notifyOpportunities() {
         financialDistress: [],
         lifeEvents: [],
         hiddenMortgages: 0,
-        isAbsentee: false
+        isAbsentee: false,
+        photoUrls: []
       });
     } else {
       const existing = groupedMap.get(key)!;
@@ -748,12 +820,13 @@ async function notifyOpportunities() {
         physicalDistress: [],
         financialDistress: [],
         lifeEvents: [],
-        hiddenMortgages: row.hidden_mortgages as number || 0,
+        hiddenMortgages: (row.hidden_mortgages as number || 0) + (row.hidden_liens_amount as number || 0),
         mailingAddress: row.mailing_address as string || undefined,
         isAbsentee: (row.absentee_owner as number) === 1,
         sqft: row.sqft as number || undefined,
         beds: row.beds as number || undefined,
-        baths: row.baths as number || undefined
+        baths: row.baths as number || undefined,
+        photoUrls: []
       });
     } else {
       const existing = groupedMap.get(key)!;
@@ -781,8 +854,9 @@ async function notifyOpportunities() {
       if (!existing.baths && row.baths) {
         existing.baths = row.baths as number;
       }
-      if (row.hidden_mortgages && (row.hidden_mortgages as number) > existing.hiddenMortgages) {
-        existing.hiddenMortgages = row.hidden_mortgages as number;
+      const rowHidden = (row.hidden_mortgages as number || 0) + (row.hidden_liens_amount as number || 0);
+      if (rowHidden > existing.hiddenMortgages) {
+        existing.hiddenMortgages = rowHidden;
       }
       rowPhones.forEach(p => existing.phones.add(p));
       rowEmails.forEach(e => existing.emails.add(e));
@@ -790,7 +864,18 @@ async function notifyOpportunities() {
         existing.displayAddress = address;
       }
     }
-    groupedMap.get(key)!.physicalDistress.push(row);
+    const lead = groupedMap.get(key)!;
+    if (row.photo_urls) {
+      try {
+        const parsed = JSON.parse(row.photo_urls as string);
+        if (Array.isArray(parsed)) {
+          parsed.forEach((url: string) => {
+            if (url && !lead.photoUrls.includes(url)) lead.photoUrls.push(url);
+          });
+        }
+      } catch (e) {}
+    }
+    lead.physicalDistress.push(row);
   }
 
   // G. Agrupar estrés financiero extra (financial_distress)
@@ -820,12 +905,13 @@ async function notifyOpportunities() {
         physicalDistress: [],
         financialDistress: [],
         lifeEvents: [],
-        hiddenMortgages: row.hidden_mortgages as number || 0,
+        hiddenMortgages: (row.hidden_mortgages as number || 0) + (row.hidden_liens_amount as number || 0),
         mailingAddress: row.mailing_address as string || undefined,
         isAbsentee: (row.absentee_owner as number) === 1,
         sqft: row.sqft as number || undefined,
         beds: row.beds as number || undefined,
-        baths: row.baths as number || undefined
+        baths: row.baths as number || undefined,
+        photoUrls: []
       });
     } else {
       const existing = groupedMap.get(key)!;
@@ -853,8 +939,9 @@ async function notifyOpportunities() {
       if (!existing.baths && row.baths) {
         existing.baths = row.baths as number;
       }
-      if (row.hidden_mortgages && (row.hidden_mortgages as number) > existing.hiddenMortgages) {
-        existing.hiddenMortgages = row.hidden_mortgages as number;
+      const rowHidden = (row.hidden_mortgages as number || 0) + (row.hidden_liens_amount as number || 0);
+      if (rowHidden > existing.hiddenMortgages) {
+        existing.hiddenMortgages = rowHidden;
       }
       rowPhones.forEach(p => existing.phones.add(p));
       rowEmails.forEach(e => existing.emails.add(e));
@@ -862,7 +949,18 @@ async function notifyOpportunities() {
         existing.displayAddress = address;
       }
     }
-    groupedMap.get(key)!.financialDistress.push(row);
+    const lead = groupedMap.get(key)!;
+    if (row.photo_urls) {
+      try {
+        const parsed = JSON.parse(row.photo_urls as string);
+        if (Array.isArray(parsed)) {
+          parsed.forEach((url: string) => {
+            if (url && !lead.photoUrls.includes(url)) lead.photoUrls.push(url);
+          });
+        }
+      } catch (e) {}
+    }
+    lead.financialDistress.push(row);
   }
 
   // H. Agrupar eventos de vida críticos (life_events)
@@ -892,12 +990,13 @@ async function notifyOpportunities() {
         physicalDistress: [],
         financialDistress: [],
         lifeEvents: [],
-        hiddenMortgages: row.hidden_mortgages as number || 0,
+        hiddenMortgages: (row.hidden_mortgages as number || 0) + (row.hidden_liens_amount as number || 0),
         mailingAddress: row.mailing_address as string || undefined,
         isAbsentee: (row.absentee_owner as number) === 1,
         sqft: row.sqft as number || undefined,
         beds: row.beds as number || undefined,
-        baths: row.baths as number || undefined
+        baths: row.baths as number || undefined,
+        photoUrls: []
       });
     } else {
       const existing = groupedMap.get(key)!;
@@ -925,8 +1024,9 @@ async function notifyOpportunities() {
       if (!existing.baths && row.baths) {
         existing.baths = row.baths as number;
       }
-      if (row.hidden_mortgages && (row.hidden_mortgages as number) > existing.hiddenMortgages) {
-        existing.hiddenMortgages = row.hidden_mortgages as number;
+      const rowHidden = (row.hidden_mortgages as number || 0) + (row.hidden_liens_amount as number || 0);
+      if (rowHidden > existing.hiddenMortgages) {
+        existing.hiddenMortgages = rowHidden;
       }
       rowPhones.forEach(p => existing.phones.add(p));
       rowEmails.forEach(e => existing.emails.add(e));
@@ -934,7 +1034,29 @@ async function notifyOpportunities() {
         existing.displayAddress = address;
       }
     }
-    groupedMap.get(key)!.lifeEvents.push(row);
+    const lead = groupedMap.get(key)!;
+    if (row.photo_urls) {
+      try {
+        const parsed = JSON.parse(row.photo_urls as string);
+        if (Array.isArray(parsed)) {
+          parsed.forEach((url: string) => {
+            if (url && !lead.photoUrls.includes(url)) lead.photoUrls.push(url);
+          });
+        }
+      } catch (e) {}
+    }
+    lead.lifeEvents.push(row);
+  }
+
+  // Post-procesar para calcular el stressScore más alto de los items asociados
+  for (const lead of groupedMap.values()) {
+    let maxScore = 0;
+    lead.auctions.forEach(a => { if (a.stress_score && a.stress_score > maxScore) maxScore = a.stress_score; });
+    lead.violations.forEach(v => { if (v.stress_score && v.stress_score > maxScore) maxScore = v.stress_score; });
+    lead.physicalDistress.forEach(pd => { if (pd.stress_score && pd.stress_score > maxScore) maxScore = pd.stress_score; });
+    lead.financialDistress.forEach(fd => { if (fd.stress_score && fd.stress_score > maxScore) maxScore = fd.stress_score; });
+    lead.lifeEvents.forEach(le => { if (le.stress_score && le.stress_score > maxScore) maxScore = le.stress_score; });
+    lead.stressScore = maxScore;
   }
 
   console.log(`[NOTIFICAR] Direcciones agrupadas únicas a notificar: ${groupedMap.size}`);
@@ -950,6 +1072,11 @@ async function notifyOpportunities() {
     const hasAuctions = lead.auctions.length > 0;
     const hasViolations = lead.violations.length > 0;
     let isIndianaManual = lead.state === "IN" && lead.auctions.some(a => a.needs_manual_review === 1);
+    let isIndianaHibernated = lead.state === "IN" && lead.auctions.some(a => a.needs_manual_review === 2);
+    
+    const firstAuction = lead.auctions[0];
+    const daysRemaining = firstAuction ? getDaysRemaining(firstAuction.auction_date as string) : null;
+    const nextRetryDate = lead.nextRetryDate || (firstAuction ? (firstAuction.next_retry_date as string) : null) || "N/A";
 
     // --- CÁLCULOS FINANCIEROS (UNDERWRITING) ---
     const violationKeywords = lead.violations.map(v => v.violation_type as string);
@@ -1046,7 +1173,10 @@ async function notifyOpportunities() {
       msg += `🚨 *ALERTA DE OPORTUNIDAD: ESTRÉS MULTIDIMENSIONAL* 🚨\n`;
       msg += `_Propiedad con acumulación de múltiples factores de estrés legal o físico_\n\n`;
     } else if (hasAuctions) {
-      if (isIndianaManual) {
+      if (isIndianaHibernated) {
+        msg += `🤖 *SINCERIDAD DEL SISTEMA: BÚSQUEDA PAUSADA* 🤖\n`;
+        msg += `La búsqueda gratuita falló. Como la subasta es en ${daysRemaining} días (entre 30 y 60), he pausado el proceso para no gastar saldo de API. Hay un 75% de probabilidad de que la corte publique los datos pronto. Volveré a buscar automáticamente el ${nextRetryDate}.\n\n`;
+      } else if (isIndianaManual) {
         msg += `⚠️ *REVISIÓN MANUAL REQUERIDA (INDIANA)* ⚠️\n`;
         msg += `_El crawler no pudo extraer automáticamente la deuda de este expediente._\n\n`;
       } else {
@@ -1073,7 +1203,11 @@ async function notifyOpportunities() {
 
     // Datos generales de la propiedad
     msg += `📍 *Dirección:* ${lead.displayAddress}\n`;
-    msg += `🏢 *Ubicación:* ${lead.county} County, ${lead.state}\n\n`;
+    msg += `🏢 *Ubicación:* ${lead.county} County, ${lead.state}\n`;
+    if (lead.stressScore !== undefined && lead.stressScore > 0) {
+      msg += `⚡ *Índice de Estrés (SSI):* ${lead.stressScore}/100\n`;
+    }
+    msg += `\n`;
 
     // Alerta de hipotecas ocultas
     if (hiddenDebt > 0) {
@@ -1293,7 +1427,9 @@ async function notifyOpportunities() {
     if (hasAuctions && hasViolations) {
       msg += `💡 *Estrategia Recomendada:* Contactar al propietario/deudor de inmediato para negociar una compra directa debido a la acumulación de múltiples factores de estrés (deuda judicial y abandono físico).`;
     } else if (hasAuctions) {
-      if (isIndianaManual) {
+      if (isIndianaHibernated) {
+        msg += `💡 *Instrucciones:* Esta subasta está en lista de espera (hibernación). Se volverá a buscar automáticamente en la fecha indicada. Si es urgente, puedes buscar el caso manualmente en MyCase.`;
+      } else if (isIndianaManual) {
         msg += `💡 *Instrucciones:* Busca por el nombre del demandado en MyCase para el condado correspondiente de Indiana y extrae el monto de la deuda para actualizar Turso.`;
       } else {
         const firstAuction = lead.auctions[0];
@@ -1320,7 +1456,7 @@ async function notifyOpportunities() {
 
     console.log(`[ALERTANDO] Enviando alerta agrupada para: ${lead.displayAddress} (Subastas: ${lead.auctions.length}, Violaciones: ${lead.violations.length}, Herencias: ${lead.probates.length}, Divorcios: ${lead.divorces.length}, Quiebras: ${lead.bankruptcies.length})...`);
     
-    const success = await sendTelegramNotification(msg, replyMarkup);
+    const success = await sendTelegramNotification(msg, replyMarkup, lead.photoUrls && lead.photoUrls.length > 0 ? lead.photoUrls[0] : null);
 
     
     if (success) {
@@ -1445,4 +1581,4 @@ if (require.main === module) {
   notifyOpportunities().catch(console.error);
 }
 
-export { notifyOpportunities };
+export { notifyOpportunities, sendTelegramNotification };

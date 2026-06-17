@@ -43,6 +43,12 @@ CREATE TABLE IF NOT EXISTS foreclosure_auctions (
     beds INTEGER,
     baths REAL,
     hidden_mortgages REAL DEFAULT 0,
+    hidden_liens_amount REAL DEFAULT 0,
+    stress_score INTEGER DEFAULT 0,
+    telegram_ssi_sent INTEGER DEFAULT 0,
+    photo_urls TEXT,
+    title_check_status TEXT DEFAULT 'pending',
+    next_retry_date TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -82,6 +88,11 @@ CREATE TABLE IF NOT EXISTS code_violations (
     beds INTEGER,
     baths REAL,
     hidden_mortgages REAL DEFAULT 0,
+    hidden_liens_amount REAL DEFAULT 0,
+    stress_score INTEGER DEFAULT 0,
+    telegram_ssi_sent INTEGER DEFAULT 0,
+    photo_urls TEXT,
+    title_check_status TEXT DEFAULT 'pending',
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -153,8 +164,12 @@ CREATE TABLE IF NOT EXISTS physical_distress (
     beds INTEGER,
     baths REAL,
     hidden_mortgages REAL DEFAULT 0,
+    hidden_liens_amount REAL DEFAULT 0,
     is_high_yield INTEGER DEFAULT 0,
     telegram_sent INTEGER DEFAULT 0,
+    stress_score INTEGER DEFAULT 0,
+    telegram_ssi_sent INTEGER DEFAULT 0,
+    photo_urls TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -181,8 +196,12 @@ CREATE TABLE IF NOT EXISTS financial_distress (
     beds INTEGER,
     baths REAL,
     hidden_mortgages REAL DEFAULT 0,
+    hidden_liens_amount REAL DEFAULT 0,
     is_high_yield INTEGER DEFAULT 0,
     telegram_sent INTEGER DEFAULT 0,
+    stress_score INTEGER DEFAULT 0,
+    telegram_ssi_sent INTEGER DEFAULT 0,
+    photo_urls TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -207,8 +226,12 @@ CREATE TABLE IF NOT EXISTS life_events (
     beds INTEGER,
     baths REAL,
     hidden_mortgages REAL DEFAULT 0,
+    hidden_liens_amount REAL DEFAULT 0,
     is_high_yield INTEGER DEFAULT 0,
     telegram_sent INTEGER DEFAULT 0,
+    stress_score INTEGER DEFAULT 0,
+    telegram_ssi_sent INTEGER DEFAULT 0,
+    photo_urls TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -225,6 +248,7 @@ CREATE TABLE IF NOT EXISTS surplus_funds (
     state TEXT,
     defendant_phones TEXT,
     defendant_emails TEXT,
+    hidden_liens_amount REAL DEFAULT 0,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -234,6 +258,8 @@ CREATE TABLE IF NOT EXISTS portfolio_clusters (
     associated_properties TEXT NOT NULL, -- JSON array of objects: '[{"id": "...", "table": "...", "address": "...", "debt": 123}]'
     total_debt_estimated REAL DEFAULT 0,
     risk_score REAL DEFAULT 0,
+    stress_score INTEGER DEFAULT 0,
+    telegram_ssi_sent INTEGER DEFAULT 0,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 

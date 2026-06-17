@@ -37,9 +37,14 @@ export function calculateRehab(sqFt: number | null, violationKeywords: string[])
 /**
  * Base de datos podría tener deudas ocultas como NULL o undefined.
  */
-export function calculateNetEquity(arv: number, primaryDebt: number, hiddenMortgages: number = 0): number {
+export function calculateNetEquity(
+  arv: number,
+  primaryDebt: number,
+  hiddenMortgages: number = 0,
+  hiddenLiensAmount: number = 0
+): number {
   if (arv <= 0) return 0;
-  const cleanHidden = hiddenMortgages || 0;
+  const cleanHidden = (hiddenMortgages || 0) + (hiddenLiensAmount || 0);
   return Math.round(arv - primaryDebt - cleanHidden);
 }
 
@@ -48,10 +53,15 @@ export function calculateNetEquity(arv: number, primaryDebt: number, hiddenMortg
  * MAO = (ARV * 0.70) - Rehab - Costos_Adquisición - Deuda_Oculta
  * Asume costos de adquisición estándar del 3% del ARV.
  */
-export function calculateMAO(arv: number, rehab: number, hiddenMortgages: number = 0): number {
+export function calculateMAO(
+  arv: number,
+  rehab: number,
+  hiddenMortgages: number = 0,
+  hiddenLiensAmount: number = 0
+): number {
   if (arv <= 0) return 0;
   const acquisitionCosts = arv * 0.03; // Gastos de cierre y administrativos de compra (3%)
-  const cleanHidden = hiddenMortgages || 0;
+  const cleanHidden = (hiddenMortgages || 0) + (hiddenLiensAmount || 0);
   const mao = (arv * 0.70) - rehab - acquisitionCosts - cleanHidden;
   return Math.max(0, Math.round(mao));
 }
@@ -59,9 +69,14 @@ export function calculateMAO(arv: number, rehab: number, hiddenMortgages: number
 /**
  * Retorna true si la deuda acumulada (deuda judicial primaria + hipotecas ocultas) supera el ARV.
  */
-export function isUnderwater(arv: number, primaryDebt: number, hiddenMortgages: number = 0): boolean {
+export function isUnderwater(
+  arv: number,
+  primaryDebt: number,
+  hiddenMortgages: number = 0,
+  hiddenLiensAmount: number = 0
+): boolean {
   if (arv <= 0) return false;
-  const cleanHidden = hiddenMortgages || 0;
+  const cleanHidden = (hiddenMortgages || 0) + (hiddenLiensAmount || 0);
   return (primaryDebt + cleanHidden) > arv;
 }
 
@@ -73,7 +88,8 @@ export function checkCriticalRisk(
   primaryDebt: number,
   hiddenMortgages: number = 0,
   plaintiff: string | null,
-  caseNumber: string | null
+  caseNumber: string | null,
+  hiddenLiensAmount: number = 0
 ): { isRisk: boolean; reasons: string[] } {
   const reasons: string[] = [];
 
@@ -81,7 +97,7 @@ export function checkCriticalRisk(
     reasons.push("Posible gravamen secundario (Junior Lien).");
   }
 
-  const cleanHidden = hiddenMortgages || 0;
+  const cleanHidden = (hiddenMortgages || 0) + (hiddenLiensAmount || 0);
   const totalDebt = primaryDebt + cleanHidden;
   if (arv > 0 && totalDebt > arv) {
     reasons.push(`Propiedad bajo el agua (Deuda Total: $${totalDebt.toLocaleString()} > ARV: $${arv.toLocaleString()}).`);
@@ -158,9 +174,14 @@ export function isJuniorLien(plaintiff: string | null, caseNumber: string | null
  * Determina si una propiedad es de Alta Rentabilidad (High Yield).
  * Criterio: El Equity Neto (ARV - Deuda Primaria - Deudas Ocultas) debe ser de al menos el 30% del ARV.
  */
-export function isHighYieldProperty(arv: number, primaryDebt: number, hiddenMortgages: number = 0): boolean {
+export function isHighYieldProperty(
+  arv: number,
+  primaryDebt: number,
+  hiddenMortgages: number = 0,
+  hiddenLiensAmount: number = 0
+): boolean {
   if (arv <= 0) return false;
-  const cleanHidden = hiddenMortgages || 0;
+  const cleanHidden = (hiddenMortgages || 0) + (hiddenLiensAmount || 0);
   const netEquity = arv - primaryDebt - cleanHidden;
   return netEquity >= arv * 0.30;
 }

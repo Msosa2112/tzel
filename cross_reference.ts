@@ -2,6 +2,7 @@ import axios from "axios";
 import { createClient } from "@libsql/client";
 import * as dotenv from "dotenv";
 import { isHighYieldProperty } from "./underwriting/underwriter";
+import { fetchPublicPropertyPhoto } from "./scrapers/public_photo_scraper";
 
 // Cargar variables de entorno
 dotenv.config();
@@ -271,6 +272,7 @@ async function runCrossReference() {
     const params = {
       "$filter": odataFilter,
       "$select": "ListingKey,ListingId,UnparsedAddress,PostalCode,ListPrice,ClosePrice,MlsStatus,StandardStatus,CountyOrParish,StateOrProvince,BedroomsTotal,BathroomsTotalDecimal,LivingArea,YearBuilt",
+      "$expand": "Media($select=MediaURL)",
       "$top": 20
     };
     
@@ -337,6 +339,20 @@ async function runCrossReference() {
           }
         }
 
+        let photoUrls: string[] = [];
+        if (matchedProp.Media && Array.isArray(matchedProp.Media)) {
+          photoUrls = matchedProp.Media
+            .map((m: any) => m.MediaURL || m.mediaURL || m.MediaUrl)
+            .filter((url: string) => url && typeof url === "string");
+        }
+        if (photoUrls.length === 0) {
+          console.log(`[MLS MEDIA] No se encontraron fotos en MLS para ${address}. Usando fallback público...`);
+          const fallbackPhotos = await fetchPublicPropertyPhoto(address);
+          if (fallbackPhotos) {
+            photoUrls = fallbackPhotos;
+          }
+        }
+        const photoUrlsStr = photoUrls.length > 0 ? JSON.stringify(photoUrls) : null;
         
         // Calcular redemption_margin si aplica (KY) y tenemos appraisal
         // (Nota: Si no tenemos appraisal, la base de datos lo guarda como NULL y redemption_margin queda NULL)
@@ -351,7 +367,8 @@ async function runCrossReference() {
               is_high_yield = ?,
               sqft = ?,
               beds = ?,
-              baths = ?
+              baths = ?,
+              photo_urls = ?
             WHERE auction_id = ?
           `,
           args: [
@@ -362,6 +379,7 @@ async function runCrossReference() {
             sqft,
             beds,
             baths,
+            photoUrlsStr,
             auctionId
           ]
         });
@@ -369,9 +387,13 @@ async function runCrossReference() {
         matchCount++;
       } else {
         console.log(`[NOT FOUND] No se encontró coincidencia de calle en las ${properties.length} propiedades del MLS.`);
+        console.log(`[MLS FALLBACK] No encontrado en MLS. Buscando foto pública para: ${address}`);
+        const fallbackPhotos = await fetchPublicPropertyPhoto(address);
+        const photoUrlsStr = fallbackPhotos && fallbackPhotos.length > 0 ? JSON.stringify(fallbackPhotos) : null;
+
         await db.execute({
-          sql: "UPDATE foreclosure_auctions SET mls_status = 'not_found' WHERE auction_id = ?",
-          args: [auctionId]
+          sql: "UPDATE foreclosure_auctions SET mls_status = 'not_found', photo_urls = ? WHERE auction_id = ?",
+          args: [photoUrlsStr, auctionId]
         });
         notFoundCount++;
       }
@@ -446,6 +468,7 @@ async function runCrossReference() {
     const params = {
       "$filter": odataFilter,
       "$select": "ListingKey,ListingId,UnparsedAddress,PostalCode,ListPrice,ClosePrice,MlsStatus,StandardStatus,CountyOrParish,StateOrProvince,BedroomsTotal,BathroomsTotalDecimal,LivingArea,YearBuilt",
+      "$expand": "Media($select=MediaURL)",
       "$top": 20
     };
 
@@ -501,6 +524,21 @@ async function runCrossReference() {
         // Al no haber deuda para violaciones de código, consideramos de alta rentabilidad si logramos calcular el ARV
         const isHighYield = mlsValue > 0 ? 1 : 0;
 
+        let photoUrls: string[] = [];
+        if (matchedProp.Media && Array.isArray(matchedProp.Media)) {
+          photoUrls = matchedProp.Media
+            .map((m: any) => m.MediaURL || m.mediaURL || m.MediaUrl)
+            .filter((url: string) => url && typeof url === "string");
+        }
+        if (photoUrls.length === 0) {
+          console.log(`[MLS MEDIA] No se encontraron fotos en MLS para ${address}. Usando fallback público...`);
+          const fallbackPhotos = await fetchPublicPropertyPhoto(address);
+          if (fallbackPhotos) {
+            photoUrls = fallbackPhotos;
+          }
+        }
+        const photoUrlsStr = photoUrls.length > 0 ? JSON.stringify(photoUrls) : null;
+
         await db.execute({
           sql: `
             UPDATE code_violations SET
@@ -510,7 +548,8 @@ async function runCrossReference() {
               is_high_yield = ?,
               sqft = ?,
               beds = ?,
-              baths = ?
+              baths = ?,
+              photo_urls = ?
             WHERE violation_id = ?
           `,
           args: [
@@ -521,6 +560,7 @@ async function runCrossReference() {
             sqft,
             beds,
             baths,
+            photoUrlsStr,
             violationId
           ]
         });
@@ -528,9 +568,13 @@ async function runCrossReference() {
         violationMatchCount++;
       } else {
         console.log(`[NOT FOUND] No se encontró coincidencia de calle en las ${properties.length} propiedades del MLS.`);
+        console.log(`[MLS FALLBACK] No encontrado en MLS. Buscando foto pública para: ${address}`);
+        const fallbackPhotos = await fetchPublicPropertyPhoto(address);
+        const photoUrlsStr = fallbackPhotos && fallbackPhotos.length > 0 ? JSON.stringify(fallbackPhotos) : null;
+
         await db.execute({
-          sql: "UPDATE code_violations SET mls_status = 'not_found' WHERE violation_id = ?",
-          args: [violationId]
+          sql: "UPDATE code_violations SET mls_status = 'not_found', photo_urls = ? WHERE violation_id = ?",
+          args: [photoUrlsStr, violationId]
         });
         violationNotFoundCount++;
       }
@@ -610,6 +654,7 @@ async function crossReferenceGeneric(tableName: string, idCol: string, addressCo
         params: {
           "$filter": odataFilter,
           "$select": "ListingKey,ListingId,UnparsedAddress,PostalCode,ListPrice,ClosePrice,MlsStatus,StandardStatus,CountyOrParish,StateOrProvince,BedroomsTotal,BathroomsTotalDecimal,LivingArea,YearBuilt",
+          "$expand": "Media($select=MediaURL)",
           "$top": 20
         },
         timeout: 15000
@@ -642,6 +687,21 @@ async function crossReferenceGeneric(tableName: string, idCol: string, addressCo
         const mlsValue = await calculateARV(mlsHeaders, zip, beds, sqft, closePrice, listPrice);
         const isHighYield = mlsValue > 0 ? 1 : 0;
 
+        let photoUrls: string[] = [];
+        if (matchedProp.Media && Array.isArray(matchedProp.Media)) {
+          photoUrls = matchedProp.Media
+            .map((m: any) => m.MediaURL || m.mediaURL || m.MediaUrl)
+            .filter((url: string) => url && typeof url === "string");
+        }
+        if (photoUrls.length === 0) {
+          console.log(`[MLS MEDIA] No se encontraron fotos en MLS para ${address}. Usando fallback público...`);
+          const fallbackPhotos = await fetchPublicPropertyPhoto(address);
+          if (fallbackPhotos) {
+            photoUrls = fallbackPhotos;
+          }
+        }
+        const photoUrlsStr = photoUrls.length > 0 ? JSON.stringify(photoUrls) : null;
+
         await db.execute({
           sql: `
             UPDATE ${tableName} SET
@@ -651,18 +711,23 @@ async function crossReferenceGeneric(tableName: string, idCol: string, addressCo
               is_high_yield = ?,
               sqft = ?,
               beds = ?,
-              baths = ?
+              baths = ?,
+              photo_urls = ?
             WHERE ${idCol} = ?
           `,
-          args: [mlsId, mlsStatus, mlsValue, isHighYield, sqft, beds, baths, idVal]
+          args: [mlsId, mlsStatus, mlsValue, isHighYield, sqft, beds, baths, photoUrlsStr, idVal]
         });
         console.log(`[MATCH FOUND] ¡Coincidencia MLS para ${tableName}! ID: ${mlsId} | Valor: $${mlsValue}`);
       } else {
-        await db.execute({
-          sql: `UPDATE ${tableName} SET mls_status = 'not_found' WHERE ${idCol} = ?`,
-          args: [idVal]
-        });
         console.log(`[NOT FOUND] No se encontró coincidencia MLS para ${address}.`);
+        console.log(`[MLS FALLBACK] No encontrado en MLS. Buscando foto pública para: ${address}`);
+        const fallbackPhotos = await fetchPublicPropertyPhoto(address);
+        const photoUrlsStr = fallbackPhotos && fallbackPhotos.length > 0 ? JSON.stringify(fallbackPhotos) : null;
+
+        await db.execute({
+          sql: `UPDATE ${tableName} SET mls_status = 'not_found', photo_urls = ? WHERE ${idCol} = ?`,
+          args: [photoUrlsStr, idVal]
+        });
       }
     } catch (err: any) {
       console.error(`[ERROR QUERYING MLS] Falló para ${tableName} id ${idVal}:`, err.message);

@@ -201,7 +201,9 @@ async function searchMyCaseByName(first: string, last: string, county: string): 
     await page.fill('input[placeholder="first name / initial"]', first);
     
     // Select county court
-    const courtValue = county.toLowerCase().includes("clark") ? "106" : "115";
+    const courtValue = county.toLowerCase().includes("clark") 
+      ? "106" 
+      : (county.toLowerCase().includes("floyd") ? "115" : "129");
     await page.selectOption("select.form-control", courtValue);
     
     // Search
@@ -216,7 +218,7 @@ async function searchMyCaseByName(first: string, last: string, county: string): 
     }
     
     // Regex para números de caso de Indiana
-    const countyCodePrefix = courtValue === "106" ? "10" : "22";
+    const countyCodePrefix = courtValue === "106" ? "10" : (courtValue === "115" ? "22" : "31");
     const caseRegex = new RegExp(`\\b${countyCodePrefix}[A-Z]\\d{2}-\\d{4}-MF-\\d{3,6}\\b`, "gi");
     const matches = bodyText.match(caseRegex);
     
@@ -508,24 +510,80 @@ async function getCaseDetailsFromMyCase(caseNumber: string): Promise<{ debt: num
 }
 
 /**
+ * Calcula la cantidad de días restantes hasta la fecha de la subasta.
+ */
+function getDaysRemaining(dateStr: string): number | null {
+  try {
+    let cleanDate = dateStr.toLowerCase().replace(/\s+/g, " ").trim();
+    const months: { [key: string]: number } = {
+      jan: 0, january: 0, feb: 1, february: 1, mar: 2, march: 2,
+      apr: 3, april: 3, may: 4, jun: 5, june: 5, jul: 6, july: 6,
+      aug: 7, august: 7, sep: 8, september: 8, oct: 9, october: 9,
+      nov: 10, november: 10, dec: 11, december: 11
+    };
+    
+    let dateObj: Date | null = null;
+    
+    if (/^\d+\/\d+\/\d+$/.test(cleanDate)) {
+      const [m, d, y] = cleanDate.split("/").map(Number);
+      dateObj = new Date(y, m - 1, d);
+    }
+    else if (cleanDate.includes("/")) {
+      const parts = cleanDate.split("/");
+      const monthName = parts[0].trim();
+      const dayAndYear = parts[1].trim();
+      const dayYearParts = dayAndYear.split(" ");
+      const day = parseInt(dayYearParts[0]);
+      const year = parseInt(dayYearParts[1] || "2026");
+      
+      if (months[monthName] !== undefined && !isNaN(day)) {
+        dateObj = new Date(year, months[monthName], day);
+      }
+    }
+    else {
+      cleanDate = cleanDate.replace(/,/g, "");
+      const parts = cleanDate.split(" ");
+      if (parts.length >= 3) {
+        const monthName = parts[0];
+        const day = parseInt(parts[1]);
+        const year = parseInt(parts[2]);
+        if (months[monthName] !== undefined && !isNaN(day) && !isNaN(year)) {
+          dateObj = new Date(year, months[monthName], day);
+        }
+      }
+    }
+    
+    if (dateObj && !isNaN(dateObj.getTime())) {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      dateObj.setHours(0, 0, 0, 0);
+      const diffTime = dateObj.getTime() - today.getTime();
+      return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    }
+  } catch (e) {}
+  return null;
+}
+
+/**
  * Función principal para procesar todas las subastas de Indiana pendientes de deuda
  */
 async function runIndianaCrawler() {
   console.log("[INICIO] Iniciando Crawler de Expedientes de Indiana (MyCase)...");
   
-  // Limpiar storage de Crawlee al inicio del proceso para evitar colisiones de colas de peticiones
-  try {
-    const fs = require("fs");
-    fs.rmSync("./storage", { recursive: true, force: true });
-  } catch (e) {}
+  // NOTA: No limpiar toda la carpeta ./storage aquí, ya que Crawlee mantiene en caché de memoria
+  // el gestor del KeyValueStore por defecto. Si se borra la carpeta en disco a mitad del proceso,
+  // las siguientes llamadas a PlaywrightCrawler fallarán al buscar 'SDK_SESSION_POOL_STATE.json'.
+  // Las colas de peticiones ya están versionadas con timestamp y se eliminan vía requestQueue.drop().
+
   
-  // 1. Consultar subastas de Indiana que no tengan deuda asociada
+  // 1. Consultar subastas de Indiana que no tengan deuda asociada y no estén hibernadas para el futuro
   let auctionsRes;
   try {
     auctionsRes = await db.execute(`
-      SELECT auction_id, address, county, case_number, defendant, plaintiff, mls_estimated_value, hidden_mortgages
+      SELECT auction_id, address, county, case_number, defendant, plaintiff, mls_estimated_value, hidden_mortgages, auction_date, next_retry_date
       FROM foreclosure_auctions 
       WHERE state = 'IN' AND (debt_amount IS NULL OR debt_amount = 0)
+        AND (next_retry_date IS NULL OR next_retry_date <= date('now'))
     `);
   } catch (dbErr: any) {
     console.error("[DB ERROR] Error al consultar subastas de Indiana:", dbErr.message);
@@ -554,6 +612,7 @@ async function runIndianaCrawler() {
     
     // 2. Si el caso es 'PENDING', buscar el número de caso y parties en la web
     if (caseNumber === "PENDING") {
+      // PASO 1: Extracción Gratis
       const searchRes = await searchCaseAndParties(address, county);
       if (searchRes.caseNumber) {
         caseNumber = searchRes.caseNumber;
@@ -574,7 +633,27 @@ async function runIndianaCrawler() {
           });
         } catch (e) {}
       } else {
-        console.log(`[DDG FAILED] No se pudo encontrar caso en DDG para "${address}". Intentando fallback de BatchData Property Lookup + MyCase Name Search...`);
+        // PASO 2: Filtro de Fecha e Hibernación (30 a 60 días)
+        const daysRemaining = getDaysRemaining(row.auction_date as string);
+        if (daysRemaining !== null && daysRemaining >= 30) {
+          const nextRetry = new Date();
+          nextRetry.setDate(nextRetry.getDate() + 15);
+          const nextRetryStr = nextRetry.toISOString().split("T")[0]; // YYYY-MM-DD
+          
+          console.log(`[HIBERNACIÓN] La búsqueda gratuita falló. Subasta en ${daysRemaining} días (entre 30 y 60). Hibernando proceso para no gastar API de pago. Próximo reintento: ${nextRetryStr}`);
+          try {
+            await db.execute({
+              sql: "UPDATE foreclosure_auctions SET needs_manual_review = 2, next_retry_date = ? WHERE auction_id = ?",
+              args: [nextRetryStr, auctionId]
+            });
+          } catch (e) {}
+          continue; // Detener el proceso para esta propiedad (NO llamamos a BatchData)
+        }
+        
+        // PASO 3: Extracción de Pago / Urgencia (menos de 30 días o fecha no determinable)
+        const daysLog = daysRemaining !== null ? `${daysRemaining} días` : "fecha indefinida";
+        console.log(`[URGENCIA] La búsqueda gratuita falló. Subasta en ${daysLog} (< 30 días). Iniciando consulta de pago en BatchData...`);
+        
         let fallbackFound = false;
         try {
           const ownerNames = await getOwnerNameFromBatchData(address, "IN", county);
@@ -597,14 +676,14 @@ async function runIndianaCrawler() {
                     `,
                     args: [caseNumber, extractedDefendant, auctionId]
                   });
-                  console.log(`[FALLBACK SUCCESS] Caso encontrado vía Name Search: ${caseNumber} para deudor: ${extractedDefendant}`);
+                  console.log(`[FALLBACK SUCCESS] Caso encontrado de pago vía Name Search: ${caseNumber} para deudor: ${extractedDefendant}`);
                   break;
                 }
               }
             }
           }
         } catch (fallbackErr: any) {
-          console.error(`[FALLBACK ERROR] Falló el proceso de fallback: ${fallbackErr.message}`);
+          console.error(`[FALLBACK ERROR] Falló el proceso de fallback de pago: ${fallbackErr.message}`);
         }
 
         if (!fallbackFound) {

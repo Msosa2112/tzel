@@ -88,7 +88,6 @@ export async function scrapeIndianaCaseWithCrawlee(caseNumber: string): Promise<
     requestHandlerTimeoutSecs: 60,
     launchContext: {
       launcher: chromium,
-      useChrome: true,
       launchOptions: {
         headless: process.env.HEADLESS ? process.env.HEADLESS === "true" : false,
       }

@@ -3,6 +3,7 @@ import { createClient } from "@libsql/client";
 import * as dotenv from "dotenv";
 import { querySearXNG } from "./searxng_client";
 import { BatchDataClient } from "./scrapers/batchdata_client";
+import { searchOSINTContacts } from "./intelligence/osint_scraper";
 
 
 // Cargar variables de entorno
@@ -186,28 +187,26 @@ export async function performSkipTrace(
   state: string,
   county: string
 ): Promise<SkipTraceResult> {
-  const phones: string[] = [];
-  const emails: string[] = [];
-
-  // 1. Intentar primero con OSINT gratuito (SearXNG) para ahorrar costos de API
+  // 1. Paso 1: Ejecutar la nueva búsqueda gratuita en OSINT
   try {
-    const osintResult = await performFreeOSINTrace(defendant, rawAddress, state, county);
-    if (osintResult.phones.length > 0) {
-      osintResult.phones.forEach(p => phones.push(`OSINT: ${p}`));
-    }
-    if (osintResult.emails.length > 0) {
-      osintResult.emails.forEach(e => emails.push(`OSINT: ${e}`));
-    }
-    if (osintResult.links.length > 0) {
-      osintResult.links.forEach(l => emails.push(`OSINT Link: ${l}`));
+    console.log(`[WATERFALL SKIP TRACE] Paso 1: Buscando contactos vía OSINT para "${defendant}"...`);
+    const osintResult = await searchOSINTContacts(defendant, rawAddress, state, county);
+    
+    // Paso 2: Si el motor OSINT devuelve contactos válidos, terminar el proceso (Costo: $0)
+    if (osintResult && (osintResult.phones.length > 0 || osintResult.emails.length > 0)) {
+      console.log(`[WATERFALL SKIP TRACE] Paso 2: OSINT gratuito exitoso para "${defendant}". Evitando BatchData.`);
+      const phones = osintResult.phones.map(p => `OSINT: ${p}`);
+      const emails = osintResult.emails.map(e => `OSINT: ${e}`);
+      return { phones, emails };
     }
   } catch (err: any) {
-    console.error(`[SKIP TRACE ERR] OSINT failed for ${defendant}:`, err.message);
+    console.error(`[WATERFALL SKIP TRACE ERR] OSINT failed for ${defendant}:`, err.message);
   }
 
-  // 2. Si no obtuvimos teléfonos por OSINT y el proveedor es BatchData, usar la API de BatchData
-  if (phones.length === 0 && process.env.SKIP_TRACE_PROVIDER === "batchdata") {
+  // 2. Paso 3 (Fallback): Solo si el motor OSINT falló o devolvió null/vacío, usar la llamada a la API de BatchData
+  if (process.env.SKIP_TRACE_PROVIDER === "batchdata") {
     try {
+      console.log(`[WATERFALL SKIP TRACE] Paso 3: Fallback a BatchData API para "${defendant}"...`);
       const parsed = parseAddress(rawAddress, state, county);
       const batchRes = await batchDataClient.skipTrace(defendant, {
         street: parsed.street,
@@ -216,7 +215,10 @@ export async function performSkipTrace(
         zip: parsed.zip
       });
 
-      if (batchRes.success && batchRes.phones.length > 0) {
+      if (batchRes.success && (batchRes.phones.length > 0 || batchRes.emails.length > 0)) {
+        const phones: string[] = [];
+        const emails: string[] = [];
+        
         batchRes.phones.forEach(p => {
           const dncLabel = p.isDNC ? " [DNC]" : "";
           phones.push(`BatchData (${p.type}${dncLabel}): ${p.number}`);
@@ -224,22 +226,20 @@ export async function performSkipTrace(
         batchRes.emails.forEach(e => {
           emails.push(`BatchData: ${e.email}`);
         });
+        
+        return { phones, emails };
       }
     } catch (err: any) {
-      console.error(`[SKIP TRACE ERR] BatchData failed for ${defendant}:`, err.message);
+      console.error(`[WATERFALL SKIP TRACE ERR] BatchData failed for ${defendant}:`, err.message);
     }
   }
 
   // 3. Fallback final simulado solo si no hay absolutamente ningún resultado (OSINT ni BatchData)
-  if (phones.length === 0) {
-    console.log(`[SKIP TRACE FALLBACK] No se encontraron resultados reales. Devolviendo contactos de prueba para: "${defendant}"`);
-    return {
-      phones: ["OSINT: (502) 555-0199", "OSINT: (502) 555-0144"],
-      emails: ["OSINT Link: https://truepeoplesearch.com/find/person/p82"]
-    };
-  }
-
-  return { phones, emails };
+  console.log(`[WATERFALL SKIP TRACE FALLBACK] No se encontraron resultados reales. Devolviendo contactos de prueba para: "${defendant}"`);
+  return {
+    phones: ["OSINT: (502) 555-0199", "OSINT: (502) 555-0144"],
+    emails: ["OSINT Link: https://truepeoplesearch.com/find/person/p82"]
+  };
 }
 
 /**

@@ -1,5 +1,7 @@
 # Ignore environment variables / secrets
 .env
+env_*.txt
+*.log
 
 # Node.js dependencies and builds
 node_modules/

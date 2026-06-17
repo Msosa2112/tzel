@@ -29,11 +29,11 @@ function runRuleBasedFallback(rawText: string): LLMAnalysisResult {
 }
 
 /**
- * Envía el texto del expediente judicial a la API local de Ollama (Gemma:7b)
+ * Envía el texto del expediente judicial a la API de Google Gemini (gemini-1.5-flash)
  * para clasificar semánticamente si el caso ha sido desestimado.
  */
 export async function analyzeTextWithGemma(rawText: string): Promise<LLMAnalysisResult> {
-  const url = "http://localhost:11434/api/generate";
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`;
   const prompt = `Instrucción: Eres un asistente legal experto. Analiza el siguiente texto de un expediente judicial de ejecución hipotecaria (foreclosure) y determina si el caso ha sido desestimado (dismissed) por el tribunal.
 
 REGLAS DE CLASIFICACIÓN (Síguelas al pie de la letra):
@@ -52,19 +52,27 @@ Texto del expediente a analizar:
 ${rawText}`;
 
   try {
-    console.log("[LLM UNDERWRITER] Consultando Gemma local en localhost:11434...");
+    console.log("[LLM UNDERWRITER] Consultando API de Gemini (gemini-1.5-flash)...");
     const response = await fetch(url, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "gemma:7b",
-        prompt: prompt,
-        stream: false,
-        format: "json"
+        contents: [
+          {
+            parts: [
+              {
+                text: prompt
+              }
+            ]
+          }
+        ],
+        generationConfig: {
+          response_mime_type: "application/json"
+        }
       }),
-      // Añadir un timeout razonable para evitar colgar el pipeline si Ollama no responde
+      // Añadir un timeout razonable para evitar colgar el pipeline si Gemini no responde
       signal: AbortSignal.timeout(15000)
     });
 
@@ -72,13 +80,23 @@ ${rawText}`;
       throw new Error(`HTTP Error ${response.status}: ${response.statusText}`);
     }
 
-    const data = await response.json() as { response: string };
+    const data = await response.json() as any;
     
-    if (!data.response) {
-      throw new Error("Respuesta vacía recibida desde Ollama.");
+    // Mapear respuesta del API de Gemini
+    let responseText = "";
+    if (data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts && data.candidates[0].content.parts[0]) {
+      responseText = data.candidates[0].content.parts[0].text;
+    } else if (data.candidates && (data.candidates as any).content && (data.candidates as any).content.parts && (data.candidates as any).content.parts.text) {
+      responseText = (data.candidates as any).content.parts.text;
+    } else {
+      throw new Error("Estructura de respuesta de Gemini inválida.");
+    }
+    
+    if (!responseText) {
+      throw new Error("Respuesta vacía recibida desde Gemini.");
     }
 
-    const parsedResult = JSON.parse(data.response);
+    const parsedResult = JSON.parse(responseText);
     
     let isDismissed = false;
     let reason = "Sin detalles adicionales del LLM.";
@@ -105,7 +123,7 @@ ${rawText}`;
     };
 
   } catch (err: any) {
-    console.warn(`[LLM UNDERWRITER WARNING] No se pudo conectar con Ollama o falló la respuesta: ${err.message}. Usando fallback de reglas rígidas.`);
+    console.warn(`[LLM UNDERWRITER WARNING] No se pudo conectar con Gemini o falló la respuesta: ${err.message}. Usando fallback de reglas rígidas.`);
     return runRuleBasedFallback(rawText);
   }
 }
