@@ -1045,9 +1045,147 @@
       cursor: pointer;
       transition: background 0.2s;
     }
-    .drawer-photo-dot.active {
-      background: var(--color-radar-green);
-      box-shadow: 0 0 6px var(--color-radar-green);
+    /* --- MOBILE RESPONSIVE STYLING --- */
+    .header-toggle-btn {
+      display: none;
+      background: transparent;
+      border: none;
+      color: var(--text-main);
+      cursor: pointer;
+      padding: 8px;
+      border-radius: 4px;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s;
+    }
+    .header-toggle-btn:hover {
+      background: rgba(255, 255, 255, 0.05);
+      color: var(--color-radar-green);
+    }
+    .sidebar-header-mobile {
+      display: none;
+      justify-content: space-between;
+      align-items: center;
+      padding: 16px;
+      border-bottom: 1px solid var(--border-glass);
+      background: rgba(255, 255, 255, 0.02);
+    }
+    .sidebar-header-mobile h3 {
+      font-size: 1rem;
+      color: #ffffff;
+      font-family: 'Orbitron', sans-serif;
+    }
+    .close-btn-mobile {
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      cursor: pointer;
+      font-size: 1.8rem;
+      line-height: 1;
+      padding: 2px 8px;
+      border-radius: 4px;
+      transition: all 0.2s;
+    }
+    .close-btn-mobile:hover {
+      color: #ffffff;
+      background: rgba(255, 255, 255, 0.05);
+    }
+    .sidebar-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.6);
+      backdrop-filter: blur(4px);
+      -webkit-backdrop-filter: blur(4px);
+      z-index: 1000;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.3s ease;
+    }
+    .sidebar-overlay.active {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    @media (max-width: 768px) {
+      .header-toggle-btn {
+        display: flex;
+      }
+      header {
+        padding: 0 16px;
+      }
+      .brand-title {
+        font-size: 0.95rem;
+      }
+      .system-status {
+        display: none;
+      }
+      
+      .app-container {
+        position: relative;
+        overflow: hidden;
+      }
+      .map-container {
+        width: 100%;
+        height: 100%;
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        z-index: 1;
+      }
+      
+      .sidebar-left {
+        position: absolute;
+        top: 0;
+        left: 0;
+        bottom: 0;
+        width: 85vw;
+        max-width: 360px;
+        height: 100%;
+        z-index: 1010;
+        transform: translateX(-100%);
+        transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        box-shadow: 8px 0 24px rgba(0, 0, 0, 0.6);
+        background: var(--bg-dark);
+      }
+      .sidebar-left.open {
+        transform: translateX(0);
+      }
+      .sidebar-header-mobile {
+        display: flex;
+      }
+      
+      .sidebar-right {
+        width: 85vw;
+        max-width: 380px;
+        z-index: 1020;
+        background: var(--bg-dark);
+      }
+      
+      .map-legend {
+        bottom: 15px;
+        left: 15px;
+        right: 15px;
+        max-width: none;
+        padding: 8px 12px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        justify-content: space-between;
+      }
+      .map-legend-title {
+        width: 100%;
+        margin-bottom: 4px;
+        padding-bottom: 4px;
+        font-size: 11px;
+      }
+      .map-legend-item {
+        margin-bottom: 0;
+      }
     }
   </style>
 </head>
@@ -1055,9 +1193,14 @@
 
   <!-- Header HUD -->
   <header>
-    <div class="brand-container">
-      <img src="logo.jpg" alt="TZEL Logo" class="brand-logo">
-      <h1 class="brand-title">TZEL TACTICAL RADAR v1.2</h1>
+    <div style="display: flex; align-items: center; gap: 8px;">
+      <button id="toggle-sidebar-left-btn" class="header-toggle-btn" aria-label="Toggle Sidebar Left">
+        <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" x2="20" y1="12" y2="12"/><line x1="4" x2="20" y1="6" y2="6"/><line x1="4" x2="20" y1="18" y2="18"/></svg>
+      </button>
+      <div class="brand-container">
+        <img src="logo.jpg" alt="TZEL Logo" class="brand-logo">
+        <h1 class="brand-title">TZEL TACTICAL RADAR v1.2</h1>
+      </div>
     </div>
     
     <div class="system-status">
@@ -1068,9 +1211,15 @@
 
   <!-- App Body Layout -->
   <div class="app-container">
+    <!-- Backdrop Overlay for Mobile Drawers -->
+    <div class="sidebar-overlay" id="sidebar-overlay"></div>
     
     <!-- Left Sidebar: Filters & Alerts list -->
-    <aside class="sidebar-left">
+    <aside class="sidebar-left" id="sidebar-left">
+      <div class="sidebar-header-mobile">
+        <h3>Filtros y Listado</h3>
+        <button id="close-sidebar-left-btn" class="close-btn-mobile" aria-label="Close Sidebar Left">&times;</button>
+      </div>
       <!-- Search -->
       <div class="sidebar-section">
         <h3>Filtros Operativos</h3>
@@ -1421,6 +1570,32 @@
       document.getElementById('pill-stack').addEventListener('change', applyFilters);
       document.getElementById('btn-surplus-vault').addEventListener('click', openSurplusVault);
       document.getElementById('close-surplus-btn').addEventListener('click', closeSurplusVault);
+
+      // Mobile Sidebar Controls
+      const sidebarLeft = document.getElementById('sidebar-left');
+      const overlay = document.getElementById('sidebar-overlay');
+      const toggleLeftBtn = document.getElementById('toggle-sidebar-left-btn');
+      const closeLeftBtn = document.getElementById('close-sidebar-left-btn');
+
+      if (toggleLeftBtn && closeLeftBtn && overlay && sidebarLeft) {
+        toggleLeftBtn.addEventListener('click', () => {
+          sidebarLeft.classList.add('open');
+          overlay.classList.add('active');
+        });
+
+        closeLeftBtn.addEventListener('click', () => {
+          sidebarLeft.classList.remove('open');
+          const drawerRight = document.getElementById('tactical-drawer');
+          if (drawerRight && !drawerRight.classList.contains('open')) {
+            overlay.classList.remove('active');
+          }
+        });
+
+        overlay.addEventListener('click', () => {
+          sidebarLeft.classList.remove('open');
+          closeDrawer();
+        });
+      }
       
       document.getElementById('btn-deals').addEventListener('click', () => {
         setFinancialFilter('deals');
@@ -1876,20 +2051,31 @@
       hydrateDrawer(lead);
     }
 
+    function openDrawer() {
+      const drawer = document.getElementById('tactical-drawer');
+      if (drawer) drawer.classList.add('open');
+      const overlay = document.getElementById('sidebar-overlay');
+      if (overlay) overlay.classList.add('active');
+    }
+
+    function closeDrawer() {
+      const drawer = document.getElementById('tactical-drawer');
+      if (drawer) drawer.classList.remove('open');
+      const sidebarLeft = document.getElementById('sidebar-left');
+      const overlay = document.getElementById('sidebar-overlay');
+      if (overlay && (!sidebarLeft || !sidebarLeft.classList.contains('open'))) {
+        overlay.classList.remove('active');
+      }
+    }
+
     // Explictly called by Leaflet popup button
     window.openLeadDrawer = function(groupingKey) {
       const lead = allLeads.find(l => l.groupingKey === groupingKey);
       if (lead) {
         selectLead(lead, false);
-        const drawer = document.getElementById('tactical-drawer');
-        drawer.classList.add('open');
+        openDrawer();
       }
     };
-
-    function closeDrawer() {
-      const drawer = document.getElementById('tactical-drawer');
-      drawer.classList.remove('open');
-    }
 
     window.switchDrawerPhoto = function(index) {
       const slider = document.getElementById('drawer-photos-slider');
@@ -2341,8 +2527,7 @@
       buildCallScripts(lead, activeDistressCategories);
 
       // Open drawer in screen
-      const drawer = document.getElementById('tactical-drawer');
-      drawer.classList.add('open');
+      openDrawer();
     }
 
     function buildCallScripts(lead, categories) {
