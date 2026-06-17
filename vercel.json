@@ -10,10 +10,6 @@
     {
       "src": "/api/(.*)",
       "dest": "tzel_map_server.ts"
-    },
-    {
-      "src": "/(.*)",
-      "dest": "/$1"
     }
   ]
 }
