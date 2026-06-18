@@ -54,3 +54,48 @@ export function getRandomProxyUrl(): string | undefined {
   const randomIndex = Math.floor(Math.random() * proxyUrls.length);
   return proxyUrls[randomIndex];
 }
+
+/**
+ * Solicita una resolución de Cloudflare al puerto de FlareSolverr e inyecta las cookies y UA correspondientes en el contexto de Playwright.
+ */
+export async function applyFlareSolverrBypass(context: any, url: string): Promise<boolean> {
+  const solverUrl = process.env.FLARESOLVERR_URL || "http://localhost:8191/v1";
+  try {
+    const axios = require("axios");
+    console.log(`[FLARESOLVERR] Intentando bypass de Cloudflare para ${url}...`);
+    const solverRes = await axios.post(solverUrl, {
+      cmd: "request.get",
+      url: url,
+      maxTimeout: 60000
+    }, { timeout: 65000 });
+
+    if (solverRes.data && solverRes.data.status === "ok") {
+      const solution = solverRes.data.solution;
+      console.log(`[FLARESOLVERR] Bypass exitoso. Inyectando cookies y User-Agent...`);
+      
+      // Inyectar User Agent
+      await context.setExtraHTTPHeaders({
+        "User-Agent": solution.userAgent
+      });
+
+      // Mapear cookies al formato de Playwright
+      const cookies = solution.cookies.map((c: any) => ({
+        name: c.name,
+        value: c.value,
+        domain: c.domain,
+        path: c.path,
+        expires: c.expires || undefined,
+        httpOnly: c.httpOnly || false,
+        secure: c.secure || false,
+        sameSite: c.sameSite as "Lax" | "Strict" | "None" | undefined
+      }));
+
+      await context.addCookies(cookies);
+      return true;
+    }
+  } catch (err: any) {
+    console.error(`[FLARESOLVERR BYPASS ERROR] Falló la llamada a FlareSolverr: ${err.message}`);
+  }
+  return false;
+}
+

@@ -265,8 +265,9 @@ async function runCrossReference() {
     let odataFilter = `contains(UnparsedAddress, '${houseNumber}') and StateOrProvince eq '${state}'`;
     if (zipCode) {
       odataFilter += ` and PostalCode eq '${zipCode}'`;
-    } else if (coreWords.length > 0) {
-      odataFilter += ` and contains(UnparsedAddress, '${coreWords[0]}')`;
+    }
+    for (const word of coreWords) {
+      odataFilter += ` and contains(tolower(UnparsedAddress), '${word.toLowerCase()}')`;
     }
     
     const params = {
@@ -461,8 +462,9 @@ async function runCrossReference() {
     let odataFilter = `contains(UnparsedAddress, '${houseNumber}') and StateOrProvince eq '${state}'`;
     if (zipCode) {
       odataFilter += ` and PostalCode eq '${zipCode}'`;
-    } else if (coreWords.length > 0) {
-      odataFilter += ` and contains(UnparsedAddress, '${coreWords[0]}')`;
+    }
+    for (const word of coreWords) {
+      odataFilter += ` and contains(tolower(UnparsedAddress), '${word.toLowerCase()}')`;
     }
 
     const params = {
@@ -643,8 +645,9 @@ async function crossReferenceGeneric(tableName: string, idCol: string, addressCo
     let odataFilter = `contains(UnparsedAddress, '${houseNumber}') and StateOrProvince eq '${state}'`;
     if (zipCode) {
       odataFilter += ` and PostalCode eq '${zipCode}'`;
-    } else if (coreWords.length > 0) {
-      odataFilter += ` and contains(UnparsedAddress, '${coreWords[0]}')`;
+    }
+    for (const word of coreWords) {
+      odataFilter += ` and contains(tolower(UnparsedAddress), '${word.toLowerCase()}')`;
     }
 
     try {

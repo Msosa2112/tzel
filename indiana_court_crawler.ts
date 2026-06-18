@@ -7,6 +7,7 @@ import * as dotenv from "dotenv";
 import { isHighYieldProperty } from "./underwriting/underwriter";
 import { BatchDataClient } from "./scrapers/batchdata_client";
 import { scrapeIndianaCaseWithCrawlee } from "./scrapers/crawlee_court_scraper";
+import { applyFlareSolverrBypass } from "./scrapers/proxy_helper";
 
 chromium.use(stealthPlugin());
 
@@ -174,19 +175,26 @@ async function searchMyCaseByName(first: string, last: string, county: string): 
     // Detección y manejo defensivo del desafío de Cloudflare / Turnstile
     const cfIframe = page.locator('iframe[src*="challenges.cloudflare.com"]');
     const count = await cfIframe.count();
-    if (count > 0 || title.includes("Just a moment") || title.includes("Cloudflare")) {
-      console.log("[MYCASE NAME SEARCH] Desafío de Cloudflare detectado. Intentando resolver...");
-      try {
-        const frame = page.frame({ url: /challenges\.cloudflare\.com/ });
-        if (frame) {
-          const checkbox = frame.locator('#challenge-stage');
-          if (await checkbox.isVisible()) {
-            await checkbox.click();
-            console.log("[MYCASE NAME SEARCH] Se hizo clic en el checkbox de Turnstile.");
+    if (count > 0 || title.includes("Just a moment") || title.includes("Cloudflare") || title.includes("Attention Required")) {
+      console.log("[MYCASE NAME SEARCH] Desafío de Cloudflare detectado. Intentando bypass con FlareSolverr...");
+      const bypassed = await applyFlareSolverrBypass(context, "https://public.courts.in.gov/mycase/");
+      if (bypassed) {
+        console.log("[MYCASE NAME SEARCH] Bypass de FlareSolverr exitoso. Recargando página...");
+        await page.goto("https://public.courts.in.gov/mycase/", { waitUntil: "networkidle", timeout: 25000 });
+      } else {
+        console.log("[MYCASE NAME SEARCH] FlareSolverr falló. Intentando resolver con click de Turnstile...");
+        try {
+          const frame = page.frame({ url: /challenges\.cloudflare\.com/ });
+          if (frame) {
+            const checkbox = frame.locator('#challenge-stage');
+            if (await checkbox.isVisible()) {
+              await checkbox.click();
+              console.log("[MYCASE NAME SEARCH] Se hizo clic en el checkbox de Turnstile.");
+            }
           }
+        } catch (e: any) {
+          console.warn(`[MYCASE NAME SEARCH] No se pudo hacer clic en el iframe de Turnstile: ${e.message}`);
         }
-      } catch (e: any) {
-        console.warn(`[MYCASE NAME SEARCH] No se pudo hacer clic en el iframe de Turnstile: ${e.message}`);
       }
       await page.waitForSelector("#SearchValue", { timeout: 15000 }).catch(() => {});
     }
@@ -413,8 +421,15 @@ async function getCaseDetailsFromMyCase(caseNumber: string): Promise<{ debt: num
     
     // Verificar si nos topamos con un bloqueo directo o Cloudflare
     const pageTitle = await page.title();
-    if (pageTitle.includes("Attention Required") || pageTitle.includes("Cloudflare")) {
-      throw new Error("Bloqueo de seguridad / Captcha de Cloudflare detectado en la página de inicio.");
+    if (pageTitle.includes("Attention Required") || pageTitle.includes("Cloudflare") || pageTitle.includes("Just a moment")) {
+      console.log("[MYCASE DETAILS] Desafío de Cloudflare detectado. Intentando bypass con FlareSolverr...");
+      const bypassed = await applyFlareSolverrBypass(context, "https://public.courts.in.gov/mycase/");
+      if (bypassed) {
+        console.log("[MYCASE DETAILS] Bypass de FlareSolverr exitoso. Recargando página...");
+        await page.goto("https://public.courts.in.gov/mycase/", { waitUntil: "networkidle", timeout: 20000 });
+      } else {
+        throw new Error("Bloqueo de seguridad / Captcha de Cloudflare detectado en la página de inicio y FlareSolverr falló.");
+      }
     }
     
     // 2. Ingresar el número de caso en el buscador

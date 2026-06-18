@@ -15,6 +15,7 @@ import { runSkipTracing } from "./skip_trace";
 import { scoreAllProperties } from "./intelligence/stress_scorer";
 import { notifyOpportunities, sendTelegramNotification } from "./notify_opportunities";
 import { createClient } from "@libsql/client";
+import { runSurplusAuditRoutine, SURPLUS_FUNDS_MOCKS } from "./surplus_funds";
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -203,6 +204,20 @@ async function runPipeline() {
     await notifyOpportunities();
   } catch (err: any) {
     console.error("[CAPA 4 ERROR] Falló el notificador de Telegram:", err.message);
+  }
+
+  // =================================================================
+  // CAPA 5: AUDITORÍA DE EXCEDENTES (SURPLUS FUNDS AUDIT)
+  // =================================================================
+  console.log("\n=================================================================");
+  console.log("💰 [CAPA 5] AUDITORÍA DE EXCEDENTES DE SUBASTAS");
+  console.log("=================================================================");
+
+  try {
+    console.log("\n[CAPA 5] Corriendo Auditoría Financiera de Fondos Excedentes (Surplus Funds)...");
+    await runSurplusAuditRoutine(SURPLUS_FUNDS_MOCKS);
+  } catch (err: any) {
+    console.error("[CAPA 5 ERROR] Falló la auditoría de excedentes:", err.message);
   }
 
   console.log("\n=================================================================");

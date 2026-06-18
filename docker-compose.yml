@@ -1,6 +1,13 @@
-version: '3.7'
-
 services:
+  redis:
+    image: docker.io/redis:alpine
+    container_name: redis_local
+    restart: always
+    ports:
+      - "6379:6379"
+    networks:
+      - tzel-network
+
   searxng:
     image: docker.io/searxng/searxng:latest
     container_name: searxng_local
@@ -24,3 +31,52 @@ services:
       options:
         max-size: "10m"
         max-file: "3"
+    depends_on:
+      - redis
+    networks:
+      - tzel-network
+
+  flaresolverr:
+    image: ghcr.io/flaresolverr/flaresolverr:latest
+    container_name: flaresolverr_local
+    restart: always
+    ports:
+      - "8191:8191"
+    environment:
+      - LOG_LEVEL=info
+      - CAPTCHA_SOLVER=none
+    networks:
+      - tzel-network
+
+  ollama:
+    image: docker.io/ollama/ollama:latest
+    container_name: ollama_local
+    restart: always
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    networks:
+      - tzel-network
+
+  neo4j:
+    image: docker.io/neo4j:community
+    container_name: neo4j_local
+    restart: always
+    ports:
+      - "7474:7474"
+      - "7687:7687"
+    environment:
+      - NEO4J_AUTH=none
+    volumes:
+      - neo4j_data:/data
+    networks:
+      - tzel-network
+
+volumes:
+  ollama_data:
+  neo4j_data:
+
+networks:
+  tzel-network:
+    driver: bridge

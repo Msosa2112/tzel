@@ -68,15 +68,21 @@ export async function searchOSINTContacts(
   const cleanName = name.trim();
   const stateVal = state || "KY";
   const city = address ? address.split(",")[1]?.trim() || county || "" : county || "";
+  const zipMatches = address ? address.match(/\b\d{5}\b/g) : null;
+  const zip = zipMatches ? zipMatches[zipMatches.length - 1] : "";
+  const location = zip || city || stateVal;
   
   // Construct a specific query based on individual vs corporate
   let query = "";
   if (isLLC(cleanName)) {
     const stateName = stateVal === "KY" ? "Kentucky" : (stateVal === "IN" ? "Indiana" : stateVal);
-    query = `"${cleanName}" "${stateName}" (phone OR contact OR "secretary of state" OR directory)`;
+    query = `"${cleanName}" "${stateName}" (bizapedia OR opencorporates OR "secretary of state")`;
   } else {
-    query = `"${cleanName}" "${city}" ${stateVal} (phone OR contact OR directory OR obituary OR email)`;
+    query = `"${cleanName}" "${location}" (obituary OR divorce)`;
   }
+
+  // Truncamiento estricto a 100 caracteres
+  query = query.substring(0, 100);
 
   try {
     console.log(`[OSINT ENGINE] Searching for "${cleanName}" with query: "${query}"`);

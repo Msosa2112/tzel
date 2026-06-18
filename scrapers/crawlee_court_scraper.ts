@@ -1,6 +1,6 @@
 import { PlaywrightCrawler, RequestQueue } from "crawlee";
 import { createClient } from "@libsql/client";
-import { getProxyConfiguration } from "./proxy_helper";
+import { getProxyConfiguration, applyFlareSolverrBypass } from "./proxy_helper";
 import { chromium } from "playwright-extra";
 import stealthPlugin from "puppeteer-extra-plugin-stealth";
 import * as dotenv from "dotenv";
@@ -106,19 +106,27 @@ export async function scrapeIndianaCaseWithCrawlee(caseNumber: string): Promise<
       // Detección y manejo defensivo del desafío de Cloudflare / Turnstile
       const cfIframe = page.locator('iframe[src*="challenges.cloudflare.com"]');
       const count = await cfIframe.count();
-      if (count > 0 || title.includes("Just a moment") || title.includes("Cloudflare")) {
-        log.warning("Desafío de Cloudflare detectado. Intentando resolver...");
-        try {
-          const frame = page.frame({ url: /challenges\.cloudflare\.com/ });
-          if (frame) {
-            const checkbox = frame.locator('#challenge-stage');
-            if (await checkbox.isVisible()) {
-              await checkbox.click();
-              log.info("Se hizo clic en el checkbox de Turnstile.");
+      if (count > 0 || title.includes("Just a moment") || title.includes("Cloudflare") || title.includes("Attention Required")) {
+        log.warning("Desafío de Cloudflare detectado. Intentando bypass con FlareSolverr...");
+        const context = page.context();
+        const bypassed = await applyFlareSolverrBypass(context, "https://public.courts.in.gov/mycase/");
+        if (bypassed) {
+          log.info("Bypass de FlareSolverr exitoso. Recargando página...");
+          await page.goto("https://public.courts.in.gov/mycase/", { waitUntil: "networkidle", timeout: 25000 });
+        } else {
+          log.warning("Bypass de FlareSolverr falló. Intentando click manual en Turnstile...");
+          try {
+            const frame = page.frame({ url: /challenges\.cloudflare\.com/ });
+            if (frame) {
+              const checkbox = frame.locator('#challenge-stage');
+              if (await checkbox.isVisible()) {
+                await checkbox.click();
+                log.info("Se hizo clic en el checkbox de Turnstile.");
+              }
             }
+          } catch (e: any) {
+            log.warning(`No se pudo hacer clic en el iframe de Turnstile: ${e.message}`);
           }
-        } catch (e: any) {
-          log.warning(`No se pudo hacer clic en el iframe de Turnstile: ${e.message}`);
         }
         // Esperar hasta 15 segundos a que aparezca la página real
         await page.waitForSelector("#SearchValue", { timeout: 15000 }).catch(() => {});

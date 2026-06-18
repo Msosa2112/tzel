@@ -58,12 +58,32 @@ function parseAddress(address: string): { houseNumber: string | null; coreWords:
   return { houseNumber, coreWords };
 }
 
+/**
+ * Extrae y normaliza la información de la unidad/departamento para evitar colisiones.
+ */
+function getUnitInfo(address: string): string {
+  const cleanAddress = address.toLowerCase();
+  for (const indicator of ["apt", "unit", "ste", "suite", "#", "apartment"]) {
+    const idx = cleanAddress.indexOf(indicator);
+    if (idx !== -1) {
+      const rest = cleanAddress.substring(idx);
+      const parts = rest.split(",");
+      const unitPart = parts[0].trim().replace(/[^a-z0-9]/g, "");
+      if (unitPart) return unitPart;
+    }
+  }
+  return "";
+}
+
 function getGroupingKey(address: string): string {
   const parsed = parseAddress(address);
+  const unit = getUnitInfo(address);
   if (!parsed.houseNumber) {
-    return address.toLowerCase().replace(/[^a-z0-9]/g, "");
+    const base = address.toLowerCase().replace(/[^a-z0-9]/g, "");
+    return unit ? `${base}_${unit}` : base;
   }
-  return `${parsed.houseNumber}_${parsed.coreWords.join("_")}`;
+  const baseKey = `${parsed.houseNumber}_${parsed.coreWords.join("_")}`;
+  return unit ? `${baseKey}_${unit}` : baseKey;
 }
 
 export function getDaysRemaining(dateStr: string): number | null {

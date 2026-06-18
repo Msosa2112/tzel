@@ -94,6 +94,7 @@ async function performFreeOSINTrace(
 ): Promise<{ phones: string[]; links: string[]; emails: string[] }> {
   const parsed = parseAddress(address, state, county);
   const city = parsed.city || county;
+  const location = parsed.zip || city;
   
   let query = "";
   const isUnknown = !name || 
@@ -102,13 +103,16 @@ async function performFreeOSINTrace(
                     name.trim() === "";
   
   if (isUnknown) {
-    query = `"${parsed.street}" "${city}" ${state} (phone OR owner OR contact)`;
+    query = `"${parsed.street}" "${location}" (obituary OR divorce)`;
   } else if (isLLC(name)) {
     const stateName = state === "KY" ? "Kentucky" : (state === "IN" ? "Indiana" : state);
     query = `"${name}" "${stateName}" (bizapedia OR opencorporates OR "secretary of state")`;
   } else {
-    query = `"${name}" "${city}" (phone OR directory OR contact OR facebook OR whitepages)`;
+    query = `"${name}" "${location}" (obituary OR divorce)`;
   }
+  
+  // Truncamiento estricto a 100 caracteres
+  query = query.substring(0, 100);
   
   const phones: string[] = [];
   const links: string[] = [];
@@ -301,8 +305,9 @@ async function runSkipTracing() {
       console.error(`[DB ERROR] Error al guardar teléfonos para ${defendant}:`, dbErr.message);
     }
 
-    // Espera corta entre llamadas a APIs
-    await new Promise((resolve) => setTimeout(resolve, 500));
+    // Adaptive Jitter: random delay between 3000ms and 5000ms with a minimum of 4000ms
+    const jitterDelay = Math.max(4000, Math.random() * 2000 + 3000);
+    await new Promise((resolve) => setTimeout(resolve, jitterDelay));
   }
 
   // 3. Consultar violaciones de código de alta rentabilidad sin contactos asociados
@@ -358,8 +363,9 @@ async function runSkipTracing() {
       console.error(`[DB ERROR] Error al guardar teléfonos para la violación de ${ownerName}:`, dbErr.message);
     }
 
-    // Espera corta entre llamadas a APIs
-    await new Promise((resolve) => setTimeout(resolve, 500));
+    // Adaptive Jitter: random delay between 3000ms and 5000ms with a minimum of 4000ms
+    const jitterDelay = Math.max(4000, Math.random() * 2000 + 3000);
+    await new Promise((resolve) => setTimeout(resolve, jitterDelay));
   }
 
   // 4. Consultar probates sin contactos asociados
@@ -415,7 +421,9 @@ async function runSkipTracing() {
       console.error(`[DB ERROR] Error al guardar teléfonos para la herencia de ${heirName}:`, dbErr.message);
     }
 
-    await new Promise((resolve) => setTimeout(resolve, 500));
+    // Adaptive Jitter: random delay between 3000ms and 5000ms with a minimum of 4000ms
+    const jitterDelay = Math.max(4000, Math.random() * 2000 + 3000);
+    await new Promise((resolve) => setTimeout(resolve, jitterDelay));
   }
 
   // 5. Consultar divorcios sin contactos asociados
@@ -484,7 +492,9 @@ async function runSkipTracing() {
       console.error(`[DB ERROR] Error al guardar teléfonos para el divorcio ${divorceId}:`, dbErr.message);
     }
 
-    await new Promise((resolve) => setTimeout(resolve, 500));
+    // Adaptive Jitter: random delay between 3000ms and 5000ms with a minimum of 4000ms
+    const jitterDelay = Math.max(4000, Math.random() * 2000 + 3000);
+    await new Promise((resolve) => setTimeout(resolve, jitterDelay));
   }
 
   // 6. Skip Trace de nuevas tablas del Omni-Crawler
@@ -554,7 +564,9 @@ async function skipTraceGenericTable(
       console.error(`[DB ERROR] No se pudieron guardar contactos para ${name} en ${tableName}:`, err.message);
     }
 
-    await new Promise((resolve) => setTimeout(resolve, 500));
+    // Adaptive Jitter: random delay between 3000ms and 5000ms with a minimum of 4000ms
+    const jitterDelay = Math.max(4000, Math.random() * 2000 + 3000);
+    await new Promise((resolve) => setTimeout(resolve, jitterDelay));
   }
   return count;
 }

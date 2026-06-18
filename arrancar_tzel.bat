@@ -7,6 +7,17 @@ echo [TZEL STARTUP] Ejecutando pipeline en: %~dp0
 echo [TZEL STARTUP] Hora de inicio: %date% %time%
 echo -----------------------------------------------------------------
 
+echo [TZEL STARTUP] Verificando servicio de Docker...
+docker info >nul 2>&1
+if %errorlevel% neq 0 (
+    echo [TZEL STARTUP] Docker no esta respondiendo. Iniciando Docker Desktop...
+    start "" "C:\Program Files\Docker\Docker\Docker Desktop.exe" --unattended
+    echo [TZEL STARTUP] Esperando 15 segundos para que los contenedores se inicialicen...
+    timeout /t 15 /nobreak >nul
+) else (
+    echo [TZEL STARTUP] Docker ya esta corriendo.
+)
+
 npx ts-node run_pipeline.ts > pipeline_execution.log 2>&1
 
 echo -----------------------------------------------------------------

@@ -114,34 +114,72 @@ async function attemptRealPVAScrape(address: string): Promise<{ ownerName: strin
   const streetName = addressParts.slice(1).join(" ");
 
   try {
-    // Ejemplo de URL de Patriot Properties para Jefferson County (si fuera gratuita y pública en su totalidad)
     const url = "https://jeffersonky.patriotproperties.com/Search.asp";
-    
-    // Esto es un ejemplo de estructura de payload. En condados reales se envía la búsqueda:
     const payload = new URLSearchParams({
       "StreetNumber": houseNumber,
       "StreetName": streetName,
       "btnSearch": "Search"
     });
 
-    // Simulamos la llamada real. El timeout corto garantiza que caiga al fallback determinista si el portal está bloqueado o requiere suscripción.
-    const response = await axios.post(url, payload.toString(), {
-      headers: {
-        "Content-Type": "application/x-www-form-urlencoded",
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-      },
-      timeout: 2000 // 2 segundos máximo para no colgar el pipeline
-    });
-
-    if (response.status === 200 && response.data) {
-      const $ = cheerio.load(response.data);
-      // Lógica de cheerio para extraer el dueño del HTML:
-      // const ownerName = $("#OwnerName").text().trim();
-      // const mailingAddress = $("#MailingAddress").text().trim();
-      // if (ownerName) return { ownerName, mailingAddress };
+    let htmlContent = "";
+    
+    // Intentar llamada directa con timeout de 2s
+    try {
+      console.log(`[PVA SCRAPER] Intentando POST directo para ${cleanAddr}...`);
+      const response = await axios.post(url, payload.toString(), {
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+        },
+        timeout: 2000
+      });
+      if (response.status === 200 && response.data) {
+        htmlContent = response.data;
+      }
+    } catch (err: any) {
+      console.log(`[PVA SCRAPER] POST directo falló: ${err.message}. Intentando FlareSolverr...`);
     }
-  } catch (err) {
-    // Falla silenciosa y pasa al simulador determinista
+
+    // Si la llamada directa falló o nos topamos con un bloqueo de Cloudflare, usar FlareSolverr
+    const cfKeywords = ["Just a moment", "Cloudflare", "Attention Required", "Checking your browser"];
+    const hasCF = htmlContent ? cfKeywords.some(kw => htmlContent.includes(kw)) : true;
+
+    if (!htmlContent || hasCF) {
+      console.log(`[PVA SCRAPER] Cloudflare detectado o respuesta vacía. Canalizando a través de FlareSolverr local...`);
+      const solverUrl = process.env.FLARESOLVERR_URL || "http://localhost:8191/v1";
+      const postData = `StreetNumber=${encodeURIComponent(houseNumber)}&StreetName=${encodeURIComponent(streetName)}&btnSearch=Search`;
+      
+      const solverRes = await axios.post(solverUrl, {
+        cmd: "request.post",
+        url: url,
+        postData: postData,
+        maxTimeout: 60000
+      }, { timeout: 65000 });
+
+      if (solverRes.data && solverRes.data.status === "ok") {
+        htmlContent = solverRes.data.solution.response;
+        console.log(`[PVA SCRAPER] FlareSolverr bypass exitoso para ${cleanAddr}.`);
+      }
+    }
+
+    if (htmlContent) {
+      const $ = cheerio.load(htmlContent);
+      // Extraer datos catastrales si están disponibles usando selectores genéricos para Patriot Properties
+      const ownerName = $('td:contains("Owner Name"), th:contains("Owner Name")').next().text().trim() ||
+                        $('td:has(b:contains("Owner"))').next().text().trim() ||
+                        $('.DetailVal').first().text().trim();
+      const mailingAddress = $('td:contains("Mailing Address"), th:contains("Mailing Address")').next().text().trim() ||
+                             $('td:has(b:contains("Mailing"))').next().text().trim();
+      
+      if (ownerName && ownerName.length > 2) {
+        return { 
+          ownerName, 
+          mailingAddress: mailingAddress || `${cleanAddr}, Louisville, KY`
+        };
+      }
+    }
+  } catch (err: any) {
+    console.warn(`[PVA SCRAPER] Falló el scraper real para ${cleanAddr}: ${err.message}`);
   }
 
   return null;
