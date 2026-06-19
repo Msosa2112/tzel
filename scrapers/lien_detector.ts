@@ -154,9 +154,6 @@ function runLienRuleBasedFallback(rawText: string): LienDetectorResult {
   };
 }
 
-/**
- * Main function to check public clerk records for property liens and parse them using Gemini.
- */
 export async function checkPropertyLiens(
   ownerName: string,
   address: string,
@@ -173,6 +170,24 @@ export async function checkPropertyLiens(
   
   if (!recordText || recordText.trim() === "") {
     console.log(`[LIEN DETECTOR CLEAN] No records found on Clerk portal for "${ownerName}".`);
+    return { hasHiddenLiens: false, totalHiddenDebt: 0 };
+  }
+
+  // OPTIMIZACIÓN: Verificar heurísticamente si el texto contiene palabras clave de deudas y cifras
+  const lowerText = recordText.toLowerCase();
+  const dangerKeywords = ["mortgage", "judgment", "mechanic", "tax lien", "irs", "gravamen", "hipoteca", "ejecución"];
+  const hasDanger = dangerKeywords.some(keyword => lowerText.includes(keyword));
+  
+  const hasCurrencySymbol = recordText.includes("$") || lowerText.includes("usd") || lowerText.includes("dollar");
+  const numberMatches = recordText.match(/\b\d{1,3}(?:,\d{3})+(?:\.\d{2})?\b|\b\d{4,9}\b/g) || [];
+  const hasPotentialDebtAmount = numberMatches.some(num => {
+    const val = parseFloat(num.replace(/,/g, ""));
+    if (val >= 2020 && val <= 2030) return false; // excluir años
+    return val > 100;
+  });
+
+  if (!hasDanger && !hasCurrencySymbol && !hasPotentialDebtAmount) {
+    console.log(`[LIEN DETECTOR OPTIMIZATION] Omitiendo llamada a Gemini para "${ownerName}": No se detectaron palabras clave de deudas ni cifras numéricas sospechosas.`);
     return { hasHiddenLiens: false, totalHiddenDebt: 0 };
   }
 

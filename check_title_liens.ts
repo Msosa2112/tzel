@@ -196,7 +196,7 @@ export async function runTitleLienCheck() {
   // 1. Consultar subastas de alta rentabilidad
   let auctions;
   try {
-    const res = await db.execute("SELECT auction_id, address, county, state, defendant, mls_estimated_value, sqft, hidden_mortgages FROM foreclosure_auctions WHERE is_high_yield = 1");
+    const res = await db.execute("SELECT auction_id, address, county, state, defendant, mls_estimated_value, sqft, hidden_mortgages FROM foreclosure_auctions WHERE title_check_status = 'pending' OR title_check_status IS NULL");
     auctions = res.rows;
   } catch (err: any) {
     console.error("[DB ERROR] No se pudieron consultar las subastas judiciales:", err.message);
@@ -206,7 +206,7 @@ export async function runTitleLienCheck() {
   // 2. Consultar violaciones de código de alta rentabilidad
   let violations;
   try {
-    const res = await db.execute("SELECT violation_id, address, owner_name, mls_estimated_value, sqft, hidden_mortgages FROM code_violations WHERE is_high_yield = 1");
+    const res = await db.execute("SELECT violation_id, address, owner_name, mls_estimated_value, sqft, hidden_mortgages FROM code_violations WHERE title_check_status = 'pending' OR title_check_status IS NULL");
     violations = res.rows;
   } catch (err: any) {
     console.error("[DB ERROR] No se pudieron consultar las violaciones de código:", err.message);
@@ -362,7 +362,7 @@ export async function retryFailedTitleChecks(maxRetries: number = 3) {
       auctionsRes = await db.execute(`
         SELECT auction_id, address, county, state, defendant, mls_estimated_value, sqft, hidden_mortgages 
         FROM foreclosure_auctions 
-        WHERE is_high_yield = 1 AND title_check_status = 'failed'
+        WHERE title_check_status = 'failed'
       `);
     } catch (e) { break; }
     const pendingAuctions = auctionsRes.rows;
@@ -373,7 +373,7 @@ export async function retryFailedTitleChecks(maxRetries: number = 3) {
       violationsRes = await db.execute(`
         SELECT violation_id, address, owner_name, mls_estimated_value, sqft, hidden_mortgages 
         FROM code_violations 
-        WHERE is_high_yield = 1 AND title_check_status = 'failed'
+        WHERE title_check_status = 'failed'
       `);
     } catch (e) { break; }
     const pendingViolations = violationsRes.rows;
