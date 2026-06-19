@@ -1004,9 +1004,9 @@ app.get("/api/prospectos", async (req, res) => {
       const violationKeywords = lead.violations.map(v => v.violation_type as string);
       const rehab = calculateRehab(lead.sqft || null, violationKeywords);
       const hiddenDebt = lead.hiddenMortgages || 0;
-      const mao = calculateMAO(lead.mlsValue, rehab, hiddenDebt);
+      const mao = calculateMAO(lead.mlsValue, rehab, hiddenDebt, lead.hiddenLiensAmount);
       const primaryDebt = hasAuctions ? (lead.auctions[0].debt_amount as number || 0) : 0;
-      const netEquity = calculateNetEquity(lead.mlsValue, primaryDebt, hiddenDebt);
+      const netEquity = calculateNetEquity(lead.mlsValue, primaryDebt, hiddenDebt, lead.hiddenLiensAmount);
       const purchasePrice = primaryDebt > 0 ? primaryDebt : mao;
       const { roi, totalCost } = calculateROI(lead.mlsValue, purchasePrice, rehab);
 
@@ -1016,7 +1016,7 @@ app.get("/api/prospectos", async (req, res) => {
         const firstAuction = lead.auctions[0];
         const daysRemaining = getDaysRemaining(firstAuction.auction_date);
         if (daysRemaining !== null && daysRemaining >= 0 && daysRemaining <= 60) {
-          if (hasViolations || primaryDebt > 0 || hiddenDebt > 0) {
+          if (hasViolations || primaryDebt > 0 || hiddenDebt > 0 || lead.hiddenLiensAmount > 0) {
             isHighMotivation = true;
           }
         }

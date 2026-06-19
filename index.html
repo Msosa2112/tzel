@@ -1401,6 +1401,10 @@
               <span class="uw-value highlight-red" id="uw-hidden">$0</span>
             </div>
             <div class="uw-item">
+              <span class="uw-label">Gravámenes Ocultos</span>
+              <span class="uw-value highlight-red" id="uw-liens">$0</span>
+            </div>
+            <div class="uw-item">
               <span class="uw-label">Est. Rehab (Costo)</span>
               <span class="uw-value" id="uw-rehab">$0</span>
             </div>
@@ -1904,7 +1908,7 @@
             </div>
             <div class="comp-item">
               <span class="comp-label">Deuda</span>
-              <span class="comp-val" style="color: var(--color-high-motivation)">$${((lead.primaryDebt || 0) + (lead.hiddenMortgages || 0)).toLocaleString()}</span>
+              <span class="comp-val" style="color: var(--color-high-motivation)">$${((lead.primaryDebt || 0) + (lead.hiddenMortgages || 0) + (lead.hiddenLiensAmount || 0)).toLocaleString()}</span>
             </div>
             <div class="comp-item">
               <span class="comp-label">Oferta MAO</span>
@@ -2161,6 +2165,7 @@
       }
       document.getElementById('uw-debt').textContent = `$${(lead.primaryDebt || 0).toLocaleString()}`;
       document.getElementById('uw-hidden').textContent = `$${(lead.hiddenMortgages || 0).toLocaleString()}`;
+      document.getElementById('uw-liens').textContent = `$${(lead.hiddenLiensAmount || 0).toLocaleString()}`;
       document.getElementById('uw-rehab').textContent = `$${(lead.rehab || 0).toLocaleString()}`;
 
       // Toggle Zillow/Redfin manual search links
@@ -2174,7 +2179,7 @@
       }
 
       // Underwater check
-      const totalDebt = (lead.primaryDebt || 0) + (lead.hiddenMortgages || 0);
+      const totalDebt = (lead.primaryDebt || 0) + (lead.hiddenMortgages || 0) + (lead.hiddenLiensAmount || 0);
       const isUnderwater = totalDebt > lead.mlsValue && lead.mlsValue > 0;
       const alertBanner = document.getElementById('uw-alert');
       if (isUnderwater) {
@@ -2208,7 +2213,7 @@
             if (lead.mlsValue === 0 && res.mcaArv > 0) {
               const arv = res.mcaArv;
               const rehab = lead.rehab || 0;
-              const hidden = lead.hiddenMortgages || 0;
+              const hidden = (lead.hiddenMortgages || 0) + (lead.hiddenLiensAmount || 0);
               const primaryDebt = lead.primaryDebt || 0;
               
               // MAO = ARV * 0.70 - Rehab - 3% ARV - Hidden

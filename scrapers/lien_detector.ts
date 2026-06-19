@@ -40,7 +40,7 @@ async function scrapeClerkPortal(
     });
 
     bodyText = await page.evaluate(() => {
-      const elements = Array.from(document.querySelectorAll(".result-snippet, .result-link, tr"));
+      const elements = Array.from(document.querySelectorAll(".result-snippet, .result-link"));
       return elements.map(el => el.textContent || "").join("\n");
     });
   } catch (err: any) {
@@ -63,7 +63,7 @@ export async function analyzeLienTextWithGemini(rawText: string): Promise<LienDe
     return runLienRuleBasedFallback(rawText);
   }
 
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${apiKey}`;
   const prompt = `Instrucción: Eres un analista de títulos inmobiliarios experto. Analiza el siguiente texto de registros públicos del secretario del condado (county clerk) para una propiedad/propietario y determina si existen gravámenes secundarios (junior liens), hipotecas adicionales (mortgages), deudas de impuestos (Tax Liens, IRS) o juicios civiles (Judgments) vigentes.
 
 REGLAS DE EXTRACCIÓN:
@@ -79,47 +79,73 @@ REGLAS DE EXTRACCIÓN:
 Texto de registros públicos a analizar:
 ${rawText}`;
 
-  try {
-    const response = await fetch(url, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        contents: [
-          {
-            parts: [
-              {
-                text: prompt
-              }
-            ]
+  const maxRetries = 3;
+  let responseText = "";
+
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      console.log(`[LIEN DETECTOR GEMINI] Invocando Gemini (intento ${attempt}/${maxRetries})...`);
+      // Retardo preventivo de 5 segundos para evitar 429
+      await new Promise(resolve => setTimeout(resolve, 5000));
+
+      const response = await fetch(url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          contents: [
+            {
+              parts: [
+                {
+                  text: prompt
+                }
+              ]
+            }
+          ],
+          generationConfig: {
+            response_mime_type: "application/json"
           }
-        ],
-        generationConfig: {
-          response_mime_type: "application/json"
+        }),
+        signal: AbortSignal.timeout(15000)
+      });
+
+      if (!response.ok) {
+        if (response.status === 429 && attempt < maxRetries) {
+          const delay = 15000 * Math.pow(2, attempt - 1);
+          console.warn(`[LIEN DETECTOR GEMINI 429] Rate limit superado. Reintentando en ${delay / 1000}s...`);
+          await new Promise(resolve => setTimeout(resolve, delay));
+          continue;
         }
-      }),
-      signal: AbortSignal.timeout(15000)
-    });
+        throw new Error(`HTTP Error ${response.status}: ${response.statusText}`);
+      }
 
-    if (!response.ok) {
-      throw new Error(`HTTP Error ${response.status}: ${response.statusText}`);
+      const data = await response.json() as any;
+      responseText = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
+      if (!responseText) {
+        throw new Error("Respuesta vacía o estructura inválida de Gemini.");
+      }
+      break; // Éxito
+    } catch (err: any) {
+      if (attempt === maxRetries) {
+        console.error(`[LIEN DETECTOR GEMINI ERROR] Falló análisis con Gemini tras ${maxRetries} intentos: ${err.message}`);
+        throw err; // Propagar error para que la auditoría no sea marcada como exitosa silenciosamente
+      }
+      const delay = 8000 * Math.pow(2, attempt - 1);
+      console.warn(`[LIEN DETECTOR GEMINI WARN] Intento ${attempt} falló: ${err.message}. Reintentando en ${delay / 1000}s...`);
+      await new Promise(resolve => setTimeout(resolve, delay));
     }
+  }
 
-    const data = await response.json() as any;
-    const responseText = data.candidates?.[0]?.content?.parts?.[0]?.text;
-    if (!responseText) {
-      throw new Error("Respuesta vacía o estructura inválida de Gemini.");
-    }
-
+  try {
     const result = JSON.parse(responseText) as LienDetectorResult;
     return {
       hasHiddenLiens: !!result.hasHiddenLiens,
       totalHiddenDebt: Number(result.totalHiddenDebt) || 0
     };
-  } catch (err: any) {
-    console.warn(`[LIEN DETECTOR GEMINI WARNING] Gemini parsing failed (${err.message}). Falling back to rule-based extraction.`);
-    return runLienRuleBasedFallback(rawText);
+  } catch (jsonErr: any) {
+    console.error(`[LIEN DETECTOR GEMINI JSON ERROR] Error al parsear respuesta: ${responseText}`);
+    throw jsonErr;
   }
 }
 
@@ -177,17 +203,9 @@ export async function checkPropertyLiens(
   const lowerText = recordText.toLowerCase();
   const dangerKeywords = ["mortgage", "judgment", "mechanic", "tax lien", "irs", "gravamen", "hipoteca", "ejecución"];
   const hasDanger = dangerKeywords.some(keyword => lowerText.includes(keyword));
-  
-  const hasCurrencySymbol = recordText.includes("$") || lowerText.includes("usd") || lowerText.includes("dollar");
-  const numberMatches = recordText.match(/\b\d{1,3}(?:,\d{3})+(?:\.\d{2})?\b|\b\d{4,9}\b/g) || [];
-  const hasPotentialDebtAmount = numberMatches.some(num => {
-    const val = parseFloat(num.replace(/,/g, ""));
-    if (val >= 2020 && val <= 2030) return false; // excluir años
-    return val > 100;
-  });
 
-  if (!hasDanger && !hasCurrencySymbol && !hasPotentialDebtAmount) {
-    console.log(`[LIEN DETECTOR OPTIMIZATION] Omitiendo llamada a Gemini para "${ownerName}": No se detectaron palabras clave de deudas ni cifras numéricas sospechosas.`);
+  if (!hasDanger) {
+    console.log(`[LIEN DETECTOR OPTIMIZATION] Omitiendo llamada a Gemini para "${ownerName}": No se detectaron palabras clave de deudas secundarias.`);
     return { hasHiddenLiens: false, totalHiddenDebt: 0 };
   }
 
