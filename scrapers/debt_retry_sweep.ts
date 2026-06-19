@@ -100,6 +100,26 @@ async function performOSINTDebtSearch(
     return null;
   }
 
+  // OPTIMIZACIÓN: Verificar heurísticamente si el texto contiene alguna indicación de montos financieros
+  // para evitar llamadas inútiles a Gemini y mitigar el error 429 de Rate Limit.
+  const hasCurrencySymbol = searchResultsText.includes("$") || searchResultsText.toLowerCase().includes("usd") || searchResultsText.toLowerCase().includes("dollar");
+  
+  // Buscar números de deudas probables (ej. montos de más de 4 cifras, o con comas ej. "1,500" o "200,000")
+  // Excluyendo años típicos como 2020-2029
+  const numberMatches = searchResultsText.match(/\b\d{1,3}(?:,\d{3})+(?:\.\d{2})?\b|\b\d{4,9}\b/g) || [];
+  const hasPotentialDebtAmount = numberMatches.some(num => {
+    const val = parseFloat(num.replace(/,/g, ""));
+    // Excluir años típicos y códigos postales como 40211, 47130
+    if (val >= 2020 && val <= 2030) return false;
+    if (val >= 40000 && val <= 47999) return false;
+    return val > 100; // cualquier valor mayor a 100 que no sea año/zipcode
+  });
+
+  if (!hasCurrencySymbol && !hasPotentialDebtAmount) {
+    console.log("  [OSINT SWEEP OPTIMIZATION] Omitiendo llamada a Gemini: No se detectaron símbolos de moneda ni cifras numéricas sospechosas de deudas.");
+    return null;
+  }
+
   // Enviar a Gemini para análisis financiero
   const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
   const prompt = `Eres un perito auditor inmobiliario. Analiza la siguiente recopilación de resultados de búsqueda pública para una propiedad o deudor y extrae:
@@ -124,6 +144,9 @@ async function performOSINTDebtSearch(
   const maxRetries = 3;
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     try {
+      // Delay preventivo para no ahogar el API rate limit si son consultas seguidas
+      await new Promise(resolve => setTimeout(resolve, 3000));
+      
       response = await axios.post(url, {
         contents: [{ parts: [{ text: prompt }] }],
         generationConfig: { response_mime_type: "application/json" }
@@ -131,7 +154,7 @@ async function performOSINTDebtSearch(
       break; // Éxito
     } catch (err: any) {
       if (err.response?.status === 429 && attempt < maxRetries - 1) {
-        const delay = 6000 * Math.pow(2, attempt);
+        const delay = 8000 * Math.pow(2, attempt);
         console.warn(`    [GEMINI 429] Rate limit superado. Reintentando en ${delay / 1000}s...`);
         await new Promise(resolve => setTimeout(resolve, delay));
         continue;
