@@ -5,6 +5,7 @@ import * as dotenv from "dotenv";
 import { isAddressInJurisdiction } from "./geo_fencing";
 import { chromium } from "playwright-extra";
 import stealthPlugin from "puppeteer-extra-plugin-stealth";
+import { validateAndCleanAddress } from "./address_validation";
 
 chromium.use(stealthPlugin());
 
@@ -271,7 +272,8 @@ async function scrapeClarkCounty() {
           
           const auctionId = `IN_CLARK_${streetAddress.replace(/\s+/g, "_")}_${cleanText(currentDate).replace(/\s+/g, "_")}`;
           
-          const fullAddress = `${streetAddress}, ${city}`;
+          const rawFullAddress = `${streetAddress}, ${city}`;
+          const fullAddress = await validateAndCleanAddress(rawFullAddress, "IN");
           if (!isAddressInJurisdiction(fullAddress, "IN")) {
             console.log(`[SKIP] Propiedad fuera de jurisdicción detectada y descartada. Dirección: "${fullAddress}"`);
             lastPlaintiff = null;
@@ -387,13 +389,13 @@ async function scrapeFloydCounty() {
     let lastDefendant: string | null = null;
     
     // Recorremos las filas de la tabla
-    $("tr").each((_, trElem) => {
+    for (const trElem of $("tr").toArray()) {
       const cells: string[] = [];
       $(trElem).find("td").each((_, tdElem) => {
         cells.push(cleanText($(tdElem).text()));
       });
       
-      if (cells.length === 0) return;
+      if (cells.length === 0) continue;
       
       const non_empty = cells.filter(c => c);
       
@@ -431,12 +433,12 @@ async function scrapeFloydCounty() {
         
         // Ignorar las propiedades canceladas (CANCELED)
         if (status.includes("CANCEL") || status.includes("RETIRADA")) {
-          return;
+          continue;
         }
         
         // Ignorar filas de encabezado de fecha agrupadas
         if (address.toLowerCase() === currentDate.toLowerCase()) {
-          return;
+          continue;
         }
         
         // Filtro de vigencia: si la fecha de subasta ya pasó, descartar
@@ -444,15 +446,16 @@ async function scrapeFloydCounty() {
           console.log(`[FILTRO VIGENCIA] Descartando subasta pasada de Floyd County: Dirección: ${address}, ${city} | Fecha: ${currentDate}`);
           lastPlaintiff = null;
           lastDefendant = null;
-          return;
+          continue;
         }
         
-        const fullAddress = `${address}, ${city}`;
+        const rawFullAddress = `${address}, ${city}`;
+        const fullAddress = await validateAndCleanAddress(rawFullAddress, "IN");
         if (!isAddressInJurisdiction(fullAddress, "IN")) {
           console.log(`[SKIP] Propiedad fuera de jurisdicción detectada y descartada. Dirección: "${fullAddress}"`);
           lastPlaintiff = null;
           lastDefendant = null;
-          return;
+          continue;
         }
         
         const auctionId = `IN_FLOYD_${address.replace(/\s+/g, "_")}_${currentDate.replace(/\s+/g, "_")}`;
@@ -475,45 +478,43 @@ async function scrapeFloydCounty() {
         console.log(`[TEMP LOG - FLOYD] Nombre de defendant extraído antes de guardar: "${defendantVal}"`);
         
         // Insertar en la base de datos de Turso
-        db.execute({
-          sql: `
-            INSERT INTO foreclosure_auctions (
-              auction_id, case_number, address, county, state, auction_date,
-              plaintiff, defendant, mls_status
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending_check')
-            ON CONFLICT(auction_id) DO UPDATE SET
-              address = excluded.address,
-              auction_date = excluded.auction_date,
-              plaintiff = COALESCE(excluded.plaintiff, foreclosure_auctions.plaintiff),
-              defendant = COALESCE(excluded.defendant, foreclosure_auctions.defendant)
-          `,
-          args: [
-            auctionId,
-            "PENDING",
-            fullAddress,
-            "Floyd",
-            state,
-            currentDate,
-            plaintiffVal,
-            defendantVal
-          ]
-        }).then(() => {
+        try {
+          await db.execute({
+            sql: `
+              INSERT INTO foreclosure_auctions (
+                auction_id, case_number, address, county, state, auction_date,
+                plaintiff, defendant, mls_status
+              ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending_check')
+              ON CONFLICT(auction_id) DO UPDATE SET
+                address = excluded.address,
+                auction_date = excluded.auction_date,
+                plaintiff = COALESCE(excluded.plaintiff, foreclosure_auctions.plaintiff),
+                defendant = COALESCE(excluded.defendant, foreclosure_auctions.defendant)
+            `,
+            args: [
+              auctionId,
+              "PENDING",
+              fullAddress,
+              "Floyd",
+              state,
+              currentDate,
+              plaintiffVal,
+              defendantVal
+            ]
+          });
           activeSavedCount++;
           console.log(`[SUBASTA FLOYD GUARDADA] Dirección: ${fullAddress} | Defendant: ${defendantVal} | Fecha: ${currentDate}`);
-        }).catch(dbErr => {
+        } catch (dbErr) {
           console.error(`[DB ERROR] Error al guardar subasta de Floyd County:`, dbErr);
-        });
+        }
         
         // Resetear para la siguiente propiedad
         lastPlaintiff = null;
         lastDefendant = null;
       }
-    });
+    }
     
-    // Esperar un momento para asegurar el procesamiento asíncrono de base de datos
-    setTimeout(() => {
-      console.log(`[SCRAPER FLOYD] Finalizado. Guardadas/Actualizadas: ${activeSavedCount} subastas.`);
-    }, 1500);
+    console.log(`[SCRAPER FLOYD] Finalizado. Guardadas/Actualizadas: ${activeSavedCount} subastas.`);
     
   } catch (error: any) {
     console.error("[SCRAPER FLOYD ERROR] Falló la extracción en Floyd County:", error.message || error);
@@ -558,7 +559,8 @@ async function scrapeHarrisonCounty() {
       
       if (!street) continue;
       
-      const fullAddress = `${street.trim()}, ${subtitle.trim()}`;
+      const rawFullAddress = `${street.trim()}, ${subtitle.trim()}`;
+      const fullAddress = await validateAndCleanAddress(rawFullAddress, "IN");
       
       // Extraer Cause #, Defendant, Sale Date, Status de las filas de texto
       let caseNumber = "PENDING";

@@ -118,10 +118,24 @@ export async function fetchPublicPropertyPhoto(address: string): Promise<string[
     for (const targetUrl of candidateUrls) {
       try {
         console.log(`[PHOTO SCRAPER] Probando enlace objetivo: ${targetUrl}`);
+        // Navegar a la página candidata
         await page.goto(targetUrl, {
           waitUntil: "domcontentloaded",
           timeout: 20000
         });
+        // Validación estricta de dirección en el contenido/título de la página de Zillow/Redfin
+        const pageTitle = await page.title().catch(() => "");
+        const ogTitle = await page.locator('meta[property="og:title"]').getAttribute("content").catch(() => null);
+        const textToValidate = `${pageTitle} ${ogTitle || ""}`.toLowerCase();
+
+        const houseNum = houseNumberMatch ? houseNumberMatch[0] : "";
+        const hasHouseNum = houseNum ? textToValidate.includes(houseNum) : true;
+        const hasStreetWord = streetTokens.length > 0 ? streetTokens.some(tok => textToValidate.includes(tok)) : true;
+
+        if (!hasHouseNum || !hasStreetWord) {
+          console.log(`[PHOTO SCRAPER] Enlace rechazado: No coincide dirección en metadatos de la página. Buscado: casa="${houseNum}", calle="${streetTokens.join(",")}". Encontrado: "${pageTitle}"`);
+          continue;
+        }
 
         const ogImage = await page.locator('meta[property="og:image"]').getAttribute("content").catch(() => null);
         const twitterImage = await page.locator('meta[name="twitter:image"]').getAttribute("content").catch(() => null);

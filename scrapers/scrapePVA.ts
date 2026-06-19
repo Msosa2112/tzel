@@ -65,7 +65,7 @@ function getSimpleHash(str: string): number {
 /**
  * Simula de forma determinista la consulta PVA para una dirección.
  */
-function simulatePVAPortal(address: string): { ownerName: string; mailingAddress: string } {
+function simulatePVAPortal(address: string): { ownerName: string; mailingAddress: string } | null {
   const cleanAddrKey = address.split(",")[0].trim().toLowerCase().replace(/[^a-z0-9\s]/g, "").replace(/\s+/g, " ");
   
   // 1. Intentar coincidir con base predefinida
@@ -79,23 +79,10 @@ function simulatePVAPortal(address: string): { ownerName: string; mailingAddress
     }
   }
 
-  // 2. Generación determinista si no está en la base predefinida
-  const hash = getSimpleHash(cleanAddrKey);
-  const firstName = FIRST_NAMES[hash % FIRST_NAMES.length];
-  const lastName = LAST_NAMES[(hash >> 2) % LAST_NAMES.length];
-  const ownerName = `${firstName} ${lastName}`;
-
-  // 30% de probabilidad de ser un "Dueño Ausente" (dirección postal diferente)
-  const isAbsentee = (hash % 10) < 3;
-  let mailingAddress = `${address.split(",")[0].trim()}, Louisville, KY`;
-  if (isAbsentee) {
-    const streetNum = (hash % 9000) + 100;
-    const streetName = STREET_NAMES[(hash >> 3) % STREET_NAMES.length];
-    const cityState = CITIES[(hash >> 4) % CITIES.length];
-    mailingAddress = `${streetNum} ${streetName}, ${cityState}`;
-  }
-
-  return { ownerName, mailingAddress };
+  // ¡IMPORTANTE! Para direcciones reales en producción, NO inventamos nombres ni direcciones ficticias.
+  // Devolvemos null para que no se contaminen los leads reales.
+  console.log(`[PVA SCRAPER] Dirección real sin datos de prueba y sin respuesta del portal: "${address}". Retornando null.`);
+  return null;
 }
 
 /**
@@ -217,6 +204,11 @@ async function scrapePVA() {
       result = simulatePVAPortal(address);
     }
 
+    if (!result) {
+      console.log(`[PVA SCRAPER] No se pudo obtener información catastral real para ${address}. Dejando como Desconocido para evitar falsear datos.`);
+      continue;
+    }
+
     const rawName = result.ownerName;
     const mailingAddr = result.mailingAddress;
 
@@ -276,6 +268,11 @@ async function scrapePVA() {
       let result = await attemptRealPVAScrape(address);
       if (!result) {
         result = simulatePVAPortal(address);
+      }
+
+      if (!result) {
+        console.log(`[PVA SCRAPER] No se pudo obtener dirección postal real para subasta en ${address}. Continuando sin actualizar para evitar inventar datos.`);
+        continue;
       }
 
       const rawName = result.ownerName;

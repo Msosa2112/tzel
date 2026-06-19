@@ -2,6 +2,7 @@ import axios from "axios";
 import { createClient } from "@libsql/client";
 import * as dotenv from "dotenv";
 import { isAddressInJurisdiction } from "./geo_fencing";
+import { validateAndCleanAddress } from "./address_validation";
 
 // Cargar variables de entorno
 dotenv.config();
@@ -176,7 +177,10 @@ async function scrapeJeffersonCounty() {
       const attorney = row[3] || "";
       const saleDate = row[4];
       const docket = row[5];
-      const address = row[6];
+      const rawAddress = row[6];
+      
+      // Estandarizar dirección con Google Address Validation
+      const address = await validateAndCleanAddress(rawAddress, "KY");
       const status = row[8].toUpperCase().trim();
       
       // Filtrar subastas retiradas (WITHDRAWN)

@@ -22,7 +22,7 @@ CREATE TABLE IF NOT EXISTS foreclosure_auctions (
     address TEXT NOT NULL,
     county TEXT NOT NULL,
     state TEXT NOT NULL,
-    auction_date TEXT NOT NULL,
+    auction_date TEXT,
     plaintiff TEXT, -- Banco o acreedor que demanda
     defendant TEXT, -- Propietario deudor
     debt_amount REAL, -- Monto reclamado por el banco

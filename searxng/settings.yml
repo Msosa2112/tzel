@@ -1,12 +1,17 @@
 # Configuración Soberana de SearXNG para Tzel Real Estate OSINT
-use_default_settings: true
+use_default_settings:
+  engines:
+    keep_only:
+      - google
+      - duckduckgo
+      - brave
 
 server:
   port: 8080
   bind_address: "0.0.0.0"
   secret_key: "6a7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c"
   image_proxy: true
-  limiter: true
+  limiter: false
 
 redis:
   url: redis://redis:6379/0
@@ -17,9 +22,3 @@ search:
   formats:
     - html
     - json
-
-engines:
-  keep_only:
-    - google
-    - duckduckgo
-    - brave

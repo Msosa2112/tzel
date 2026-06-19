@@ -168,6 +168,9 @@ interface GroupedLead {
   financialDistress: any[];
   lifeEvents: any[];
   hiddenMortgages: number;
+  hiddenLiensAmount: number;
+  titleCheckStatus: string;
+  nextRetryDate?: string;
   mailingAddress?: string;
   isAbsentee: boolean;
   sqft?: number;
@@ -190,16 +193,81 @@ async function getCoordinates(address: string): Promise<{ lat: number; lon: numb
       if (row.lat !== null && row.lon !== null) {
         return { lat: row.lat as number, lon: row.lon as number };
       }
-      return null; // Cached as not found
+      // If it is cached as null, we might want to retry with Google if key is available
+      if (!process.env.GOOGLE_MAPS_API_KEY) {
+        return null; // Cached as not found
+      }
     }
   } catch (err) {
     console.error("[CACHE READ ERROR] Failed to query cache:", err);
   }
 
-  // 1. Try US Census Geocoder first (No rate limits, fast for US addresses)
+  // 1. Try Google Geocoding API first (if key is configured)
+  const googleKey = process.env.GOOGLE_MAPS_API_KEY;
+  if (googleKey) {
+    const googleUrl = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(address)}&key=${googleKey}`;
+    try {
+      console.log(`[GEOCODER] Trying Google Geocoding for: "${address}"`);
+      const resp = await axios.get(googleUrl, { timeout: 6000 });
+      if (
+        resp.status === 200 &&
+        resp.data &&
+        resp.data.status === "OK" &&
+        resp.data.results &&
+        resp.data.results.length > 0
+      ) {
+        const match = resp.data.results[0].geometry.location;
+        const lat = match.lat;
+        const lon = match.lng;
+        
+        console.log(`[GEOCODER SUCCESS] Google Geocoding matched: "${address}" -> (${lat}, ${lon})`);
+        await db.execute({
+          sql: "INSERT OR REPLACE INTO geocode_cache (address, lat, lon) VALUES (?, ?, ?)",
+          args: [address, lat, lon]
+        });
+        return { lat, lon };
+      } else {
+        console.warn(`[GEOCODER WARNING] Google returned status "${resp.data?.status}" for: "${address}". Reason: ${resp.data?.error_message || 'No error message details'}`);
+        
+        // If Geocoding API is not enabled, fall back to Google Address Validation API
+        const isNotActivated = resp.data?.status === "REQUEST_DENIED" && 
+                               (resp.data?.error_message?.includes("not activated") || 
+                                resp.data?.error_message?.includes("enable this API") ||
+                                resp.data?.error_message?.includes("API project"));
+                                
+        if (isNotActivated) {
+          console.log(`[GEOCODER] Geocoding API not active on project. Falling back to Address Validation API for: "${address}"`);
+          const validationUrl = `https://addressvalidation.googleapis.com/v1:validateAddress?key=${googleKey}`;
+          const valResp = await axios.post(
+            validationUrl,
+            { address: { addressLines: [address] } },
+            { headers: { "Content-Type": "application/json" }, timeout: 10000 }
+          );
+          
+          const geocodeLoc = valResp.data?.result?.geocode?.location;
+          if (geocodeLoc && geocodeLoc.latitude && geocodeLoc.longitude) {
+            const lat = geocodeLoc.latitude;
+            const lon = geocodeLoc.longitude;
+            console.log(`[GEOCODER SUCCESS] Google Address Validation matched: "${address}" -> (${lat}, ${lon})`);
+            await db.execute({
+              sql: "INSERT OR REPLACE INTO geocode_cache (address, lat, lon) VALUES (?, ?, ?)",
+              args: [address, lat, lon]
+            });
+            return { lat, lon };
+          } else {
+            console.warn(`[GEOCODER WARNING] Google Address Validation did not return coordinates for: "${address}"`);
+          }
+        }
+      }
+    } catch (err: any) {
+      console.error(`[GEOCODER EXCEPTION] Google geocode failed for "${address}":`, err.message);
+    }
+  }
+
+  // 2. Try US Census Geocoder as fallback
   const censusUrl = `https://geocoding.geo.census.gov/geocoder/locations/onelineaddress?address=${encodeURIComponent(address)}&benchmark=Public_AR_Current&format=json`;
   try {
-    console.log(`[GEOCODER] Trying US Census Geocoder for: "${address}"`);
+    console.log(`[GEOCODER] Trying US Census Geocoder fallback for: "${address}"`);
     const resp = await axios.get(censusUrl, { timeout: 6000 });
     if (
       resp.status === 200 &&
@@ -223,7 +291,7 @@ async function getCoordinates(address: string): Promise<{ lat: number; lon: numb
     console.warn(`[GEOCODER INFO] US Census did not match "${address}":`, err.message);
   }
 
-  // 2. Fall back to OpenStreetMap Nominatim (if cooldown is not active)
+  // 3. Fall back to OpenStreetMap Nominatim (if cooldown is not active)
   if (Date.now() < rateLimitCooldownUntil) {
     console.log(`[GEOCODER SKIP] Nominatim cooldown active. Skipping Nominatim search for "${address}".`);
     return null;
@@ -299,7 +367,8 @@ app.get("/api/prospectos", async (req, res) => {
       SELECT 
         violation_id, case_number, address, violation_type, report_date, status, 
         owner_name, mls_estimated_value, mls_id, defendant_phones, defendant_emails,
-        mailing_address, absentee_owner, sqft, beds, baths, hidden_mortgages, hidden_liens_amount, photo_urls
+        mailing_address, absentee_owner, sqft, beds, baths, hidden_mortgages, hidden_liens_amount, photo_urls,
+        title_check_status
       FROM code_violations
     `);
     const violations = violationsRes.rows;
@@ -396,7 +465,10 @@ app.get("/api/prospectos", async (req, res) => {
           physicalDistress: [],
           financialDistress: [],
           lifeEvents: [],
-          hiddenMortgages: (row.hidden_mortgages as number || 0) + (row.hidden_liens_amount as number || 0),
+          hiddenMortgages: row.hidden_mortgages as number || 0,
+          hiddenLiensAmount: row.hidden_liens_amount as number || 0,
+          titleCheckStatus: row.title_check_status as string || "pending",
+          nextRetryDate: row.next_retry_date as string || undefined,
           mailingAddress: row.mailing_address as string || undefined,
           isAbsentee: (row.absentee_owner as number) === 1,
           sqft: row.sqft as number || undefined,
@@ -416,9 +488,19 @@ app.get("/api/prospectos", async (req, res) => {
         if (!existing.sqft && row.sqft) existing.sqft = row.sqft as number;
         if (!existing.beds && row.beds) existing.beds = row.beds as number;
         if (!existing.baths && row.baths) existing.baths = row.baths as number;
-        const rowHidden = (row.hidden_mortgages as number || 0) + (row.hidden_liens_amount as number || 0);
+        const rowHidden = row.hidden_mortgages as number || 0;
         if (rowHidden > existing.hiddenMortgages) {
           existing.hiddenMortgages = rowHidden;
+        }
+        const rowLiens = row.hidden_liens_amount as number || 0;
+        if (rowLiens > existing.hiddenLiensAmount) {
+          existing.hiddenLiensAmount = rowLiens;
+        }
+        if (row.title_check_status && row.title_check_status !== "pending") {
+          existing.titleCheckStatus = row.title_check_status as string;
+        }
+        if (row.next_retry_date) {
+          existing.nextRetryDate = row.next_retry_date as string;
         }
         rowPhones.forEach(p => existing.phones.add(p));
         rowEmails.forEach(e => existing.emails.add(e));
@@ -466,7 +548,10 @@ app.get("/api/prospectos", async (req, res) => {
           physicalDistress: [],
           financialDistress: [],
           lifeEvents: [],
-          hiddenMortgages: (row.hidden_mortgages as number || 0) + (row.hidden_liens_amount as number || 0),
+          hiddenMortgages: row.hidden_mortgages as number || 0,
+          hiddenLiensAmount: row.hidden_liens_amount as number || 0,
+          titleCheckStatus: row.title_check_status as string || "pending",
+          nextRetryDate: undefined,
           mailingAddress: row.mailing_address as string || undefined,
           isAbsentee: (row.absentee_owner as number) === 1,
           sqft: row.sqft as number || undefined,
@@ -488,9 +573,16 @@ app.get("/api/prospectos", async (req, res) => {
         if (!existing.sqft && row.sqft) existing.sqft = row.sqft as number;
         if (!existing.beds && row.beds) existing.beds = row.beds as number;
         if (!existing.baths && row.baths) existing.baths = row.baths as number;
-        const rowHidden = (row.hidden_mortgages as number || 0) + (row.hidden_liens_amount as number || 0);
+        const rowHidden = row.hidden_mortgages as number || 0;
         if (rowHidden > existing.hiddenMortgages) {
           existing.hiddenMortgages = rowHidden;
+        }
+        const rowLiens = row.hidden_liens_amount as number || 0;
+        if (rowLiens > existing.hiddenLiensAmount) {
+          existing.hiddenLiensAmount = rowLiens;
+        }
+        if (row.title_check_status && row.title_check_status !== "pending") {
+          existing.titleCheckStatus = row.title_check_status as string;
         }
         rowPhones.forEach(p => existing.phones.add(p));
         rowEmails.forEach(e => existing.emails.add(e));
@@ -539,6 +631,9 @@ app.get("/api/prospectos", async (req, res) => {
           financialDistress: [],
           lifeEvents: [],
           hiddenMortgages: 0,
+          hiddenLiensAmount: 0,
+          titleCheckStatus: "pending",
+          nextRetryDate: undefined,
           isAbsentee: false,
           photoUrls: []
         });
@@ -586,6 +681,9 @@ app.get("/api/prospectos", async (req, res) => {
           financialDistress: [],
           lifeEvents: [],
           hiddenMortgages: 0,
+          hiddenLiensAmount: 0,
+          titleCheckStatus: "pending",
+          nextRetryDate: undefined,
           isAbsentee: false,
           photoUrls: []
         });
@@ -624,6 +722,9 @@ app.get("/api/prospectos", async (req, res) => {
           financialDistress: [],
           lifeEvents: [],
           hiddenMortgages: 0,
+          hiddenLiensAmount: 0,
+          titleCheckStatus: "pending",
+          nextRetryDate: undefined,
           isAbsentee: false,
           photoUrls: []
         });
@@ -664,7 +765,10 @@ app.get("/api/prospectos", async (req, res) => {
           physicalDistress: [],
           financialDistress: [],
           lifeEvents: [],
-          hiddenMortgages: (row.hidden_mortgages as number || 0) + (row.hidden_liens_amount as number || 0),
+          hiddenMortgages: row.hidden_mortgages as number || 0,
+          hiddenLiensAmount: row.hidden_liens_amount as number || 0,
+          titleCheckStatus: "pending",
+          nextRetryDate: undefined,
           mailingAddress: row.mailing_address as string || undefined,
           isAbsentee: (row.absentee_owner as number) === 1,
           sqft: row.sqft as number || undefined,
@@ -686,9 +790,13 @@ app.get("/api/prospectos", async (req, res) => {
         if (!existing.sqft && row.sqft) existing.sqft = row.sqft as number;
         if (!existing.beds && row.beds) existing.beds = row.beds as number;
         if (!existing.baths && row.baths) existing.baths = row.baths as number;
-        const rowHidden = (row.hidden_mortgages as number || 0) + (row.hidden_liens_amount as number || 0);
+        const rowHidden = row.hidden_mortgages as number || 0;
         if (rowHidden > existing.hiddenMortgages) {
           existing.hiddenMortgages = rowHidden;
+        }
+        const rowLiens = row.hidden_liens_amount as number || 0;
+        if (rowLiens > existing.hiddenLiensAmount) {
+          existing.hiddenLiensAmount = rowLiens;
         }
         rowPhones.forEach(p => existing.phones.add(p));
         rowEmails.forEach(e => existing.emails.add(e));
@@ -736,7 +844,10 @@ app.get("/api/prospectos", async (req, res) => {
           physicalDistress: [],
           financialDistress: [],
           lifeEvents: [],
-          hiddenMortgages: (row.hidden_mortgages as number || 0) + (row.hidden_liens_amount as number || 0),
+          hiddenMortgages: row.hidden_mortgages as number || 0,
+          hiddenLiensAmount: row.hidden_liens_amount as number || 0,
+          titleCheckStatus: "pending",
+          nextRetryDate: undefined,
           mailingAddress: row.mailing_address as string || undefined,
           isAbsentee: (row.absentee_owner as number) === 1,
           sqft: row.sqft as number || undefined,
@@ -758,9 +869,13 @@ app.get("/api/prospectos", async (req, res) => {
         if (!existing.sqft && row.sqft) existing.sqft = row.sqft as number;
         if (!existing.beds && row.beds) existing.beds = row.beds as number;
         if (!existing.baths && row.baths) existing.baths = row.baths as number;
-        const rowHidden = (row.hidden_mortgages as number || 0) + (row.hidden_liens_amount as number || 0);
+        const rowHidden = row.hidden_mortgages as number || 0;
         if (rowHidden > existing.hiddenMortgages) {
           existing.hiddenMortgages = rowHidden;
+        }
+        const rowLiens = row.hidden_liens_amount as number || 0;
+        if (rowLiens > existing.hiddenLiensAmount) {
+          existing.hiddenLiensAmount = rowLiens;
         }
         rowPhones.forEach(p => existing.phones.add(p));
         rowEmails.forEach(e => existing.emails.add(e));
@@ -808,7 +923,10 @@ app.get("/api/prospectos", async (req, res) => {
           physicalDistress: [],
           financialDistress: [],
           lifeEvents: [],
-          hiddenMortgages: (row.hidden_mortgages as number || 0) + (row.hidden_liens_amount as number || 0),
+          hiddenMortgages: row.hidden_mortgages as number || 0,
+          hiddenLiensAmount: row.hidden_liens_amount as number || 0,
+          titleCheckStatus: "pending",
+          nextRetryDate: undefined,
           mailingAddress: row.mailing_address as string || undefined,
           isAbsentee: (row.absentee_owner as number) === 1,
           sqft: row.sqft as number || undefined,
@@ -830,9 +948,13 @@ app.get("/api/prospectos", async (req, res) => {
         if (!existing.sqft && row.sqft) existing.sqft = row.sqft as number;
         if (!existing.beds && row.beds) existing.beds = row.beds as number;
         if (!existing.baths && row.baths) existing.baths = row.baths as number;
-        const rowHidden = (row.hidden_mortgages as number || 0) + (row.hidden_liens_amount as number || 0);
+        const rowHidden = row.hidden_mortgages as number || 0;
         if (rowHidden > existing.hiddenMortgages) {
           existing.hiddenMortgages = rowHidden;
+        }
+        const rowLiens = row.hidden_liens_amount as number || 0;
+        if (rowLiens > existing.hiddenLiensAmount) {
+          existing.hiddenLiensAmount = rowLiens;
         }
         rowPhones.forEach(p => existing.phones.add(p));
         rowEmails.forEach(e => existing.emails.add(e));
@@ -921,6 +1043,9 @@ app.get("/api/prospectos", async (req, res) => {
         financialDistress: lead.financialDistress,
         lifeEvents: lead.lifeEvents,
         hiddenMortgages: hiddenDebt,
+        hiddenLiensAmount: lead.hiddenLiensAmount,
+        titleCheckStatus: lead.titleCheckStatus,
+        nextRetryDate: lead.nextRetryDate,
         isAbsentee: lead.isAbsentee,
         rehab,
         mao,
@@ -1150,8 +1275,9 @@ async function startBackgroundGeocoding() {
         
         await getCoordinates(addr);
         
-        // Espera de 1.5s para no saturar la API gratuita de Nominatim
-        await sleep(1500);
+        // Espera corta si usamos Google, o 1.5s para no saturar la API gratuita de Nominatim
+        const sleepTime = process.env.GOOGLE_MAPS_API_KEY ? 200 : 1500;
+        await sleep(sleepTime);
       }
       console.log("[BACKGROUND GEOCODER] Geocodificación en lote completada.");
     } else {

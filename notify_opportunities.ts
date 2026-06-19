@@ -195,11 +195,21 @@ async function checkPdfUrl(pdfUrl: string): Promise<string> {
 /**
  * Envía un mensaje estructurado premium a Telegram, soportando botones interactivos (inline keyboard).
  */
-async function sendTelegramNotification(message: string, replyMarkup?: any, photoUrl: string | null = null): Promise<boolean> {
+async function sendTelegramNotification(
+  message: string,
+  replyMarkup?: any,
+  photoUrl: string | null = null,
+  retryCount = 0
+): Promise<boolean> {
   const token = process.env.TELEGRAM_BOT_TOKEN;
   const chatId = process.env.TELEGRAM_CHAT_ID;
   if (!token || !chatId) {
     console.log("[TELEGRAM] Advertencia: Credenciales de Telegram no configuradas.");
+    return false;
+  }
+
+  if (retryCount > 3) {
+    console.error("[TELEGRAM ERROR] Superado el número máximo de reintentos por rate limit (429).");
     return false;
   }
   
@@ -220,6 +230,12 @@ async function sendTelegramNotification(message: string, replyMarkup?: any, phot
         const response = await axios.post(url, payload, { timeout: 10000 });
         if (response.status === 200) return true;
       } catch (err: any) {
+        if (err.response?.status === 429) {
+          const retryAfter = err.response?.data?.parameters?.retry_after || 9;
+          console.warn(`[TELEGRAM 429] Rate limit en sendPhoto. Esperando ${retryAfter}s (Intento ${retryCount + 1})...`);
+          await sleep(retryAfter * 1000);
+          return sendTelegramNotification(message, replyMarkup, photoUrl, retryCount + 1);
+        }
         console.warn(`[TELEGRAM PHOTO WARNING] Falló el envío de foto con caption: ${err.message}. Reintentando texto...`);
       }
     } else {
@@ -234,6 +250,12 @@ async function sendTelegramNotification(message: string, replyMarkup?: any, phot
           parse_mode: "Markdown"
         }, { timeout: 10000 });
       } catch (err: any) {
+        if (err.response?.status === 429) {
+          const retryAfter = err.response?.data?.parameters?.retry_after || 9;
+          console.warn(`[TELEGRAM 429] Rate limit en sendPhoto previa. Esperando ${retryAfter}s (Intento ${retryCount + 1})...`);
+          await sleep(retryAfter * 1000);
+          return sendTelegramNotification(message, replyMarkup, photoUrl, retryCount + 1);
+        }
         console.warn(`[TELEGRAM PHOTO WARNING] Falló el envío de la foto previa: ${err.message}`);
       }
     }
@@ -255,6 +277,12 @@ async function sendTelegramNotification(message: string, replyMarkup?: any, phot
     const response = await axios.post(url, payload, { timeout: 10000 });
     return response.status === 200;
   } catch (e: any) {
+    if (e.response?.status === 429) {
+      const retryAfter = e.response?.data?.parameters?.retry_after || 9;
+      console.warn(`[TELEGRAM 429] Rate limit en sendMessage. Esperando ${retryAfter}s (Intento ${retryCount + 1})...`);
+      await sleep(retryAfter * 1000);
+      return sendTelegramNotification(message, replyMarkup, photoUrl, retryCount + 1);
+    }
     console.error(`[TELEGRAM EXCEPTION] Error al enviar mensaje: ${e.message || e}`);
     return false;
   }
@@ -359,140 +387,165 @@ async function searchLegalRadar(ownerName: string, city: string): Promise<boolea
  * Despacha notificaciones para oportunidades de alta rentabilidad o revisiones manuales no notificadas,
  * agrupando múltiples incidencias (claims y violaciones) bajo una misma dirección física.
  */
-async function notifyOpportunities() {
-  console.log("[INICIO] Buscando oportunidades y violaciones sin notificar...");
+async function notifyOpportunities(mode?: 'legal' | 'physical') {
+  console.log(`[INICIO] Buscando oportunidades sin notificar (Modo: ${mode || 'TODOS'})...`);
   
   // 1. Consultar subastas judiciales no notificadas
-  let opportunitiesRes;
-  try {
-    opportunitiesRes = await db.execute(`
-      SELECT 
-        auction_id, case_number, address, county, state, auction_date, 
-        plaintiff, defendant, debt_amount, appraisal_value, 
-        mls_estimated_value, mls_id, pdf_url,
-        defendant_phones, defendant_emails, needs_manual_review,
-        mailing_address, absentee_owner, sqft, beds, baths, hidden_mortgages, hidden_liens_amount, stress_score, photo_urls, next_retry_date
-      FROM foreclosure_auctions 
-      WHERE (is_high_yield = 1 OR (state = 'IN' AND (needs_manual_review = 1 OR needs_manual_review = 2))) AND telegram_sent = 0
-    `);
-  } catch (dbErr: any) {
-    console.error("[DB ERROR] Error al consultar subastas:", dbErr.message);
-    process.exit(1);
-  }
-  const opportunities = opportunitiesRes.rows.filter(row => {
-    const dateStr = row.auction_date as string;
-    const daysRemaining = getDaysRemaining(dateStr);
-    if (daysRemaining === null) {
-      // Si no se puede parsear la fecha, lo mantenemos como medida de seguridad (por ejemplo, Indiana manual review)
-      return true;
+  let opportunities: any[] = [];
+  if (mode !== 'physical') {
+    try {
+      const opportunitiesRes = await db.execute(`
+        SELECT 
+          auction_id, case_number, address, county, state, auction_date, 
+          plaintiff, defendant, debt_amount, appraisal_value, 
+          mls_estimated_value, mls_id, pdf_url,
+          defendant_phones, defendant_emails, needs_manual_review,
+          mailing_address, absentee_owner, sqft, beds, baths, hidden_mortgages, hidden_liens_amount, stress_score, photo_urls, next_retry_date
+        FROM foreclosure_auctions 
+        WHERE (is_high_yield = 1 OR (state = 'IN' AND (needs_manual_review = 1 OR needs_manual_review = 2))) AND telegram_sent = 0
+      `);
+      opportunities = opportunitiesRes.rows.filter(row => {
+        const dateStr = row.auction_date as string;
+        const daysRemaining = getDaysRemaining(dateStr);
+        if (daysRemaining === null) return true;
+        return daysRemaining >= 0 && daysRemaining <= 60;
+      });
+    } catch (dbErr: any) {
+      console.error("[DB ERROR] Error al consultar subastas:", dbErr.message);
+      process.exit(1);
     }
-    return daysRemaining >= 0 && daysRemaining <= 60;
-  });
-
-
-  // 2. Consultar violaciones de código no notificadas
-  let violationsRes;
-  try {
-    violationsRes = await db.execute(`
-      SELECT 
-        violation_id, case_number, address, violation_type, report_date, status, 
-        owner_name, mls_estimated_value, mls_id, defendant_phones, defendant_emails,
-        mailing_address, absentee_owner, sqft, beds, baths, hidden_mortgages, hidden_liens_amount, stress_score, photo_urls
-      FROM code_violations 
-      WHERE is_high_yield = 1 AND telegram_sent = 0
-    `);
-  } catch (dbErr: any) {
-    console.error("[DB ERROR] Error al consultar violaciones de código:", dbErr.message);
-    process.exit(1);
   }
-  const violations = violationsRes.rows;
+
+  // 2. Consultar violaciones de código no notificadas (Excluyendo césped/basura)
+  let violations: any[] = [];
+  if (mode !== 'legal') {
+    try {
+      const violationsRes = await db.execute(`
+        SELECT 
+          violation_id, case_number, address, violation_type, report_date, status, 
+          owner_name, mls_estimated_value, mls_id, defendant_phones, defendant_emails,
+          mailing_address, absentee_owner, sqft, beds, baths, hidden_mortgages, hidden_liens_amount, stress_score, photo_urls
+        FROM code_violations 
+        WHERE is_high_yield = 1 AND telegram_sent = 0
+          AND violation_type NOT LIKE '%02A%' 
+          AND violation_type NOT LIKE '%CLEANING%' 
+          AND violation_type NOT LIKE '%WEEDS%' 
+          AND violation_type NOT LIKE '%rubbish%' 
+          AND violation_type NOT LIKE '%grass%' 
+          AND violation_type NOT LIKE '%weed%' 
+          AND violation_type NOT LIKE '%trash%'
+          AND violation_type NOT LIKE '%vehicle%'
+          AND violation_type NOT LIKE '%lawn%'
+      `);
+      violations = violationsRes.rows;
+    } catch (dbErr: any) {
+      console.error("[DB ERROR] Error al consultar violaciones de código:", dbErr.message);
+      process.exit(1);
+    }
+  }
 
   // 3. Consultar herencias no notificadas
-  let probatesRes;
-  try {
-    probatesRes = await db.execute(`
-      SELECT probate_id, case_number, address, county, state, deceased_name, heir_name, heir_phones, heir_emails
-      FROM probates
-      WHERE telegram_sent = 0
-    `);
-  } catch (dbErr: any) {
-    console.error("[DB ERROR] Error al consultar probates:", dbErr.message);
-    process.exit(1);
+  let probates: any[] = [];
+  if (mode !== 'physical' && mode !== 'legal') {
+    try {
+      const probatesRes = await db.execute(`
+        SELECT probate_id, case_number, address, county, state, deceased_name, heir_name, heir_phones, heir_emails
+        FROM probates
+        WHERE telegram_sent = 0
+      `);
+      probates = probatesRes.rows;
+    } catch (dbErr: any) {
+      console.error("[DB ERROR] Error al consultar probates:", dbErr.message);
+      process.exit(1);
+    }
   }
-  const probates = probatesRes.rows;
 
   // 4. Consultar divorcios no notificados
-  let divorcesRes;
-  try {
-    divorcesRes = await db.execute(`
-      SELECT divorce_id, case_number, address, county, state, spouse_a, spouse_b, spouse_a_phones, spouse_a_emails, spouse_b_phones, spouse_b_emails
-      FROM divorces
-      WHERE telegram_sent = 0
-    `);
-  } catch (dbErr: any) {
-    console.error("[DB ERROR] Error al consultar divorces:", dbErr.message);
-    process.exit(1);
+  let divorces: any[] = [];
+  if (mode !== 'physical' && mode !== 'legal') {
+    try {
+      const divorcesRes = await db.execute(`
+        SELECT divorce_id, case_number, address, county, state, spouse_a, spouse_b, spouse_a_phones, spouse_a_emails, spouse_b_phones, spouse_b_emails
+        FROM divorces
+        WHERE telegram_sent = 0
+      `);
+      divorces = divorcesRes.rows;
+    } catch (dbErr: any) {
+      console.error("[DB ERROR] Error al consultar divorces:", dbErr.message);
+      process.exit(1);
+    }
   }
-  const divorces = divorcesRes.rows;
 
   // 5. Consultar bancarrotas no notificadas
-  let bankruptciesRes;
-  try {
-    bankruptciesRes = await db.execute(`
-      SELECT bankruptcy_id, case_number, address, county, state, debtor_name, bankruptcy_type, debtor_phones, debtor_emails
-      FROM bankruptcies
-      WHERE telegram_sent = 0
-    `);
-  } catch (dbErr: any) {
-    console.error("[DB ERROR] Error al consultar bankruptcies:", dbErr.message);
-    process.exit(1);
+  let bankruptcies: any[] = [];
+  if (mode !== 'physical' && mode !== 'legal') {
+    try {
+      const bankruptciesRes = await db.execute(`
+        SELECT bankruptcy_id, case_number, address, county, state, debtor_name, bankruptcy_type, debtor_phones, debtor_emails
+        FROM bankruptcies
+        WHERE telegram_sent = 0
+      `);
+      bankruptcies = bankruptciesRes.rows;
+    } catch (dbErr: any) {
+      console.error("[DB ERROR] Error al consultar bankruptcies:", dbErr.message);
+      process.exit(1);
+    }
   }
-  const bankruptcies = bankruptciesRes.rows;
 
   // 6. Consultar estrés físico no notificado
-  let physicalRes;
-  try {
-    physicalRes = await db.execute(`
-      SELECT distress_id, address, county, state, distress_type, report_date, details, owner_name,
-             mls_estimated_value, mls_id, defendant_phones, defendant_emails, mailing_address, absentee_owner, sqft, beds, baths, hidden_mortgages, hidden_liens_amount, stress_score, photo_urls
-      FROM physical_distress
-      WHERE telegram_sent = 0
-    `);
-  } catch (dbErr: any) {
-    console.error("[DB ERROR] Error al consultar physical_distress:", dbErr.message);
-    process.exit(1);
+  let physicalDistressList: any[] = [];
+  if (mode !== 'legal') {
+    try {
+      const physicalRes = await db.execute(`
+        SELECT distress_id, address, county, state, distress_type, report_date, details, owner_name,
+               mls_estimated_value, mls_id, defendant_phones, defendant_emails, mailing_address, absentee_owner, sqft, beds, baths, hidden_mortgages, hidden_liens_amount, stress_score, photo_urls
+        FROM physical_distress
+        WHERE telegram_sent = 0
+      `);
+      physicalDistressList = physicalRes.rows;
+    } catch (dbErr: any) {
+      console.error("[DB ERROR] Error al consultar physical_distress:", dbErr.message);
+      process.exit(1);
+    }
   }
-  const physicalDistressList = physicalRes.rows;
 
   // 7. Consultar estrés financiero extra no notificado
-  let financialRes;
-  try {
-    financialRes = await db.execute(`
-      SELECT record_id, case_number, address, county, state, record_type, debt_amount, owner_name, plaintiff, report_date,
-             mls_estimated_value, mls_id, defendant_phones, defendant_emails, mailing_address, absentee_owner, sqft, beds, baths, hidden_mortgages, hidden_liens_amount, stress_score, photo_urls
-      FROM financial_distress
-      WHERE telegram_sent = 0
-    `);
-  } catch (dbErr: any) {
-    console.error("[DB ERROR] Error al consultar financial_distress:", dbErr.message);
-    process.exit(1);
+  let financialDistressList: any[] = [];
+  if (mode !== 'physical') {
+    try {
+      let queryStr = `
+        SELECT record_id, case_number, address, county, state, record_type, debt_amount, owner_name, plaintiff, report_date,
+               mls_estimated_value, mls_id, defendant_phones, defendant_emails, mailing_address, absentee_owner, sqft, beds, baths, hidden_mortgages, hidden_liens_amount, stress_score, photo_urls
+        FROM financial_distress
+        WHERE telegram_sent = 0
+      `;
+      if (mode === 'legal') {
+        queryStr += ` AND record_type NOT IN ('Eviction', 'Eviction Notice')`;
+      }
+      const financialRes = await db.execute(queryStr);
+      financialDistressList = financialRes.rows;
+    } catch (dbErr: any) {
+      console.error("[DB ERROR] Error al consultar financial_distress:", dbErr.message);
+      process.exit(1);
+    }
   }
-  const financialDistressList = financialRes.rows;
 
   // 8. Consultar eventos de vida críticos no notificados
-  let lifeEventsRes;
-  try {
-    lifeEventsRes = await db.execute(`
-      SELECT event_id, event_type, subject_name, address, county, state, details, report_date,
-             mls_estimated_value, mls_id, defendant_phones, defendant_emails, mailing_address, absentee_owner, sqft, beds, baths, hidden_mortgages, hidden_liens_amount, stress_score, photo_urls
-      FROM life_events
-      WHERE telegram_sent = 0
-    `);
-  } catch (dbErr: any) {
-    console.error("[DB ERROR] Error al consultar life_events:", dbErr.message);
-    process.exit(1);
+  let lifeEventsList: any[] = [];
+  if (mode !== 'legal') {
+    try {
+      const lifeEventsRes = await db.execute(`
+        SELECT event_id, event_type, subject_name, address, county, state, details, report_date,
+               mls_estimated_value, mls_id, defendant_phones, defendant_emails, mailing_address, absentee_owner, sqft, beds, baths, hidden_mortgages, hidden_liens_amount, stress_score, photo_urls
+        FROM life_events
+        WHERE telegram_sent = 0
+      `);
+      lifeEventsList = lifeEventsRes.rows;
+    } catch (dbErr: any) {
+      console.error("[DB ERROR] Error al consultar life_events:", dbErr.message);
+      process.exit(1);
+    }
   }
-  const lifeEventsList = lifeEventsRes.rows;
 
   console.log(`[NOTIFICAR] Pendientes: Subastas: ${opportunities.length}, Violaciones: ${violations.length}, Herencias: ${probates.length}, Divorcios: ${divorces.length}, Quiebras: ${bankruptcies.length}, Físico: ${physicalDistressList.length}, Fin: ${financialDistressList.length}, Eventos: ${lifeEventsList.length}`);
 

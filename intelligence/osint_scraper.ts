@@ -17,7 +17,11 @@ function normalizePhone(phone: string): string | null {
   if (digits.length === 10) {
     // Filter out common toll-free prefix ranges
     const prefix = digits.slice(0, 3);
+    const exchange = digits.slice(3, 6);
     if (["800", "888", "877", "866", "855", "844", "833"].includes(prefix)) {
+      return null;
+    }
+    if (exchange === "555") {
       return null;
     }
     return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
@@ -25,7 +29,11 @@ function normalizePhone(phone: string): string | null {
   // US phone number with country code 1 (11 digits)
   if (digits.length === 11 && digits.startsWith("1")) {
     const prefix = digits.slice(1, 4);
+    const exchange = digits.slice(4, 7);
     if (["800", "888", "877", "866", "855", "844", "833"].includes(prefix)) {
+      return null;
+    }
+    if (exchange === "555") {
       return null;
     }
     return `(${digits.slice(1, 4)}) ${digits.slice(4, 7)}-${digits.slice(7)}`;

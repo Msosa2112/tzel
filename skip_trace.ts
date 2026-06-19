@@ -191,6 +191,8 @@ export async function performSkipTrace(
   state: string,
   county: string
 ): Promise<SkipTraceResult> {
+  let batchDataOutOfFunds = false;
+
   // 1. Paso 1: Ejecutar la nueva búsqueda gratuita en OSINT
   try {
     console.log(`[WATERFALL SKIP TRACE] Paso 1: Buscando contactos vía OSINT para "${defendant}"...`);
@@ -233,16 +235,31 @@ export async function performSkipTrace(
         
         return { phones, emails };
       }
+
+      if (batchRes.outOfFunds) {
+        batchDataOutOfFunds = true;
+      }
     } catch (err: any) {
       console.error(`[WATERFALL SKIP TRACE ERR] BatchData failed for ${defendant}:`, err.message);
     }
   }
 
-  // 3. Fallback final simulado solo si no hay absolutamente ningún resultado (OSINT ni BatchData)
-  console.log(`[WATERFALL SKIP TRACE FALLBACK] No se encontraron resultados reales. Devolviendo contactos de prueba para: "${defendant}"`);
+  // 3. Generar enlaces de búsqueda para TruePeopleSearch, Whitepages, etc.
+  const searchLinks: string[] = [];
+  if (defendant && defendant.toLowerCase() !== "unknown" && defendant.toLowerCase() !== "unknown defendant") {
+    const parsed = parseAddress(rawAddress, state, county);
+    const location = parsed.zip || parsed.city || state;
+    const nameEncoded = encodeURIComponent(defendant);
+    const locEncoded = encodeURIComponent(location);
+    searchLinks.push(`TruePeopleSearch: https://www.truepeoplesearch.com/results?name=${nameEncoded}&citystatezip=${locEncoded}`);
+    searchLinks.push(`Whitepages: https://www.whitepages.com/name/${nameEncoded}/${locEncoded}`);
+  }
+
+  console.log(`[WATERFALL SKIP TRACE] No se encontraron resultados reales para "${defendant}". Retornando enlaces de búsqueda y 'Unknown' para teléfonos.`);
+  
   return {
-    phones: ["OSINT: (502) 555-0199", "OSINT: (502) 555-0144"],
-    emails: ["OSINT Link: https://truepeoplesearch.com/find/person/p82"]
+    phones: ["Unknown"],
+    emails: searchLinks.length > 0 ? searchLinks : ["Unknown"]
   };
 }
 

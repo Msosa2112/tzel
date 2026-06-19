@@ -12,17 +12,20 @@ const db = createClient({
   authToken: process.env.TURSO_AUTH_TOKEN || "",
 });
 
-// Palabras clave de alto estrés para identificar oportunidades
+// Palabras clave de alto estrés para identificar oportunidades (Paso 2.1)
 const STRESS_KEYWORDS = [
-  "boarded",
   "unsafe",
-  "tall grass",
-  "weed",
-  "maintenance",
-  "cleaning",
-  "dangerous",
-  "structure",
-  "roof"
+  "danger",
+  "collapse",
+  "boarded",
+  "fire",
+  "burned",
+  "foundation",
+  "roof",
+  "structurally unsafe",
+  "structural",
+  "X19 - EXTERIOR SURFACE SUPPORT MEMBERS/FOUNDATION",
+  "X50 - ROOF"
 ];
 
 function cleanAddress(addr: string): string {
@@ -96,7 +99,21 @@ async function scrapeCodeViolations() {
       }
 
       const typeLower = attr.GUIDE_ITEM_TEXT.toLowerCase();
-      const isHighStress = STRESS_KEYWORDS.some(keyword => typeLower.includes(keyword));
+      const violationCode = attr.VIOLATION_CODE || "";
+
+      // Paso 2.1: Exclusión estricta de palabras clave cosméticas o códigos no deseados
+      if (
+        violationCode === "02A" || 
+        violationCode === "05A" ||
+        typeLower.includes("tall grass") ||
+        typeLower.includes("weed") ||
+        typeLower.includes("clean") ||
+        typeLower.includes("rubbish")
+      ) {
+        continue;
+      }
+
+      const isHighStress = STRESS_KEYWORDS.some(keyword => typeLower.includes(keyword.toLowerCase()));
 
       if (!isHighStress) {
         // Saltar violaciones que no generen estrés inmobiliario relevante
@@ -106,8 +123,8 @@ async function scrapeCodeViolations() {
       processedCount++;
 
       // Formatear ID único combinando caso y código de infracción
-      const violationCode = attr.VIOLATION_CODE || "UNKNOWN";
-      const violationId = `${attr.B1_ALT_ID}_${violationCode}`;
+      const finalViolationCode = violationCode || "UNKNOWN";
+      const violationId = `${attr.B1_ALT_ID}_${finalViolationCode}`;
 
       // Formatear fecha de reporte (de timestamp ms a YYYY-MM-DD)
       let reportDateStr: string | null = null;

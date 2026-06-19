@@ -1,12 +1,7 @@
 import { scrapeJeffersonCounty } from "./scrapers/scrape_jeffcomm";
 import { scrapeIndiana } from "./scrapers/scrape_sheriff_in";
-import { scrapeCodeViolations } from "./scrapers/scrapeCodeViolations";
 import { scrapePVA } from "./scrapers/scrapePVA";
-import { scrapeProbates } from "./scrapers/scrape_probates";
-import { scrapeDivorces } from "./scrapers/scrape_divorces";
-import { scrapePhysicalDistress } from "./scrapers/scrape_physical_distress";
 import { scrapeFinancialDistress } from "./scrapers/scrape_financial_distress";
-import { scrapeLifeEvents } from "./scrapers/scrape_life_events";
 import { scrapeKYCommissioners } from "./scrapers/scrape_ky_commissioners";
 import { runCrossReference } from "./cross_reference";
 import { runTitleLienCheck } from "./check_title_liens";
@@ -23,9 +18,9 @@ import { runDebtRetrySweep } from "./scrapers/debt_retry_sweep";
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-async function runPipeline() {
+async function runLegalPipeline() {
   console.log("=================================================================");
-  console.log("🚀 INICIANDO PIPELINE DE ADQUISICIÓN OSINT TZEL (4 CAPAS) 🚀");
+  console.log("🚀 INICIANDO PIPELINE LEGAL Y FINANCIERO TZEL (PRE-FORECLOSURES & LIENS) 🚀");
   console.log(`Fecha/Hora: ${new Date().toISOString()}`);
   console.log("=================================================================");
 
@@ -42,23 +37,22 @@ async function runPipeline() {
     console.warn("[INITIALIZATION WARNING] No se pudo limpiar la carpeta ./storage al inicio:", e.message);
   }
 
-
   // =================================================================
   // CAPA 1: CAPTURA E IDENTIFICACIÓN DEL OBJETIVO (TARGET ACQUISITION)
   // =================================================================
   console.log("\n=================================================================");
-  console.log("🧱 [CAPA 1] CAPTURA E IDENTIFICACIÓN DEL OBJETIVO");
+  console.log("🧱 [CAPA 1] CAPTURA E IDENTIFICACIÓN DEL OBJETIVO LEGAL");
   console.log("=================================================================");
 
   try {
-    console.log("\n[CAPA 1 - 1A] Scraping Jefferson County (KY)...");
+    console.log("\n[CAPA 1 - 1A] Scraping Jefferson County Auctions (KY)...");
     await scrapeJeffersonCounty();
   } catch (err: any) {
     console.error("[CAPA 1 ERROR] Falló el scraper de Jefferson County:", err.message);
   }
 
   try {
-    console.log("\n[CAPA 1 - 1B] Scraping Indiana Counties (IN)...");
+    console.log("\n[CAPA 1 - 1B] Scraping Indiana Sheriff Auctions (IN)...");
     await scrapeIndiana();
   } catch (err: any) {
     console.error("[CAPA 1 ERROR] Falló el scraper de Indiana:", err.message);
@@ -87,52 +81,19 @@ async function runPipeline() {
   }
 
   try {
-    console.log("\n[CAPA 1 - 1C] Scraping Louisville Metro Code Violations (KY)...");
-    await scrapeCodeViolations();
-  } catch (err: any) {
-    console.error("[CAPA 1 ERROR] Falló el scraper de Louisville Code Violations:", err.message);
-  }
-
-  try {
     console.log("\n[CAPA 1 - 1D] Resolviendo Propietarios Catastrales (PVA/GIS)...");
     await scrapePVA();
   } catch (err: any) {
     console.error("[CAPA 1 ERROR] Falló el resolvedor de PVA:", err.message);
   }
 
-  try {
-    console.log("\n[CAPA 1 - 1E] Scraping Sucesiones/Testamentarias (Probates)...");
-    await scrapeProbates();
-  } catch (err: any) {
-    console.error("[CAPA 1 ERROR] Falló el scraper de testamentarias (Probates):", err.message);
-  }
 
-  try {
-    console.log("\n[CAPA 1 - 1F] Scraping Divorcios (Divorces)...");
-    await scrapeDivorces();
-  } catch (err: any) {
-    console.error("[CAPA 1 ERROR] Falló el scraper de divorcios (Divorces):", err.message);
-  }
-
-  try {
-    console.log("\n[CAPA 1 - 1G] Scraping Physical Distress (Municipal alerts)...");
-    await scrapePhysicalDistress();
-  } catch (err: any) {
-    console.error("[CAPA 1 ERROR] Falló el scraper de estrés físico:", err.message);
-  }
 
   try {
     console.log("\n[CAPA 1 - 1H] Scraping Financial Distress (Tax Liens, Evictions, etc.)...");
     await scrapeFinancialDistress();
   } catch (err: any) {
     console.error("[CAPA 1 ERROR] Falló el scraper de estrés financiero:", err.message);
-  }
-
-  try {
-    console.log("\n[CAPA 1 - 1I] Scraping Life Events (Arrests, Obituaries, etc.)...");
-    await scrapeLifeEvents();
-  } catch (err: any) {
-    console.error("[CAPA 1 ERROR] Falló el scraper de eventos de vida:", err.message);
   }
 
   try {
@@ -148,8 +109,6 @@ async function runPipeline() {
   // PUERTA DE CALIDAD 1: Validar registros sin propietario y marcarlos para revisión manual
   console.log("\n[PUERTA DE CALIDAD 1] Validando nombres y normalizando propietarios...");
   try {
-    // Si un registro quedó con propietario 'Unknown' o vacío en Indiana y no tiene caso, se marca para revisión manual.
-    // En Louisville, si el PVA falló completamente y sigue en 'DUEÑO DESCONOCIDO', no avanza.
     const db = createClient({
       url: process.env.TURSO_DATABASE_URL || "",
       authToken: process.env.TURSO_AUTH_TOKEN || "",
@@ -206,9 +165,9 @@ async function runPipeline() {
   } catch (err: any) {
     console.error("[CAPA 3 ERROR] Falló la auditoría de títulos (Fallo Crítico):", err.message);
     try {
-      await sendTelegramNotification(`❌ *Pipeline de Adquisición OSINT TZEL Falló*\n⚠️ Error Crítico en Auditoría de Títulos: ${err.message}`);
+      await sendTelegramNotification(`❌ *Pipeline Legal TZEL Falló*\n⚠️ Error Crítico en Auditoría de Títulos: ${err.message}`);
     } catch (telegrErr) {}
-    throw err; // Detener pipeline si ocurre un error grave e inesperado en la base de datos
+    throw err;
   }
 
   try {
@@ -222,7 +181,7 @@ async function runPipeline() {
   // CAPA 4: INTELIGENCIA Y DESPACHO (INTELLIGENCE SCORING & DISPATCH)
   // =================================================================
   console.log("\n=================================================================");
-  console.log("📡 [CAPA 4] INTELIGENCIA Y DESPACHO DE ALERTAS");
+  console.log("📡 [CAPA 4] INTELIGENCIA Y DESPACHO DE ALERTAS LEGALES");
   console.log("=================================================================");
 
   try {
@@ -233,8 +192,8 @@ async function runPipeline() {
   }
 
   try {
-    console.log("\n[CAPA 4 - FASE 6] Enviando alertas de oportunidades y revisiones a Telegram...");
-    await notifyOpportunities();
+    console.log("\n[CAPA 4 - FASE 6] Enviando alertas legales y financieras a Telegram...");
+    await notifyOpportunities('legal');
   } catch (err: any) {
     console.error("[CAPA 4 ERROR] Falló el notificador de Telegram:", err.message);
   }
@@ -254,19 +213,18 @@ async function runPipeline() {
   }
 
   console.log("\n=================================================================");
-  console.log("✅ PIPELINE DE FORECLOSURES DE TZEL FINALIZADO CON ÉXITO ✅");
+  console.log("✅ PIPELINE LEGAL Y FINANCIERO DE TZEL FINALIZADO CON ÉXITO ✅");
   console.log("=================================================================");
 
   try {
-    await sendTelegramNotification(`✅ *Pipeline de Adquisición OSINT TZEL Finalizado con Éxito*\n🏁 Todas las fases completadas.`);
+    await sendTelegramNotification(`✅ *Pipeline Legal y Financiero TZEL Finalizado con Éxito*\n🏁 Todas las fases legales completadas.`);
   } catch (telegrErr: any) {
     console.error("Error al enviar notificación final de Telegram:", telegrErr.message);
   }
 }
 
-// Ejecutar si se corre directamente
 if (require.main === module) {
-  runPipeline().catch(console.error);
+  runLegalPipeline().catch(console.error);
 }
 
-export { runPipeline };
+export { runLegalPipeline };

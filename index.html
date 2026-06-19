@@ -1330,11 +1330,11 @@
         </div>
         <div class="map-legend-item">
           <span class="legend-color-dot" style="background-color: var(--color-financial-yellow); box-shadow: 0 0 6px var(--color-financial-yellow)"></span>
-          <span class="legend-label">⚖️ <strong>Estrés Financiero</strong><br>Bancarrota, impuestos o deudas</span>
+          <span class="legend-label">⚖️ <strong>Estrés Financiero</strong><br>Impuestos y gravámenes activos</span>
         </div>
         <div class="map-legend-item">
           <span class="legend-color-dot" style="background-color: var(--color-others-purple); box-shadow: 0 0 6px var(--color-others-purple)"></span>
-          <span class="legend-label">👤 <strong>Sucesión / Divorcio</strong><br>Herencias y eventos de vida</span>
+          <span class="legend-label">👤 <strong>Otros Estresores</strong><br>Sucesión, divorcio o bancarrota</span>
         </div>
       </div>
     </main>
@@ -1811,10 +1811,10 @@
 
         // Distress Stacking / Type Filter
         const hasAuctions = lead.auctions && lead.auctions.length > 0;
-        const hasPhysical = lead.physicalDistress && lead.physicalDistress.length > 0;
+        const hasPhysical = (lead.physicalDistress && lead.physicalDistress.length > 0) || 
+                            (lead.violations && lead.violations.length > 0);
         const hasOthers = (lead.financialDistress && lead.financialDistress.length > 0) || 
                           (lead.lifeEvents && lead.lifeEvents.length > 0) || 
-                          (lead.violations && lead.violations.length > 0) || 
                           (lead.probates && lead.probates.length > 0) || 
                           (lead.divorces && lead.divorces.length > 0) || 
                           (lead.bankruptcies && lead.bankruptcies.length > 0);
@@ -1938,6 +1938,8 @@
           
           const hasAuctions = lead.auctions && lead.auctions.length > 0;
           const hasScheduledAuction = hasAuctions && lead.auctions.some(auc => getDaysRemaining(auc.auction_date) !== null);
+          const hasPhysical = (lead.physicalDistress && lead.physicalDistress.length > 0) || (lead.violations && lead.violations.length > 0);
+          const hasFinancial = (lead.financialDistress && lead.financialDistress.length > 0);
 
           if (hasScheduledAuction) {
             markerColor = 'var(--color-execution-red)';
@@ -1947,11 +1949,11 @@
             markerColor = 'var(--color-execution-orange)';
             emoji = '⏳';
             markerClass = 'execution-pre';
-          } else if (lead.physicalDistress && lead.physicalDistress.length > 0) {
+          } else if (hasPhysical) {
             markerColor = 'var(--color-physical-amber)';
             emoji = '🔥';
             markerClass = 'physical';
-          } else if ((lead.financialDistress && lead.financialDistress.length > 0) || (lead.bankruptcies && lead.bankruptcies.length > 0)) {
+          } else if (hasFinancial) {
             markerColor = 'var(--color-financial-yellow)';
             emoji = '⚖️';
             markerClass = 'financial';
@@ -2412,11 +2414,11 @@
         lead.bankruptcies.forEach(b => {
           const div = document.createElement('div');
           div.className = 'distress-log-item';
-          div.style.borderLeftColor = 'var(--color-financial-yellow)';
+          div.style.borderLeftColor = 'var(--color-others-purple)';
           div.innerHTML = `
             <div class="distress-log-header">
-              <span style="color: var(--color-financial-yellow); font-weight: bold;">💸 Otros: Declaración de Bancarrota</span>
-              <span style="color: var(--color-financial-yellow)">Caso: ${b.case_number}</span>
+              <span style="color: var(--color-others-purple); font-weight: bold;">👤 Otros: Declaración de Bancarrota</span>
+              <span style="color: var(--color-others-purple)">Caso: ${b.case_number}</span>
             </div>
             <div><strong>Deudor Principal:</strong> ${b.debtor_name}</div>
             <div><strong>Tipo / Capítulo:</strong> ${b.bankruptcy_type || 'Capítulo 7/13'}</div>

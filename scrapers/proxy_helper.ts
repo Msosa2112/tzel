@@ -99,3 +99,62 @@ export async function applyFlareSolverrBypass(context: any, url: string): Promis
   return false;
 }
 
+/**
+ * Lista de dominios que requieren enrutamiento forzado a través de FlareSolverr
+ */
+export const FLARESOLVERR_ENFORCED_DOMAINS = [
+  "search.jeffersondeeds.com",
+  "ecclix.com",
+  "doxpop.com",
+  "kypublicnotices.com",
+  "indianapublicnotices.com"
+];
+
+/**
+ * Determina si una URL pertenece a los dominios protegidos que requieren FlareSolverr
+ */
+export function shouldEnforceBypass(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    const hostname = parsed.hostname.toLowerCase();
+    return FLARESOLVERR_ENFORCED_DOMAINS.some(domain => hostname.includes(domain));
+  } catch (e) {
+    return FLARESOLVERR_ENFORCED_DOMAINS.some(domain => url.toLowerCase().includes(domain));
+  }
+}
+
+/**
+ * Enruta forzadamente una petición de bypass si la URL coincide con los dominios protegidos
+ */
+export async function enforceFlareSolverrBypass(context: any, url: string): Promise<boolean> {
+  if (shouldEnforceBypass(url)) {
+    console.log(`[PROXY HELPER] Dominio protegido detectado: ${url}. Ejecutando FlareSolverr de forma exclusiva.`);
+    return applyFlareSolverrBypass(context, url);
+  }
+  return false;
+}
+
+/**
+ * Realiza un GET directo a través de FlareSolverr y retorna el HTML resultante
+ */
+export async function fetchHtmlViaFlareSolverr(url: string): Promise<string> {
+  const solverUrl = process.env.FLARESOLVERR_URL || "http://localhost:8191/v1";
+  try {
+    const axios = require("axios");
+    console.log(`[FLARESOLVERR DIRECT GET] Solicitando HTML para: ${url}...`);
+    const solverRes = await axios.post(solverUrl, {
+      cmd: "request.get",
+      url: url,
+      maxTimeout: 60000
+    }, { timeout: 65000 });
+
+    if (solverRes.data && solverRes.data.status === "ok" && solverRes.data.solution) {
+      return solverRes.data.solution.response || "";
+    }
+  } catch (err: any) {
+    console.error(`[FLARESOLVERR FETCH ERROR] No se pudo obtener HTML para ${url}: ${err.message}`);
+  }
+  return "";
+}
+
+
