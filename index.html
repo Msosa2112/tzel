@@ -1030,10 +1030,15 @@
       width: 100%;
       height: 100%;
       object-fit: cover;
-      transition: transform 0.3s;
+      user-select: none;
+      -webkit-user-drag: none;
     }
-    .drawer-photo:hover {
-      transform: scale(1.05);
+    #drawer-photos-card {
+      cursor: grab;
+      user-select: none;
+    }
+    #drawer-photos-card.dragging {
+      cursor: grabbing;
     }
     .drawer-photo-nav {
       position: absolute;
@@ -1616,6 +1621,15 @@
     let mapMarkers = new Map(); // key -> leaflet marker
     let financialFilter = 'deals'; // 'deals' or 'underwater'
 
+    // Variables para el arrastre / swipe del carrusel de fotos
+    let isDraggingPhoto = false;
+    let startX = 0;
+    let currentTranslate = 0;
+    let prevTranslate = 0;
+    let animationID = 0;
+    let currentPhotoIndex = 0;
+    let photoUrlsCount = 0;
+
     // Initialize Map on load
     window.addEventListener('DOMContentLoaded', () => {
       initMap();
@@ -1632,6 +1646,8 @@
       document.getElementById('close-surplus-btn').addEventListener('click', closeSurplusVault);
       document.getElementById('btn-zero-debt-vault').addEventListener('click', openZeroDebtVault);
       document.getElementById('close-zero-debt-btn').addEventListener('click', closeZeroDebtVault);
+
+      initPhotoCarouselSwipe();
 
       // Mobile Sidebar Controls
       const sidebarLeft = document.getElementById('sidebar-left');
@@ -1702,6 +1718,104 @@
       }
       
       applyFilters();
+    }
+
+    function initPhotoCarouselSwipe() {
+      const photosCard = document.getElementById('drawer-photos-card');
+      const photosSlider = document.getElementById('drawer-photos-slider');
+
+      if (!photosCard || !photosSlider) return;
+
+      let startTranslateX = 0;
+      let diffX = 0;
+
+      // Eventos de ratón
+      photosCard.addEventListener('mousedown', dragStart);
+      photosCard.addEventListener('mousemove', dragMove);
+      photosCard.addEventListener('mouseup', dragEnd);
+      photosCard.addEventListener('mouseleave', dragEnd);
+
+      // Eventos táctiles
+      photosCard.addEventListener('touchstart', dragStart, { passive: true });
+      photosCard.addEventListener('touchmove', dragMove, { passive: false });
+      photosCard.addEventListener('touchend', dragEnd);
+
+      function getPositionX(event) {
+        return event.type.includes('mouse') ? event.clientX : event.touches[0].clientX;
+      }
+
+      function dragStart(event) {
+        if (photoUrlsCount <= 1) return;
+        
+        isDraggingPhoto = true;
+        startX = getPositionX(event);
+        
+        const sliderWidth = photosCard.offsetWidth;
+        startTranslateX = -currentPhotoIndex * sliderWidth;
+        diffX = 0;
+        
+        // Quitar transición temporalmente para arrastre inmediato y responsivo
+        photosSlider.style.transition = 'none';
+        photosCard.classList.add('dragging');
+        
+        if (event.type === 'mousedown') {
+          event.preventDefault();
+        }
+      }
+
+      function dragMove(event) {
+        if (!isDraggingPhoto) return;
+        
+        if (event.type === 'touchmove') {
+          event.preventDefault(); // Prevenir scrolling de la página
+        }
+
+        let currentX;
+        if (event.type.includes('mouse')) {
+          currentX = event.clientX;
+        } else {
+          if (event.touches && event.touches.length > 0) {
+            currentX = event.touches[0].clientX;
+          } else {
+            return;
+          }
+        }
+
+        diffX = currentX - startX;
+        currentTranslateX = startTranslateX + diffX;
+        
+        // Efecto resorte (elastic bounce) en los extremos
+        const sliderWidth = photosCard.offsetWidth;
+        const maxTranslate = 0;
+        const minTranslate = -(photoUrlsCount - 1) * sliderWidth;
+        
+        if (currentTranslateX > maxTranslate) {
+          currentTranslateX = maxTranslate + (currentTranslateX - maxTranslate) * 0.35;
+        } else if (currentTranslateX < minTranslate) {
+          currentTranslateX = minTranslate + (currentTranslateX - minTranslate) * 0.35;
+        }
+        
+        photosSlider.style.transform = `translateX(${currentTranslateX}px)`;
+      }
+
+      function dragEnd(event) {
+        if (!isDraggingPhoto) return;
+        
+        isDraggingPhoto = false;
+        photosCard.classList.remove('dragging');
+        
+        // Reactivar transición de desplazamiento suave
+        photosSlider.style.transition = 'transform 0.3s ease';
+        
+        // Umbral de 50px para cambiar de foto
+        if (diffX < -50 && currentPhotoIndex < photoUrlsCount - 1) {
+          currentPhotoIndex++;
+        } else if (diffX > 50 && currentPhotoIndex > 0) {
+          currentPhotoIndex--;
+        }
+        
+        switchDrawerPhoto(currentPhotoIndex);
+      }
     }
 
     function initMap() {
@@ -2146,6 +2260,7 @@
     };
 
     window.switchDrawerPhoto = function(index) {
+      currentPhotoIndex = index; // Sincronizar índice global para el arrastre
       const slider = document.getElementById('drawer-photos-slider');
       if (slider) {
         slider.style.transform = `translateX(-${index * 100}%)`;
@@ -2163,6 +2278,10 @@
     function hydrateDrawer(lead) {
       document.getElementById('drawer-address').textContent = lead.displayAddress;
 
+      // Resetear estado del carrusel deslizable
+      currentPhotoIndex = 0;
+      photoUrlsCount = lead.photoUrls ? lead.photoUrls.length : 0;
+
       // Hydrate Photos Carousel
       const photosCard = document.getElementById('drawer-photos-card');
       const photosSlider = document.getElementById('drawer-photos-slider');
@@ -2170,6 +2289,7 @@
       
       photosSlider.innerHTML = '';
       photosNav.innerHTML = '';
+      photosSlider.style.transition = 'transform 0.3s ease'; // Asegurar transición por defecto
       
       if (lead.photoUrls && lead.photoUrls.length > 0) {
         photosCard.style.display = 'block';
@@ -2181,6 +2301,7 @@
           img.style.height = '100%';
           img.style.objectFit = 'cover';
           img.style.flexShrink = '0';
+          img.draggable = false; // Desactivar drag nativo para no interferir con swipe
           photosSlider.appendChild(img);
           
           if (lead.photoUrls.length > 1) {
