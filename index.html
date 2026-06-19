@@ -957,6 +957,14 @@
     .surplus-vault-btn:active {
       transform: translateY(1px);
     }
+    .zero-debt-vault-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 16px rgba(59, 130, 246, 0.4) !important;
+      filter: brightness(1.1);
+    }
+    .zero-debt-vault-btn:active {
+      transform: translateY(1px);
+    }
     .ledger-table tr {
       border-bottom: 1px solid rgba(255,255,255,0.05);
       transition: background 0.15s;
@@ -1296,6 +1304,13 @@
         </button>
       </div>
 
+      <!-- Zero Debt Vault Action Button -->
+      <div class="sidebar-section" style="padding-top: 0;">
+        <button id="btn-zero-debt-vault" class="zero-debt-vault-btn" style="width: 100%; background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%); border: 1px solid rgba(255,255,255,0.15); color: #ffffff; padding: 12px; border-radius: 8px; font-size: 0.9rem; font-family: 'Orbitron', sans-serif; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; font-weight: bold; box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3); transition: all 0.2s; outline: none;">
+          <span>🛡️</span> Bóveda de Deuda Cero
+        </button>
+      </div>
+
       <!-- Prospect List -->
       <div class="sidebar-section" style="flex: 1; display: flex; flex-direction: column; overflow: hidden; padding-bottom: 0; min-height: 300px; flex-shrink: 0;">
         <h3>Lista de Objetivos (<span id="count-indicator">0</span>)</h3>
@@ -1552,6 +1567,43 @@
     </div>
   </div>
 
+  <!-- Fullscreen Modal / View for Zero Debt Vault -->
+  <div id="zero-debt-vault-modal" class="surplus-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background-color: var(--bg-darker); z-index: 9999; overflow-y: auto; padding: 40px; box-sizing: border-box; font-family: 'Inter', sans-serif;">
+    <div class="surplus-modal-header" style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid var(--border-glass); padding-bottom: 20px; margin-bottom: 30px;">
+      <div style="display: flex; align-items: center; gap: 15px;">
+        <span style="font-size: 2rem;">🛡️</span>
+        <div>
+          <h1 style="font-family: 'Orbitron', sans-serif; font-size: 1.8rem; color: #ffffff; text-shadow: 0 0 10px rgba(59, 130, 246, 0.4); margin: 0;">BÓVEDA DE DEUDA CERO</h1>
+          <p style="color: var(--text-muted); font-size: 0.85rem; margin: 4px 0 0 0;">Propiedades sin deudas activas o gravámenes detectados</p>
+        </div>
+      </div>
+      <button id="close-zero-debt-btn" style="background: rgba(255,255,255,0.05); border: 1px solid var(--border-glass); color: #ffffff; font-size: 1.5rem; width: 45px; height: 45px; border-radius: 50%; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; justify-content: center; outline: none;">&times;</button>
+    </div>
+
+    <!-- Zero Debt Table Wrapper -->
+    <div class="ledger-container" style="background: var(--bg-glass); border: 1px solid var(--border-glass); border-radius: 12px; padding: 24px; box-shadow: 0 8px 32px rgba(0,0,0,0.5); backdrop-filter: blur(10px);">
+      <table class="ledger-table" style="width: 100%; border-collapse: collapse; text-align: left; font-size: 0.9rem; color: var(--text-main);">
+        <thead>
+          <tr style="border-bottom: 2px solid rgba(255,255,255,0.1); color: var(--text-muted); font-family: 'Orbitron', sans-serif; font-size: 0.8rem; letter-spacing: 0.5px;">
+            <th style="padding: 12px 16px;">PROPIETARIO / DEMANDADO</th>
+            <th style="padding: 12px 16px;">DIRECCIÓN</th>
+            <th style="padding: 12px 16px;">CONDADO / ESTADO</th>
+            <th style="padding: 12px 16px;">TIPO DE DEUDOR</th>
+            <th style="padding: 12px 16px;">TIPO REGISTRO</th>
+            <th style="padding: 12px 16px; text-align: center;">ESTATUS AUDITORÍA</th>
+            <th style="padding: 12px 16px; text-align: center;">ACCIONES</th>
+          </tr>
+        </thead>
+        <tbody id="zero-debt-tbody">
+          <!-- Dynamically populated via JS -->
+        </tbody>
+      </table>
+      <div id="zero-debt-empty-state" style="display: none; text-align: center; color: var(--text-muted); padding: 40px; font-size: 1rem;">
+        No hay registros de propiedades con $0 deudas.
+      </div>
+    </div>
+  </div>
+
   <!-- Leaflet JS CDN -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
   
@@ -1578,6 +1630,8 @@
       document.getElementById('pill-stack').addEventListener('change', applyFilters);
       document.getElementById('btn-surplus-vault').addEventListener('click', openSurplusVault);
       document.getElementById('close-surplus-btn').addEventListener('click', closeSurplusVault);
+      document.getElementById('btn-zero-debt-vault').addEventListener('click', openZeroDebtVault);
+      document.getElementById('close-zero-debt-btn').addEventListener('click', closeZeroDebtVault);
 
       // Mobile Sidebar Controls
       const sidebarLeft = document.getElementById('sidebar-left');
@@ -1791,6 +1845,10 @@
       const showStackOnly = document.getElementById('pill-stack').checked;
 
       return allLeads.filter(lead => {
+        // Excluir propiedades sin deuda (van a la Bóveda de Deuda Cero)
+        const totalDebt = (lead.primaryDebt || 0) + (lead.hiddenMortgages || 0) + (lead.hiddenLiensAmount || 0);
+        if (totalDebt === 0) return false;
+
         // Search text filter
         const matchesSearch = 
           lead.displayAddress.toLowerCase().includes(searchVal) ||
@@ -2742,6 +2800,80 @@ Este dinero le pertenece legalmente a usted, pero si no se reclama a tiempo pued
         }, 1500);
       }).catch(err => {
         console.error('Failed to copy surplus script: ', err);
+      });
+    }
+
+    async function openZeroDebtVault() {
+      document.getElementById('zero-debt-vault-modal').style.display = 'block';
+      document.body.style.overflow = 'hidden';
+      populateZeroDebtVault();
+    }
+
+    function closeZeroDebtVault() {
+      document.getElementById('zero-debt-vault-modal').style.display = 'none';
+      document.body.style.overflow = '';
+    }
+
+    function populateZeroDebtVault() {
+      const tbody = document.getElementById('zero-debt-tbody');
+      const emptyState = document.getElementById('zero-debt-empty-state');
+      
+      tbody.innerHTML = '';
+      
+      const zeroDebtLeads = allLeads.filter(lead => {
+        const totalDebt = (lead.primaryDebt || 0) + (lead.hiddenMortgages || 0) + (lead.hiddenLiensAmount || 0);
+        return totalDebt === 0;
+      });
+      
+      if (zeroDebtLeads.length === 0) {
+        emptyState.style.display = 'block';
+        return;
+      }
+      
+      emptyState.style.display = 'none';
+      
+      zeroDebtLeads.forEach(lead => {
+        const tr = document.createElement('tr');
+        
+        let typeText = 'Otro';
+        let typeColor = 'var(--text-muted)';
+        
+        if (lead.auctions && lead.auctions.length > 0) {
+          typeText = 'Subasta judicial';
+          typeColor = 'var(--color-execution-orange)';
+        } else if (lead.violations && lead.violations.length > 0) {
+          typeText = 'Violación de código';
+          typeColor = 'var(--color-physical-amber)';
+        } else if (lead.financialDistress && lead.financialDistress.length > 0) {
+          typeText = 'Estrés financiero';
+          typeColor = 'var(--color-financial-yellow)';
+        }
+        
+        const tcStatus = lead.titleCheckStatus || 'pending';
+        const tcColor = tcStatus === 'success' ? 'var(--color-radar-green)' : (tcStatus === 'failed' ? 'var(--color-execution-red)' : 'var(--text-muted)');
+        const tcText = tcStatus === 'success' ? 'VERIFICADO $0' : (tcStatus === 'failed' ? 'FALLIDO' : 'PENDIENTE');
+
+        const searchEscaped = encodeURIComponent(lead.displayAddress);
+        const zillowUrl = `https://www.zillow.com/homes/${searchEscaped}`;
+        const redfinUrl = `https://www.redfin.com/property/search?queryString=${searchEscaped}`;
+        
+        tr.innerHTML = `
+          <td style="padding: 12px 16px; font-weight: bold; color: #ffffff;">${lead.ownerName}</td>
+          <td style="padding: 12px 16px; color: var(--text-main);">${lead.displayAddress}</td>
+          <td style="padding: 12px 16px; color: var(--text-muted);">${lead.county}, ${lead.state}</td>
+          <td style="padding: 12px 16px; color: var(--text-main);">${lead.isAbsentee ? 'Ausente' : 'Residente'}</td>
+          <td style="padding: 12px 16px;"><span class="badge" style="background: rgba(255,255,255,0.03); color: ${typeColor}; border: 1px solid ${typeColor};">${typeText}</span></td>
+          <td style="padding: 12px 16px; text-align: center;"><span class="badge" style="background: rgba(255,255,255,0.03); color: ${tcColor}; border: 1px solid ${tcColor};">${tcText}</span></td>
+          <td style="padding: 12px 16px; text-align: center;">
+            <div style="display: flex; gap: 8px; justify-content: center;">
+              <a href="${zillowUrl}" target="_blank" class="contact-action-btn" style="background: rgba(0, 106, 255, 0.15); border-color: rgba(0, 106, 255, 0.3); color: #3b82f6; text-decoration: none;">Zillow 🔗</a>
+              <a href="${redfinUrl}" target="_blank" class="contact-action-btn" style="background: rgba(230, 0, 0, 0.15); border-color: rgba(230, 0, 0, 0.3); color: #ef4444; text-decoration: none;">Redfin 🔗</a>
+              <button onclick="closeZeroDebtVault(); window.openLeadDrawer('${lead.groupingKey}')" class="contact-action-btn" style="background: rgba(16, 185, 129, 0.15); border-color: rgba(16, 185, 129, 0.3); color: var(--color-radar-green); cursor: pointer;">Ficha Táctica</button>
+            </div>
+          </td>
+        `;
+        
+        tbody.appendChild(tr);
       });
     }
   </script>
