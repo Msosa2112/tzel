@@ -1057,7 +1057,10 @@ app.get("/api/prospectos", async (req, res) => {
         isHighMotivation,
         lat: coords ? coords.lat : null,
         lon: coords ? coords.lon : null,
-        photoUrls: lead.photoUrls
+        photoUrls: lead.photoUrls,
+        beds: lead.beds,
+        baths: lead.baths,
+        sqft: lead.sqft
       });
     }
 
@@ -1111,28 +1114,116 @@ app.get("/api/mca", async (req, res) => {
       "Accept": "application/json"
     };
 
-    // 1. Extraer número de casa
-    const houseNumberMatch = address.match(/^\d+/);
-    if (!houseNumberMatch) {
+    // 1. Normalizar y parsear dirección
+    const { houseNumber, coreWords } = parseAddress(address);
+    if (!houseNumber) {
       return res.json({ status: "error", message: "No se pudo extraer el número de casa de la dirección" });
     }
-    const houseNumber = houseNumberMatch[0];
 
-    // 2. Intentar buscar características de la propiedad en el MLS
-    console.log(`[MCA API] Buscando propiedad objetivo: "${address}" (${state})`);
-    const propParams = {
-      "$filter": `contains(UnparsedAddress, '${houseNumber}') and StateOrProvince eq '${state}'`,
-      "$select": "ListingId,UnparsedAddress,PostalCode,BedroomsTotal,BathroomsTotalDecimal,LivingArea,YearBuilt,ListPrice,ClosePrice,StandardStatus,CloseDate",
-      "$top": 10
+    // 2. Intentar buscar características de la propiedad en la base de datos local
+    let dbSpecs: { beds: number | null, baths: number | null, sqft: number | null, mls_id: string | null } = {
+      beds: null,
+      baths: null,
+      sqft: null,
+      mls_id: null
     };
 
-    const propRes = await axios.get(url, { headers, params: propParams });
-    const records = propRes.data.value || [];
+    const targetKey = getGroupingKey(address);
+    const tables = ["foreclosure_auctions", "code_violations", "physical_distress", "financial_distress", "life_events"];
+    for (const table of tables) {
+      try {
+        const queryStr = `SELECT address, beds, baths, sqft, mls_id FROM ${table} WHERE address LIKE '%${houseNumber}%'`;
+        const resDb = await db.execute(queryStr);
+        for (const row of resDb.rows) {
+          const rowAddr = row.address as string;
+          if (rowAddr && getGroupingKey(rowAddr) === targetKey) {
+            const rowBeds = row.beds !== null && row.beds !== undefined ? Number(row.beds) : null;
+            const rowBaths = row.baths !== null && row.baths !== undefined ? Number(row.baths) : null;
+            const rowSqft = row.sqft !== null && row.sqft !== undefined ? Number(row.sqft) : null;
+            const rowMlsId = row.mls_id as string || null;
+            
+            // Only break and use these specs if they actually provide some non-null values
+            if (rowBeds !== null || rowSqft !== null || rowMlsId !== null) {
+              dbSpecs.beds = rowBeds;
+              dbSpecs.baths = rowBaths;
+              dbSpecs.sqft = rowSqft;
+              dbSpecs.mls_id = rowMlsId;
+              break;
+            }
+          }
+        }
+        if (dbSpecs.beds !== null || dbSpecs.sqft !== null) {
+          console.log(`[MCA API] Encontradas características en BD local (tabla ${table}): ${dbSpecs.beds} habs, ${dbSpecs.baths} baños, ${dbSpecs.sqft} sqft, MLS ID: ${dbSpecs.mls_id}`);
+          break;
+        }
+      } catch (dbErr: any) {
+        console.error(`[MCA API] Error buscando en tabla local ${table}:`, dbErr.message);
+      }
+    }
+
+    // 3. Buscar características en el MLS (Spark API)
+    console.log(`[MCA API] Buscando propiedad objetivo: "${address}" (${state})`);
+    let odataFilter = "";
+    if (dbSpecs.mls_id) {
+      odataFilter = `ListingId eq '${dbSpecs.mls_id}'`;
+    } else {
+      odataFilter = `contains(UnparsedAddress, '${houseNumber}') and StateOrProvince eq '${state}'`;
+      const zipMatches = address.match(/\b\d{5}\b/g);
+      const zipCode = zipMatches ? zipMatches[zipMatches.length - 1] : null;
+      if (zipCode) {
+        odataFilter += ` and PostalCode eq '${zipCode}'`;
+      }
+      for (const word of coreWords) {
+        odataFilter += ` and contains(tolower(UnparsedAddress), '${word.toLowerCase()}')`;
+      }
+    }
 
     let targetProfile = null;
-    if (records.length > 0) {
-      const validRecords = records.filter((r: any) => r.LivingArea > 0 || r.BedroomsTotal > 0);
-      targetProfile = validRecords.length > 0 ? validRecords[0] : records[0];
+    if (odataFilter) {
+      try {
+        const propParams = {
+          "$filter": odataFilter,
+          "$select": "ListingId,UnparsedAddress,PostalCode,BedroomsTotal,BathroomsTotalDecimal,LivingArea,YearBuilt,ListPrice,ClosePrice,StandardStatus,CloseDate",
+          "$top": 20
+        };
+        const propRes = await axios.get(url, { headers, params: propParams });
+        const records = propRes.data.value || [];
+
+        if (records.length > 0) {
+          if (dbSpecs.mls_id) {
+            targetProfile = records[0];
+          } else {
+            // Intentar coincidir por clave de agrupación
+            for (const record of records) {
+              const recAddr = record.UnparsedAddress || "";
+              if (recAddr && getGroupingKey(recAddr) === targetKey) {
+                targetProfile = record;
+                break;
+              }
+            }
+            // Fallback: coincidencia de palabras clave en memoria
+            if (!targetProfile) {
+              for (const record of records) {
+                const mlsAddress = record.UnparsedAddress || "";
+                const mlsCleaned = mlsAddress.toLowerCase().replace(/[^a-z0-9\s]/g, " ");
+                const mlsWords = mlsCleaned.split(/\s+/).filter((w: string) => w.length > 0);
+                const isMatch = coreWords.every(word => mlsWords.includes(word.toLowerCase()));
+                if (isMatch) {
+                  targetProfile = record;
+                  break;
+                }
+              }
+            }
+            // Fallback de último recurso
+            if (!targetProfile) {
+              const validRecords = records.filter((r: any) => r.LivingArea > 0 || r.BedroomsTotal > 0);
+              targetProfile = validRecords.length > 0 ? validRecords[0] : records[0];
+            }
+          }
+        }
+      } catch (mlsErr: any) {
+        console.error("[MCA API] Error consultando propiedad objetivo en MLS:", mlsErr.message);
+      }
     }
 
     // Extraer o suponer características
@@ -1144,9 +1235,13 @@ app.get("/api/mca", async (req, res) => {
       zip = targetProfile.PostalCode;
     }
 
-    let beds = targetProfile ? targetProfile.BedroomsTotal : 3;
-    let baths = targetProfile ? targetProfile.BathroomsTotalDecimal : 2;
-    let sqft = targetProfile ? targetProfile.LivingArea : 1200;
+    let beds = (targetProfile && targetProfile.BedroomsTotal) ? targetProfile.BedroomsTotal : (dbSpecs.beds || 3);
+    let baths = (targetProfile && targetProfile.BathroomsTotalDecimal) ? targetProfile.BathroomsTotalDecimal : (dbSpecs.baths || 2);
+    let sqft = (targetProfile && targetProfile.LivingArea) ? targetProfile.LivingArea : (dbSpecs.sqft || 1200);
+
+    if (!beds || beds === 0) beds = dbSpecs.beds || 3;
+    if (!baths || baths === 0) baths = dbSpecs.baths || 2;
+    if (!sqft || sqft === 0) sqft = dbSpecs.sqft || 1200;
 
     if (!zip) {
       return res.json({ status: "error", message: "No se pudo determinar el código postal" });

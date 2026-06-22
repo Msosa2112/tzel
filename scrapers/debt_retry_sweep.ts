@@ -228,11 +228,14 @@ export async function runDebtRetrySweep() {
     // A. Comprobar si es un lead de prueba controlado para simulación de alta fidelidad
     let isMock = false;
     let mockData = null;
-    for (const [name, val] of Object.entries(MOCK_LEADS)) {
-      if (ownerName.toUpperCase().includes(name) || name.includes(ownerName.toUpperCase())) {
-        isMock = true;
-        mockData = val;
-        break;
+    const cleanOwnerUpper = ownerName.trim().toUpperCase();
+    if (cleanOwnerUpper !== "") {
+      for (const [name, val] of Object.entries(MOCK_LEADS)) {
+        if (cleanOwnerUpper.includes(name) || name.includes(cleanOwnerUpper)) {
+          isMock = true;
+          mockData = val;
+          break;
+        }
       }
     }
 

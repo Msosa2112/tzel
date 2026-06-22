@@ -17,31 +17,78 @@
   <!-- Custom CSS Styling (Dark Mode, Premium, Glassmorphism, Radar Theme) -->
   <style>
     :root {
-      --bg-darker: #05070c;
-      --bg-dark: #0d111d;
-      --bg-glass: rgba(13, 17, 29, 0.75);
-      --border-glass: rgba(255, 255, 255, 0.08);
-      --text-main: #f1f5f9;
-      --text-muted: #94a3b8;
+      --bg-darker: #f4f3ef; /* Soft warm-grey/cream background from the styleguide */
+      --bg-dark: #ffffff;   /* Surface color: white */
+      --bg-glass: rgba(255, 255, 255, 0.85);
+      --border-glass: #e2e1dc; /* Clean soft border color */
+      --text-main: #1c1b18; /* Dark charcoal/warm black for text */
+      --text-muted: #7c7a72; /* Muted brown-grey for captions/subtext */
       
-      /* Accent Colors (GTA / Cyber style) */
+      /* Primary and Accent Colors from Styleguide */
       --color-radar-green: #10b981;
-      --color-high-motivation: #ef4444;   /* 🔥 */
-      --color-execution-red: #ef4444;     /* 🚨 Subasta Programada */
-      --color-execution-orange: #f97316;  /* ⏳ Pre-Subasta */
-      --color-physical-amber: #ea580c;    /* 🔥 Estrés Físico */
-      --color-financial-yellow: #eab308;  /* ⚖️ Financiero */
-      --color-others-purple: #8b5cf6;     /* 👤 Sucesión/Divorcio/Eventos */
+      --color-radar-green-pastel: #e6f7f4; /* Very light mint green */
+      --color-radar-green-border: #a8eed3; /* Pastel mint green border */
+      --color-radar-green-dark: #047857; /* Dark mint text */
+      --color-focus-ring: #00cfcc; /* Focus ring color */
 
-      /* Legacy / Detail-specific colors (still used in logs timeline, etc.) */
-      --color-foreclosure: #06b6d4;
-      --color-violation: #f59e0b;
-      --color-divorce: #ec4899;
-      --color-probate: #8b5cf6;
+      --color-high-motivation: #ef4444;   /* 🔥 */
+      --color-execution-red: #ea580c;     /* 🚨 Subasta Programada */
+      --color-execution-orange: #f97316;  /* ⏳ Pre-Subasta */
+      --color-physical-amber: #d97706;    /* 🔥 Estrés Físico */
+      --color-financial-yellow: #ca8a04;  /* ⚖️ Financiero */
+      --color-others-purple: #7c3aed;     /* 👤 Sucesión/Divorcio/Eventos */
+
+      /* Timeline & Category Colors */
+      --color-foreclosure: #0891b2;
+      --color-violation: #d97706;
+      --color-divorce: #db2777;
+      --color-probate: #7c3aed;
       --color-bankruptcy: #10b981;
       --color-physical-distress: #ea580c;
-      --color-financial-distress: #eab308;
+      --color-financial-distress: #ca8a04;
       --color-life-event: #db2777;
+
+      /* Neomorphic Elevations (Using soft warm-grey shadow) */
+      --shadow-color: rgba(142, 140, 132, 0.15);
+      --shadow-level-1: 0 2px 6px var(--shadow-color);
+      --shadow-level-2: 0 6px 16px var(--shadow-color);
+      --shadow-level-3: 0 12px 28px var(--shadow-color);
+      --shadow-level-4: 0 18px 36px var(--shadow-color);
+      --shadow-level-5: 0 24px 48px var(--shadow-color);
+      
+      /* Inset Neomorphic shadow for inputs */
+      --shadow-inset: inset 0 2px 4px rgba(142, 140, 132, 0.08);
+    }
+
+    /* Lucide Icons alignment */
+    .lucide {
+      width: 16px;
+      height: 16px;
+      stroke-width: 2.2;
+      display: inline-block;
+      vertical-align: middle;
+      margin-top: -2px;
+      margin-right: 4px;
+    }
+    .inline-icon {
+      width: 12px;
+      height: 12px;
+      stroke-width: 2.2;
+      display: inline-block;
+      vertical-align: middle;
+      margin-top: -2px;
+      margin-right: 4px;
+    }
+    .fav-btn svg {
+      width: 18px;
+      height: 18px;
+      stroke: currentColor;
+      fill: none;
+      transition: all 0.2s ease;
+    }
+    .fav-btn.fav-active svg {
+      fill: #fbbf24;
+      stroke: #fbbf24;
     }
 
     * {
@@ -61,8 +108,9 @@
     }
 
     h1, h2, h3, .hud-title {
-      font-family: 'Orbitron', sans-serif;
-      letter-spacing: 1px;
+      font-family: 'Inter', sans-serif;
+      font-weight: 700;
+      letter-spacing: -0.02em;
     }
 
     /* Main Grid Layout */
@@ -76,7 +124,7 @@
     /* Top HUD / Header Bar */
     header {
       height: 60px;
-      background: linear-gradient(180deg, #090d16 0%, rgba(9, 13, 22, 0.9) 100%);
+      background: #ffffff;
       border-bottom: 1px solid var(--border-glass);
       display: flex;
       align-items: center;
@@ -84,16 +132,7 @@
       padding: 0 24px;
       z-index: 1000;
       position: relative;
-    }
-
-    header::after {
-      content: '';
-      position: absolute;
-      bottom: 0;
-      left: 0;
-      right: 0;
-      height: 1px;
-      background: linear-gradient(90deg, transparent, var(--color-radar-green), transparent);
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.02);
     }
 
     .brand-container {
@@ -104,17 +143,17 @@
 
     .brand-logo {
       height: 38px;
-      border-radius: 6px;
-      border: 1px solid rgba(16, 185, 129, 0.3);
-      box-shadow: 0 0 10px rgba(16, 185, 129, 0.2);
+      border-radius: 8px;
+      border: 1px solid rgba(16, 185, 129, 0.15);
+      box-shadow: 0 2px 10px rgba(16, 185, 129, 0.08);
       transition: all 0.3s ease;
       cursor: pointer;
     }
 
     .brand-logo:hover {
-      transform: scale(1.05);
+      transform: scale(1.03);
       border-color: var(--color-radar-green);
-      box-shadow: 0 0 15px rgba(16, 185, 129, 0.5);
+      box-shadow: 0 4px 15px rgba(16, 185, 129, 0.15);
     }
 
     .radar-icon {
@@ -133,7 +172,7 @@
       left: 50%;
       width: 100%;
       height: 100%;
-      background: conic-gradient(from 0deg, transparent 50%, rgba(16, 185, 129, 0.4) 100%);
+      background: conic-gradient(from 0deg, transparent 50%, rgba(16, 185, 129, 0.2) 100%);
       transform-origin: top left;
       animation: radar-spin-mini 2s linear infinite;
     }
@@ -144,10 +183,10 @@
     }
 
     .brand-title {
-      font-size: 1.25rem;
-      font-weight: 900;
-      color: #ffffff;
-      text-shadow: 0 0 8px rgba(16, 185, 129, 0.6);
+      font-size: 1.2rem;
+      font-weight: 800;
+      color: #111827;
+      letter-spacing: -0.03em;
     }
 
     .system-status {
@@ -157,7 +196,7 @@
       font-size: 0.8rem;
       color: var(--color-radar-green);
       text-transform: uppercase;
-      font-family: 'Orbitron', sans-serif;
+      font-weight: 700;
     }
 
     .status-dot {
@@ -165,12 +204,12 @@
       height: 8px;
       background-color: var(--color-radar-green);
       border-radius: 50%;
-      box-shadow: 0 0 8px var(--color-radar-green);
+      box-shadow: 0 0 6px var(--color-radar-green);
       animation: pulse-glow 1.5s infinite alternate;
     }
 
     @keyframes pulse-glow {
-      0% { opacity: 0.4; }
+      0% { opacity: 0.5; }
       100% { opacity: 1; }
     }
 
@@ -178,7 +217,8 @@
     .sidebar-left {
       width: 380px;
       background: var(--bg-glass);
-      backdrop-filter: blur(12px);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
       border-right: 1px solid var(--border-glass);
       display: flex;
       flex-direction: column;
@@ -193,29 +233,34 @@
     }
 
     .sidebar-section h3 {
-      font-size: 0.9rem;
+      font-size: 0.85rem;
+      font-weight: 700;
       color: var(--text-muted);
       margin-bottom: 12px;
       display: flex;
       justify-content: space-between;
       align-items: center;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
     }
 
     .search-input {
       width: 100%;
-      background: rgba(255, 255, 255, 0.04);
-      border: 1px solid var(--border-glass);
-      padding: 10px 14px;
-      border-radius: 6px;
+      background: #ffffff;
+      border: 2px solid var(--border-glass);
+      padding: 11px 18px;
+      border-radius: 30px;
       color: var(--text-main);
       font-size: 0.9rem;
       outline: none;
-      transition: border-color 0.2s;
+      transition: all 0.25s ease;
+      box-shadow: var(--shadow-inset);
     }
 
     .search-input:focus {
-      border-color: var(--color-radar-green);
-      background: rgba(255, 255, 255, 0.07);
+      border-color: var(--color-focus-ring);
+      background: #ffffff;
+      box-shadow: 0 0 0 3px rgba(0, 207, 204, 0.25);
     }
 
     .filter-group {
@@ -226,18 +271,27 @@
     }
 
     .filter-select {
-      background: #0d111d;
-      border: 1px solid var(--border-glass);
-      padding: 8px 12px;
-      border-radius: 6px;
+      background: #ffffff;
+      border: 2px solid var(--border-glass);
+      padding: 11px 16px;
+      border-radius: 30px;
       color: var(--text-main);
       font-size: 0.85rem;
       outline: none;
       cursor: pointer;
+      transition: all 0.25s ease;
+      appearance: none;
+      background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%237c7a72' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+      background-repeat: no-repeat;
+      background-position: right 16px center;
+      background-size: 14px;
+      padding-right: 38px;
     }
 
     .filter-select:focus {
-      border-color: var(--color-radar-green);
+      border-color: var(--color-focus-ring);
+      background-color: #ffffff;
+      box-shadow: 0 0 0 3px rgba(0, 207, 204, 0.25);
     }
 
     /* Custom Radio-Pills for Filters */
@@ -252,30 +306,122 @@
     }
 
     .pill-label {
-      background: rgba(255, 255, 255, 0.03);
+      background: #ffffff;
       border: 1px solid var(--border-glass);
-      padding: 8px 4px;
-      border-radius: 6px;
+      padding: 8px 6px;
+      border-radius: 30px;
       font-size: 0.75rem;
+      font-weight: 600;
       text-align: center;
       cursor: pointer;
       user-select: none;
-      transition: all 0.2s;
+      transition: all 0.2s ease;
       display: flex;
       flex-direction: column;
       align-items: center;
       gap: 4px;
+      color: var(--text-muted);
+      box-shadow: var(--shadow-level-1);
     }
 
     .pill-label:hover {
-      background: rgba(255, 255, 255, 0.08);
+      background: var(--bg-darker);
+      color: var(--text-main);
+      box-shadow: var(--shadow-level-2);
     }
 
     .pill-checkbox:checked + .pill-label {
-      background: rgba(16, 185, 129, 0.1);
-      border-color: var(--color-radar-green);
-      color: #ffffff;
-      box-shadow: 0 0 8px rgba(16, 185, 129, 0.2);
+      background: var(--color-radar-green-pastel);
+      border-color: var(--color-radar-green-border);
+      color: var(--color-radar-green-dark);
+      box-shadow: 0 0 0 3px rgba(0, 207, 204, 0.15);
+    }
+
+    /* Segment Selector Neomorphic style */
+    .segment-selector {
+      display: flex;
+      background: #e5e4e0;
+      border: 1px solid var(--border-glass);
+      border-radius: 30px;
+      padding: 4px;
+      gap: 4px;
+      box-shadow: var(--shadow-inset);
+    }
+
+    .segment-btn {
+      flex: 1;
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      padding: 8px 12px;
+      border-radius: 30px;
+      font-size: 0.65rem;
+      font-family: 'Inter', sans-serif;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+      outline: none;
+      text-align: center;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+    }
+
+    .segment-btn.active {
+      background: #ffffff;
+      box-shadow: var(--shadow-level-1);
+    }
+
+    /* Vault buttons neomorphic style */
+    .surplus-vault-btn {
+      width: 100%;
+      background: var(--color-radar-green-pastel);
+      border: 1px solid var(--color-radar-green-border);
+      color: var(--color-radar-green-dark);
+      padding: 12px;
+      border-radius: 30px;
+      font-size: 0.9rem;
+      font-family: 'Inter', sans-serif;
+      font-weight: 700;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      box-shadow: var(--shadow-level-1);
+      transition: all 0.2s ease;
+      outline: none;
+    }
+    
+    .surplus-vault-btn:hover {
+      box-shadow: 0 0 0 3px rgba(0, 207, 204, 0.25);
+      background: #d8f3ed;
+    }
+
+    .zero-debt-vault-btn {
+      width: 100%;
+      background: #e0f2fe; /* Light blue */
+      border: 1px solid #bae6fd;
+      color: #0369a1; /* Dark blue */
+      padding: 12px;
+      border-radius: 30px;
+      font-size: 0.9rem;
+      font-family: 'Inter', sans-serif;
+      font-weight: 700;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      box-shadow: var(--shadow-level-1);
+      transition: all 0.2s ease;
+      outline: none;
+    }
+    
+    .zero-debt-vault-btn:hover {
+      box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.25);
+      background: #d0e7ff;
     }
 
     /* Leads List */
@@ -290,26 +436,27 @@
       width: 6px;
     }
     ::-webkit-scrollbar-track {
-      background: rgba(0, 0, 0, 0.2);
+      background: rgba(0, 0, 0, 0.02);
     }
     ::-webkit-scrollbar-thumb {
-      background: rgba(255, 255, 255, 0.1);
+      background: rgba(0, 0, 0, 0.1);
       border-radius: 3px;
     }
     ::-webkit-scrollbar-thumb:hover {
-      background: rgba(255, 255, 255, 0.2);
+      background: rgba(0, 0, 0, 0.2);
     }
 
     .lead-card {
-      background: rgba(255, 255, 255, 0.02);
+      background: #ffffff;
       border: 1px solid var(--border-glass);
-      border-radius: 8px;
-      padding: 12px;
-      margin-bottom: 8px;
+      border-radius: 20px;
+      padding: 14px 16px;
+      margin-bottom: 12px;
       cursor: pointer;
       transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
       position: relative;
       overflow: hidden;
+      box-shadow: var(--shadow-level-2);
     }
 
     .lead-card::before {
@@ -328,15 +475,16 @@
     }
 
     .lead-card:hover {
-      background: rgba(255, 255, 255, 0.05);
-      border-color: rgba(16, 185, 129, 0.3);
-      transform: translateY(-2px);
+      background: #ffffff;
+      border-color: var(--color-radar-green-border);
+      transform: translateY(-3px);
+      box-shadow: var(--shadow-level-3);
     }
 
     .lead-card.selected {
-      background: rgba(16, 185, 129, 0.06);
-      border-color: var(--color-radar-green);
-      box-shadow: 0 0 12px rgba(16, 185, 129, 0.15);
+      background: var(--color-radar-green-pastel);
+      border-color: var(--color-focus-ring);
+      box-shadow: var(--shadow-level-2), 0 0 0 3px rgba(0, 207, 204, 0.25);
     }
 
     .lead-header {
@@ -349,7 +497,7 @@
     .lead-address {
       font-size: 0.9rem;
       font-weight: 600;
-      color: #ffffff;
+      color: var(--text-main);
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
@@ -394,7 +542,7 @@
       justify-content: space-between;
       margin-top: 6px;
       padding-top: 6px;
-      border-top: 1px dashed rgba(255, 255, 255, 0.05);
+      border-top: 1px dashed rgba(0, 0, 0, 0.08);
       font-size: 0.75rem;
     }
 
@@ -410,7 +558,7 @@
     }
 
     .comp-val {
-      color: #ffffff;
+      color: var(--text-main);
       font-weight: 600;
     }
 
@@ -441,9 +589,9 @@
       border: 1px solid var(--border-glass);
       backdrop-filter: blur(12px);
       -webkit-backdrop-filter: blur(12px);
-      border-radius: 8px;
+      border-radius: 12px;
       padding: 12px 16px;
-      box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.4);
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
       max-width: 250px;
       font-size: 11px;
       color: var(--text-main);
@@ -451,14 +599,14 @@
     }
 
     .map-legend-title {
-      font-family: 'Orbitron', sans-serif;
+      font-family: 'Inter', sans-serif;
       font-size: 12px;
       font-weight: 700;
       color: var(--color-radar-green);
       margin-bottom: 10px;
       text-transform: uppercase;
       letter-spacing: 0.5px;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      border-bottom: 1px solid rgba(0, 0, 0, 0.06);
       padding-bottom: 6px;
       display: flex;
       align-items: center;
@@ -508,13 +656,13 @@
       width: 32px;
       height: 32px;
       border-radius: 50%;
-      background: rgba(13, 17, 29, 0.85);
+      background: #ffffff;
       border: 2px solid var(--marker-color);
       display: flex;
       align-items: center;
       justify-content: center;
       font-size: 14px;
-      box-shadow: 0 0 10px var(--marker-color);
+      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.08), 0 0 5px var(--marker-color);
       position: relative;
       z-index: 10;
     }
@@ -546,7 +694,8 @@
     .sidebar-right {
       width: 440px;
       background: var(--bg-glass);
-      backdrop-filter: blur(12px);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
       border-left: 1px solid var(--border-glass);
       display: flex;
       flex-direction: column;
@@ -557,7 +706,7 @@
       bottom: 0;
       transform: translateX(100%);
       transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-      box-shadow: -8px 0 24px rgba(0, 0, 0, 0.5);
+      box-shadow: -10px 0 30px rgba(0, 0, 0, 0.05);
     }
 
     .sidebar-right.open {
@@ -570,12 +719,12 @@
       display: flex;
       justify-content: space-between;
       align-items: center;
-      background: rgba(255,255,255,0.01);
+      background: rgba(255, 255, 255, 0.01);
     }
 
     .drawer-header h2 {
       font-size: 1rem;
-      color: #ffffff;
+      color: var(--text-main);
     }
 
     .close-btn {
@@ -593,8 +742,8 @@
     }
 
     .close-btn:hover {
-      color: #ffffff;
-      background: rgba(255, 255, 255, 0.05);
+      color: var(--text-main);
+      background: rgba(0, 0, 0, 0.05);
     }
 
     .drawer-content {
@@ -608,23 +757,25 @@
 
     /* UI Cards inside tactical drawer */
     .detail-card {
-      background: rgba(255, 255, 255, 0.02);
+      background: #ffffff;
       border: 1px solid var(--border-glass);
-      border-radius: 8px;
-      padding: 16px;
+      border-radius: 20px;
+      padding: 20px;
+      box-shadow: var(--shadow-level-2);
     }
 
     .detail-card-title {
-      font-family: 'Orbitron', sans-serif;
+      font-family: 'Inter', sans-serif;
       font-size: 0.8rem;
-      color: var(--color-radar-green);
+      font-weight: 700;
+      color: var(--color-radar-green-dark);
       margin-bottom: 12px;
       text-transform: uppercase;
       display: flex;
       align-items: center;
       gap: 6px;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-      padding-bottom: 6px;
+      border-bottom: 1px solid var(--border-glass);
+      padding-bottom: 8px;
     }
 
     .prop-info-grid {
@@ -646,8 +797,8 @@
 
     .prop-info-value {
       font-size: 0.85rem;
-      font-weight: 500;
-      color: #ffffff;
+      font-weight: 600;
+      color: var(--text-main);
     }
 
     /* Underwriting Variables Styling */
@@ -658,9 +809,9 @@
     }
 
     .uw-item {
-      background: rgba(0,0,0,0.15);
-      border: 1px solid rgba(255,255,255,0.03);
-      border-radius: 6px;
+      background: #f9fafb;
+      border: 1px solid rgba(0, 0, 0, 0.04);
+      border-radius: 8px;
       padding: 10px;
       display: flex;
       flex-direction: column;
@@ -674,14 +825,14 @@
     }
 
     .uw-value {
-      font-family: 'Orbitron', sans-serif;
+      font-family: 'Inter', sans-serif;
       font-size: 1.05rem;
       font-weight: 700;
+      color: var(--text-main);
     }
 
     .uw-value.highlight-green {
       color: var(--color-radar-green);
-      text-shadow: 0 0 6px rgba(16, 185, 129, 0.3);
     }
 
     .uw-value.highlight-red {
@@ -689,26 +840,29 @@
     }
 
     .uw-alert-banner {
-      background: rgba(239, 68, 68, 0.1);
-      border: 1px solid rgba(239, 68, 68, 0.25);
-      border-radius: 6px;
+      background: #fee2e2;
+      border: 1px solid #fca5a5;
+      border-radius: 8px;
       padding: 10px;
       margin-top: 10px;
       font-size: 0.75rem;
-      color: #fca5a5;
+      color: #991b1b;
       display: flex;
       align-items: center;
       gap: 8px;
+      font-weight: 600;
     }
 
     /* Logs distress list */
     .distress-log-item {
       font-size: 0.75rem;
       padding: 8px;
-      background: rgba(255, 255, 255, 0.01);
-      border-left: 2px solid var(--color-radar-green);
+      background: #f9fafb;
+      border-left: 3px solid var(--color-radar-green);
       margin-bottom: 6px;
-      border-radius: 0 4px 4px 0;
+      border-radius: 0 8px 8px 0;
+      border: 1px solid rgba(0, 0, 0, 0.03);
+      border-left: 3px solid var(--color-radar-green);
     }
 
     .distress-log-item:last-child {
@@ -716,8 +870,8 @@
     }
 
     .distress-log-header {
-      font-weight: 600;
-      color: #ffffff;
+      font-weight: 700;
+      color: var(--text-main);
       display: flex;
       justify-content: space-between;
       margin-bottom: 4px;
@@ -729,7 +883,7 @@
       align-items: center;
       justify-content: space-between;
       padding: 8px 0;
-      border-bottom: 1px solid rgba(255,255,255,0.03);
+      border-bottom: 1px solid rgba(0, 0, 0, 0.04);
     }
 
     .contact-item:last-child {
@@ -749,36 +903,37 @@
 
     .contact-value {
       font-size: 0.85rem;
-      color: #ffffff;
+      color: var(--text-main);
       font-family: monospace;
     }
 
     .contact-action-btn {
-      background: rgba(16, 185, 129, 0.15);
-      border: 1px solid rgba(16, 185, 129, 0.3);
-      color: var(--color-radar-green);
+      background: #e6f4ea;
+      border: 1px solid rgba(16, 185, 129, 0.2);
+      color: #047857;
       padding: 4px 10px;
-      border-radius: 4px;
+      border-radius: 6px;
       font-size: 0.75rem;
       cursor: pointer;
       text-decoration: none;
       transition: all 0.2s;
+      font-weight: 600;
     }
 
     .contact-action-btn:hover {
       background: var(--color-radar-green);
-      color: #000000;
+      color: #ffffff;
     }
 
     /* Dynamic Call Script section */
     .script-box {
-      background: rgba(0, 0, 0, 0.3);
-      border: 1px solid var(--border-glass);
-      border-radius: 6px;
+      background: #f9fafb;
+      border: 1px solid rgba(0, 0, 0, 0.05);
+      border-radius: 8px;
       padding: 12px;
       font-size: 0.8rem;
       line-height: 1.5;
-      color: #e2e8f0;
+      color: var(--text-main);
       position: relative;
       min-height: 80px;
     }
@@ -787,11 +942,11 @@
       position: absolute;
       right: 8px;
       top: 8px;
-      background: rgba(255,255,255,0.05);
-      border: 1px solid var(--border-glass);
+      background: rgba(0, 0, 0, 0.03);
+      border: 1px solid rgba(0, 0, 0, 0.06);
       color: var(--text-muted);
       padding: 4px 8px;
-      border-radius: 4px;
+      border-radius: 6px;
       font-size: 0.7rem;
       cursor: pointer;
       display: flex;
@@ -801,41 +956,49 @@
     }
 
     .copy-script-btn:hover {
-      background: rgba(255,255,255,0.1);
-      color: #ffffff;
+      background: rgba(0, 0, 0, 0.06);
+      color: var(--text-main);
     }
 
     .script-tabs {
       display: flex;
       gap: 6px;
       margin-bottom: 8px;
+      flex-wrap: wrap;
     }
 
     .script-tab {
-      background: rgba(255,255,255,0.03);
-      border: 1px solid var(--border-glass);
+      background: #f3f4f6;
+      border: 1px solid rgba(0, 0, 0, 0.05);
       color: var(--text-muted);
       padding: 6px 10px;
-      border-radius: 4px;
+      border-radius: 8px;
       font-size: 0.7rem;
       cursor: pointer;
       transition: all 0.2s;
+      font-weight: 600;
+    }
+
+    .script-tab:hover {
+      background: #e5e7eb;
+      color: var(--text-main);
     }
 
     .script-tab.active {
-      background: rgba(16, 185, 129, 0.15);
+      background: #e6f4ea;
       border-color: var(--color-radar-green);
-      color: #ffffff;
+      color: #047857;
     }
 
     /* Metrics Strip Footer */
     .metrics-bar {
       height: 60px;
-      background: #090d16;
+      background: #ffffff;
       border-top: 1px solid var(--border-glass);
       display: grid;
       grid-template-columns: repeat(4, 1fr);
       z-index: 1000;
+      box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.02);
     }
 
     .metric-card {
@@ -855,14 +1018,17 @@
       font-size: 0.65rem;
       color: var(--text-muted);
       text-transform: uppercase;
-      font-family: 'Orbitron', sans-serif;
+      font-family: 'Inter', sans-serif;
+      font-weight: 700;
+      letter-spacing: 0.05em;
     }
 
     .metric-value {
       font-size: 1.1rem;
-      font-weight: 700;
-      color: #ffffff;
-      font-family: 'Orbitron', sans-serif;
+      font-weight: 800;
+      color: var(--text-main);
+      font-family: 'Inter', sans-serif;
+      letter-spacing: -0.02em;
     }
 
     .metric-value.green {
@@ -872,13 +1038,13 @@
       color: var(--color-high-motivation);
     }
 
-    /* Leaflet Overrides for Dark Integration */
+    /* Leaflet Overrides for Light Integration */
     .leaflet-popup-content-wrapper {
       background: var(--bg-dark) !important;
       color: var(--text-main) !important;
       border: 1px solid var(--border-glass) !important;
-      box-shadow: 0 10px 20px rgba(0,0,0,0.5) !important;
-      border-radius: 8px !important;
+      box-shadow: 0 8px 30px rgba(0, 0, 0, 0.06) !important;
+      border-radius: 12px !important;
     }
 
     .leaflet-popup-tip {
@@ -890,8 +1056,8 @@
       font-size: 0.9rem;
       font-weight: 700;
       margin-bottom: 6px;
-      color: #ffffff;
-      border-bottom: 1px solid rgba(255,255,255,0.08);
+      color: var(--text-main);
+      border-bottom: 1px solid var(--border-glass);
       padding-bottom: 4px;
     }
 
@@ -912,27 +1078,29 @@
     }
 
     .popup-row-value {
-      color: #ffffff;
+      color: var(--text-main);
       font-weight: 600;
     }
 
     .popup-btn {
       width: 100%;
-      background: var(--color-radar-green);
-      color: #000000;
-      border: none;
-      padding: 6px;
-      border-radius: 4px;
-      font-weight: 600;
+      background: var(--color-radar-green-pastel);
+      border: 1px solid var(--color-radar-green-border);
+      color: var(--color-radar-green-dark);
+      padding: 8px;
+      border-radius: 30px;
+      font-weight: 700;
       margin-top: 8px;
       cursor: pointer;
       text-align: center;
       font-size: 0.75rem;
-      font-family: 'Orbitron', sans-serif;
+      font-family: 'Inter', sans-serif;
+      transition: all 0.2s;
     }
 
     .popup-btn:hover {
-      opacity: 0.9;
+      background: #d8f3ed;
+      box-shadow: 0 0 0 2px rgba(0, 207, 204, 0.25);
     }
 
     /* Radar Sweep Animation overlay (Background aesthetic) */
@@ -945,7 +1113,7 @@
       pointer-events: none;
       z-index: 500;
       background: radial-gradient(circle, transparent 40%, rgba(16, 185, 129, 0.02) 100%);
-      box-shadow: inset 0 0 100px rgba(0,0,0,0.8);
+      box-shadow: inset 0 0 100px rgba(142, 140, 132, 0.15);
     }
 
     /* Surplus modal & button styles */
@@ -1056,7 +1224,183 @@
       border-radius: 50%;
       background: rgba(255, 255, 255, 0.4);
       cursor: pointer;
-      transition: background 0.2s;
+      transition: background 0.2s, transform 0.2s;
+    }
+    .drawer-photo-dot.active {
+      background: var(--color-radar-green) !important;
+      transform: scale(1.2);
+    }
+    
+    .drawer-photo-arrow {
+      position: absolute;
+      top: 50%;
+      transform: translateY(-50%);
+      background: rgba(13, 17, 29, 0.6);
+      border: 1px solid var(--border-glass);
+      color: #ffffff;
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.5rem;
+      cursor: pointer;
+      z-index: 12;
+      opacity: 0;
+      transition: all 0.2s ease;
+      backdrop-filter: blur(4px);
+    }
+    #drawer-photos-card:hover .drawer-photo-arrow {
+      opacity: 1;
+    }
+    .drawer-photo-arrow:hover {
+      background: rgba(16, 185, 129, 0.8);
+      border-color: var(--color-radar-green);
+      color: #ffffff;
+      transform: translateY(-50%) scale(1.1);
+    }
+    .drawer-photo-arrow.prev-btn {
+      left: 10px;
+    }
+    .drawer-photo-arrow.next-btn {
+      right: 10px;
+    }
+
+    /* Mini carousel inside lead cards */
+    .lead-card-photo-carousel {
+      position: relative;
+      width: 60px;
+      height: 60px;
+      border-radius: 6px;
+      overflow: hidden;
+      border: 1px solid var(--border-glass);
+      flex-shrink: 0;
+    }
+    .lead-card-photo-slider {
+      display: flex;
+      width: 100%;
+      height: 100%;
+      transition: transform 0.2s ease-in-out;
+    }
+    .lead-card-carousel-photo {
+      width: 60px;
+      height: 60px;
+      object-fit: cover;
+      flex-shrink: 0;
+    }
+    .lead-card-carousel-arrow {
+      position: absolute;
+      top: 50%;
+      transform: translateY(-50%);
+      background: rgba(13, 17, 29, 0.75);
+      color: #ffffff;
+      border: none;
+      width: 14px;
+      height: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.8rem;
+      cursor: pointer;
+      z-index: 5;
+      opacity: 0;
+      transition: opacity 0.2s ease, background 0.2s;
+    }
+    .lead-card-photo-carousel:hover .lead-card-carousel-arrow {
+      opacity: 1;
+    }
+    .lead-card-carousel-arrow:hover {
+      background: var(--color-radar-green);
+    }
+    .lead-card-carousel-arrow.prev {
+      left: 0;
+      border-radius: 0 3px 3px 0;
+    }
+    .lead-card-carousel-arrow.next {
+      right: 0;
+      border-radius: 3px 0 0 3px;
+    }
+    .lead-card-carousel-indicator {
+      position: absolute;
+      bottom: 2px;
+      right: 2px;
+      background: rgba(13, 17, 29, 0.75);
+      color: #ffffff;
+      font-size: 0.55rem;
+      padding: 1px 3px;
+      border-radius: 3px;
+      font-family: 'Orbitron', sans-serif;
+      z-index: 5;
+      pointer-events: none;
+    }
+
+    /* Comparison modal photo carousel */
+    .comp-prop-photo-carousel {
+      position: relative;
+      width: 100%;
+      height: 110px;
+      border-radius: 6px;
+      overflow: hidden;
+      border: 1px solid var(--border-glass);
+      margin-bottom: 8px;
+    }
+    .comp-prop-photo-slider {
+      display: flex;
+      width: 100%;
+      height: 100%;
+      transition: transform 0.2s ease-in-out;
+    }
+    .comp-prop-carousel-photo {
+      width: 100%;
+      height: 110px;
+      object-fit: cover;
+      flex-shrink: 0;
+    }
+    .comp-prop-carousel-arrow {
+      position: absolute;
+      top: 50%;
+      transform: translateY(-50%);
+      background: rgba(13, 17, 29, 0.75);
+      color: #ffffff;
+      border: none;
+      width: 20px;
+      height: 28px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1rem;
+      cursor: pointer;
+      z-index: 5;
+      opacity: 0;
+      transition: opacity 0.2s ease, background 0.2s;
+    }
+    .comp-prop-photo-carousel:hover .comp-prop-carousel-arrow {
+      opacity: 1;
+    }
+    .comp-prop-carousel-arrow:hover {
+      background: var(--color-radar-green);
+    }
+    .comp-prop-carousel-arrow.prev {
+      left: 0;
+      border-radius: 0 3px 3px 0;
+    }
+    .comp-prop-carousel-arrow.next {
+      right: 0;
+      border-radius: 3px 0 0 3px;
+    }
+    .comp-prop-carousel-indicator {
+      position: absolute;
+      bottom: 2px;
+      right: 2px;
+      background: rgba(13, 17, 29, 0.75);
+      color: #ffffff;
+      font-size: 0.6rem;
+      padding: 1px 4px;
+      border-radius: 3px;
+      font-family: 'Orbitron', sans-serif;
+      z-index: 5;
+      pointer-events: none;
     }
     /* --- MOBILE RESPONSIVE STYLING --- */
     .header-toggle-btn {
@@ -1081,12 +1425,13 @@
       align-items: center;
       padding: 16px;
       border-bottom: 1px solid var(--border-glass);
-      background: rgba(255, 255, 255, 0.02);
+      background: rgba(0, 0, 0, 0.02);
     }
     .sidebar-header-mobile h3 {
       font-size: 1rem;
-      color: #ffffff;
-      font-family: 'Orbitron', sans-serif;
+      color: var(--text-main);
+      font-family: 'Inter', sans-serif;
+      font-weight: 700;
     }
     .close-btn-mobile {
       background: transparent;
@@ -1100,8 +1445,8 @@
       transition: all 0.2s;
     }
     .close-btn-mobile:hover {
-      color: #ffffff;
-      background: rgba(255, 255, 255, 0.05);
+      color: var(--text-main);
+      background: rgba(0, 0, 0, 0.05);
     }
     .sidebar-overlay {
       position: absolute;
@@ -1204,6 +1549,303 @@
         margin-bottom: 0;
       }
     }
+
+    /* Custom styles for Favorites and Comparison Features */
+    .fav-btn {
+      background: transparent;
+      border: none;
+      color: rgba(255, 255, 255, 0.3);
+      font-size: 1.2rem;
+      cursor: pointer;
+      padding: 2px 6px;
+      line-height: 1;
+      transition: all 0.2s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      outline: none;
+    }
+    .fav-btn:hover {
+      color: #fbbf24;
+      transform: scale(1.2);
+    }
+    .fav-btn.fav-active {
+      color: #fbbf24 !important;
+      text-shadow: 0 0 8px rgba(251, 191, 36, 0.6);
+    }
+    
+    .lead-card-header-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      width: 100%;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+      padding-bottom: 4px;
+    }
+    
+    .card-actions-wrapper {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    
+    .compare-check-label {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 0.65rem;
+      color: var(--text-muted);
+      cursor: pointer;
+      user-select: none;
+      background: var(--bg-darker);
+      border: 1px solid var(--border-glass);
+      padding: 3px 8px;
+      border-radius: 30px;
+      transition: all 0.2s ease;
+    }
+    
+    .compare-check-label:hover {
+      background: var(--color-radar-green-pastel);
+      color: var(--color-radar-green-dark);
+      border-color: var(--color-radar-green-border);
+    }
+    
+    .compare-check-input {
+      accent-color: var(--color-radar-green);
+      cursor: pointer;
+      margin: 0;
+    }
+    
+    /* Floating Comparison Bar */
+    .comparison-bar {
+      position: absolute;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%) translateY(150%);
+      background: var(--bg-dark);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 2px solid var(--border-glass);
+      box-shadow: var(--shadow-level-3);
+      border-radius: 30px;
+      padding: 10px 24px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      z-index: 1005;
+      transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      pointer-events: auto;
+    }
+    
+    .comparison-bar.show {
+      transform: translateX(-50%) translateY(0);
+    }
+    
+    .comparison-info {
+      font-family: 'Inter', sans-serif;
+      font-weight: 600;
+      font-size: 0.85rem;
+      color: var(--text-main);
+    }
+    
+    .comparison-info span {
+      color: var(--color-radar-green-dark);
+      font-weight: bold;
+    }
+    
+    .comparison-actions {
+      display: flex;
+      gap: 8px;
+    }
+    
+    .comp-action-btn-main {
+      background: var(--color-radar-green-pastel);
+      border: 1px solid var(--color-radar-green-border);
+      color: var(--color-radar-green-dark);
+      padding: 8px 16px;
+      border-radius: 30px;
+      font-size: 0.8rem;
+      font-family: 'Inter', sans-serif;
+      cursor: pointer;
+      font-weight: bold;
+      transition: all 0.2s;
+      outline: none;
+    }
+    .comp-action-btn-main:hover {
+      background: #d8f3ed;
+      border-color: var(--color-focus-ring);
+      box-shadow: 0 0 0 3px rgba(0, 207, 204, 0.25);
+    }
+    
+    .comp-action-btn-sec {
+      background: var(--bg-darker);
+      border: 1px solid var(--border-glass);
+      color: var(--text-muted);
+      padding: 8px 14px;
+      border-radius: 30px;
+      font-size: 0.8rem;
+      font-family: 'Inter', sans-serif;
+      cursor: pointer;
+      transition: all 0.2s;
+      outline: none;
+    }
+    .comp-action-btn-sec:hover {
+      background: #e2e1dc;
+      color: var(--text-main);
+    }
+    
+    /* Comparison Overlay Modal */
+    .comp-modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      background: rgba(244, 243, 239, 0.6);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      z-index: 10000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.3s ease;
+    }
+    
+    .comp-modal-overlay.show {
+      opacity: 1;
+      pointer-events: auto;
+    }
+    
+    .comp-modal-container {
+      width: 90vw;
+      max-width: 1200px;
+      max-height: 85vh;
+      background: var(--bg-dark);
+      border: 1px solid var(--border-glass);
+      border-radius: 24px;
+      box-shadow: var(--shadow-level-4);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    
+    .comp-modal-header {
+      padding: 20px 24px;
+      border-bottom: 1px solid var(--border-glass);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: var(--bg-dark);
+    }
+    
+    .comp-modal-title {
+      font-family: 'Inter', sans-serif;
+      font-weight: 700;
+      font-size: 1.25rem;
+      color: var(--text-main);
+      margin: 0;
+    }
+    
+    .comp-modal-body {
+      flex: 1;
+      overflow: auto;
+      padding: 24px;
+    }
+    
+    .comp-table {
+      width: 100%;
+      border-collapse: collapse;
+      color: var(--text-main);
+      font-size: 0.85rem;
+    }
+    
+    .comp-table tr {
+      border-bottom: 1px solid var(--border-glass);
+    }
+    .comp-table tr:last-child {
+      border-bottom: none;
+    }
+    
+    .comp-table td, .comp-table th {
+      padding: 12px 16px;
+      vertical-align: middle;
+    }
+    
+    .comp-table th {
+      font-family: 'Inter', sans-serif;
+      font-size: 0.75rem;
+      font-weight: 700;
+      color: var(--text-main);
+      text-align: left;
+      letter-spacing: 0.5px;
+      width: 200px;
+      background: var(--bg-darker);
+    }
+    
+    .comp-col-prop {
+      text-align: center;
+      min-width: 220px;
+    }
+    
+    .comp-prop-card {
+      background: #ffffff;
+      border: 1px solid var(--border-glass);
+      border-radius: 16px;
+      padding: 12px;
+      position: relative;
+      text-align: left;
+      box-shadow: var(--shadow-level-1);
+    }
+    
+    .comp-prop-img {
+      width: 100%;
+      height: 110px;
+      object-fit: cover;
+      border-radius: 12px;
+      margin-bottom: 8px;
+    }
+    
+    .comp-prop-img-placeholder {
+      width: 100%;
+      height: 110px;
+      background: var(--bg-darker);
+      border-radius: 12px;
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 2rem;
+      color: var(--text-muted);
+    }
+    
+    .comp-prop-remove {
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      background: rgba(239, 68, 68, 0.2);
+      border: 1px solid rgba(239, 68, 68, 0.4);
+      color: #f87171;
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.8rem;
+      transition: all 0.2s;
+      border: none;
+    }
+    .comp-prop-remove:hover {
+      background: #ef4444;
+      color: #ffffff;
+    }
+
+    .favorite-marker .ping-marker {
+      box-shadow: 0 0 15px #fbbf24 !important;
+    }
   </style>
 </head>
 <body>
@@ -1257,30 +1899,37 @@
         <div class="pill-selectors">
           <div>
             <input type="checkbox" id="pill-execution" class="pill-checkbox" checked>
-            <label for="pill-execution" class="pill-label" style="border-color: rgba(239,68,68,0.2)">
-              <span>🛑</span>
+            <label for="pill-execution" class="pill-label">
+              <i data-lucide="gavel"></i>
               <span>Ejecución</span>
             </label>
           </div>
           <div>
             <input type="checkbox" id="pill-physical" class="pill-checkbox" checked>
-            <label for="pill-physical" class="pill-label" style="border-color: rgba(249,115,22,0.2)">
-              <span>🔥</span>
+            <label for="pill-physical" class="pill-label">
+              <i data-lucide="flame"></i>
               <span>Físico</span>
             </label>
           </div>
           <div>
             <input type="checkbox" id="pill-others" class="pill-checkbox" checked>
-            <label for="pill-others" class="pill-label" style="border-color: rgba(139,92,246,0.2)">
-              <span>⚠️</span>
+            <label for="pill-others" class="pill-label">
+              <i data-lucide="alert-triangle"></i>
               <span>Otros</span>
             </label>
           </div>
           <div>
             <input type="checkbox" id="pill-stack" class="pill-checkbox">
-            <label for="pill-stack" class="pill-label" style="border-color: rgba(16,185,129,0.2)">
-              <span>⚡</span>
+            <label for="pill-stack" class="pill-label">
+              <i data-lucide="zap"></i>
               <span>Stacked</span>
+            </label>
+          </div>
+          <div>
+            <input type="checkbox" id="pill-favorites" class="pill-checkbox">
+            <label for="pill-favorites" class="pill-label">
+              <i data-lucide="star"></i>
+              <span>Favoritos</span>
             </label>
           </div>
         </div>
@@ -1289,30 +1938,30 @@
       <!-- Estatus Financiero Segment Selector -->
       <div class="sidebar-section">
         <h3>Estatus Financiero</h3>
-        <div class="segment-selector" style="display: flex; background: rgba(0,0,0,0.25); border: 1px solid var(--border-glass); border-radius: 6px; padding: 3px; gap: 4px;">
-          <button id="btn-deals" class="segment-btn active" style="flex: 1; background: rgba(16, 185, 129, 0.15); border: 1px solid var(--color-radar-green); color: #ffffff; padding: 8px 4px; border-radius: 4px; font-size: 0.65rem; font-family: 'Orbitron', sans-serif; cursor: pointer; transition: all 0.2s; text-align: center; font-weight: bold; border: 1px solid var(--color-radar-green); outline: none;">
-            🟢 BUENOS DEALS
+        <div class="segment-selector">
+          <button id="btn-deals" class="segment-btn active">
+            <i data-lucide="trending-up"></i> BUENOS DEALS
           </button>
-          <button id="btn-underwater" class="segment-btn" style="flex: 1; background: transparent; border: 1px solid transparent; color: var(--text-muted); padding: 8px 4px; border-radius: 4px; font-size: 0.65rem; font-family: 'Orbitron', sans-serif; cursor: pointer; transition: all 0.2s; text-align: center; font-weight: bold; outline: none;">
-            🔴 BAJO EL AGUA
+          <button id="btn-underwater" class="segment-btn">
+            <i data-lucide="trending-down"></i> BAJO EL AGUA
           </button>
-          <button id="btn-unvalued" class="segment-btn" style="flex: 1; background: transparent; border: 1px solid transparent; color: var(--text-muted); padding: 8px 4px; border-radius: 4px; font-size: 0.65rem; font-family: 'Orbitron', sans-serif; cursor: pointer; transition: all 0.2s; text-align: center; font-weight: bold; outline: none;">
-            ⚪ SIN VALORAR
+          <button id="btn-unvalued" class="segment-btn">
+            <i data-lucide="help-circle"></i> SIN VALORAR
           </button>
         </div>
       </div>
 
       <!-- Surplus Funds Action Button -->
       <div class="sidebar-section">
-        <button id="btn-surplus-vault" class="surplus-vault-btn" style="width: 100%; background: linear-gradient(135deg, #10b981 0%, #059669 100%); border: 1px solid rgba(255,255,255,0.15); color: #ffffff; padding: 12px; border-radius: 8px; font-size: 0.9rem; font-family: 'Orbitron', sans-serif; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; font-weight: bold; box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3); transition: all 0.2s; outline: none;">
-          <span>💰</span> Bóveda de Excedentes
+        <button id="btn-surplus-vault" class="surplus-vault-btn">
+          <i data-lucide="dollar-sign"></i> Bóveda de Excedentes
         </button>
       </div>
 
       <!-- Zero Debt Vault Action Button -->
       <div class="sidebar-section" style="padding-top: 0;">
-        <button id="btn-zero-debt-vault" class="zero-debt-vault-btn" style="width: 100%; background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%); border: 1px solid rgba(255,255,255,0.15); color: #ffffff; padding: 12px; border-radius: 8px; font-size: 0.9rem; font-family: 'Orbitron', sans-serif; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; font-weight: bold; box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3); transition: all 0.2s; outline: none;">
-          <span>🛡️</span> Bóveda de Deuda Cero
+        <button id="btn-zero-debt-vault" class="zero-debt-vault-btn">
+          <i data-lucide="shield"></i> Bóveda de Deuda Cero
         </button>
       </div>
 
@@ -1338,23 +1987,23 @@
         <div class="map-legend-title">Leyenda del Radar</div>
         <div class="map-legend-item">
           <span class="legend-color-dot" style="background-color: var(--color-execution-red); box-shadow: 0 0 6px var(--color-execution-red)"></span>
-          <span class="legend-label">🚨 <strong>Subasta Programada</strong><br>Venta judicial en &lt; 60 días</span>
+          <span class="legend-label"><i data-lucide="gavel" class="inline-icon" style="color: var(--color-execution-red)"></i> <strong>Subasta Programada</strong><br>Venta judicial en &lt; 60 días</span>
         </div>
         <div class="map-legend-item">
           <span class="legend-color-dot" style="background-color: var(--color-execution-orange); box-shadow: 0 0 6px var(--color-execution-orange)"></span>
-          <span class="legend-label">⏳ <strong>Pre-Subasta</strong><br>Ejecución activa sin fecha</span>
+          <span class="legend-label"><i data-lucide="clock" class="inline-icon" style="color: var(--color-execution-orange)"></i> <strong>Pre-Subasta</strong><br>Ejecución activa sin fecha</span>
         </div>
         <div class="map-legend-item">
           <span class="legend-color-dot" style="background-color: var(--color-physical-amber); box-shadow: 0 0 6px var(--color-physical-amber)"></span>
-          <span class="legend-label">🔥 <strong>Estrés Físico</strong><br>Daños o violaciones de código</span>
+          <span class="legend-label"><i data-lucide="flame" class="inline-icon" style="color: var(--color-physical-amber)"></i> <strong>Estrés Físico</strong><br>Daños o violaciones de código</span>
         </div>
         <div class="map-legend-item">
           <span class="legend-color-dot" style="background-color: var(--color-financial-yellow); box-shadow: 0 0 6px var(--color-financial-yellow)"></span>
-          <span class="legend-label">⚖️ <strong>Estrés Financiero</strong><br>Impuestos y gravámenes activos</span>
+          <span class="legend-label"><i data-lucide="scale" class="inline-icon" style="color: var(--color-financial-yellow)"></i> <strong>Estrés Financiero</strong><br>Impuestos y gravámenes activos</span>
         </div>
         <div class="map-legend-item">
           <span class="legend-color-dot" style="background-color: var(--color-others-purple); box-shadow: 0 0 6px var(--color-others-purple)"></span>
-          <span class="legend-label">👤 <strong>Otros Estresores</strong><br>Sucesión, divorcio o bancarrota</span>
+          <span class="legend-label"><i data-lucide="user" class="inline-icon" style="color: var(--color-others-purple)"></i> <strong>Otros Estresores</strong><br>Sucesión, divorcio o bancarrota</span>
         </div>
       </div>
     </main>
@@ -1362,8 +2011,11 @@
     <!-- Right Drawer: Tactical details of selected property -->
     <aside class="sidebar-right" id="tactical-drawer">
       <div class="drawer-header">
-        <h2 id="drawer-address">123 Calle Falsa</h2>
-        <button class="close-btn" onclick="closeDrawer()">&times;</button>
+        <h2 id="drawer-address" style="flex: 1; margin-right: 12px; font-size: 0.95rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">123 Calle Falsa</h2>
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <button id="drawer-fav-btn" class="fav-btn" onclick="toggleSelectedFavorite()" title="Marcar como Favorito" style="font-size: 1.4rem;">☆</button>
+          <button class="close-btn" onclick="closeDrawer()">&times;</button>
+        </div>
       </div>
       
       <div class="drawer-content" id="drawer-content-pane">
@@ -1372,6 +2024,8 @@
           <div id="drawer-photos-slider" style="width: 100%; height: 100%; display: flex; transition: transform 0.3s ease;">
             <!-- Photos will be inserted dynamically -->
           </div>
+          <button class="drawer-photo-arrow prev-btn" id="drawer-photos-prev" onclick="event.stopPropagation(); navigateDrawerPhotos(-1);">&lsaquo;</button>
+          <button class="drawer-photo-arrow next-btn" id="drawer-photos-next" onclick="event.stopPropagation(); navigateDrawerPhotos(1);">&rsaquo;</button>
           <div id="drawer-photos-nav" class="drawer-photo-nav">
             <!-- Navigation dots -->
           </div>
@@ -1379,7 +2033,7 @@
 
         <!-- Target Overview -->
         <div class="detail-card">
-          <div class="detail-card-title">🌐 Resumen del Objetivo</div>
+          <div class="detail-card-title"><i data-lucide="globe"></i> Resumen del Objetivo</div>
           <div class="prop-info-grid">
             <div class="prop-info-item">
               <span class="prop-info-label">Propietario / Demandado</span>
@@ -1397,12 +2051,20 @@
               <span class="prop-info-label">Tipo de Dueño</span>
               <span class="prop-info-value" id="prop-owner-type">Residente</span>
             </div>
+            <div class="prop-info-item">
+              <span class="prop-info-label">Beds / Baths</span>
+              <span class="prop-info-value" id="prop-beds-baths">N/A</span>
+            </div>
+            <div class="prop-info-item">
+              <span class="prop-info-label">Área (SqFt)</span>
+              <span class="prop-info-value" id="prop-sqft">N/A</span>
+            </div>
           </div>
         </div>
 
         <!-- Underwriting / Comps Summary -->
         <div class="detail-card">
-          <div class="detail-card-title">📊 Análisis Financiero (Underwriting)</div>
+          <div class="detail-card-title"><i data-lucide="bar-chart-2"></i> Análisis Financiero (Underwriting)</div>
           <div class="uw-grid">
             <div class="uw-item">
               <span class="uw-label">MLS ARV</span>
@@ -1434,22 +2096,22 @@
             </div>
           </div>
           <div class="uw-alert-banner" id="uw-alert" style="display: none;">
-            <span>⚠️</span>
+            <span><i data-lucide="alert-triangle"></i></span>
             <span id="uw-alert-text">Alerta Crítica: Propiedad Bajo el Agua</span>
           </div>
           <div id="uw-manual-search" style="display: none; margin-top: 12px; font-size: 0.7rem; color: var(--text-muted); background: rgba(255,255,255,0.02); padding: 8px; border-radius: 4px; border: 1px solid rgba(255,255,255,0.05); justify-content: space-between; align-items: center;">
-            <span>🔍 Buscar valor comercial:</span>
+            <span><i data-lucide="search" class="inline-icon"></i> Buscar valor comercial:</span>
             <div style="display: flex; gap: 8px;">
-              <a id="zillow-link" href="#" target="_blank" style="color: #006aff; font-weight: bold; text-decoration: none;">Zillow 🔗</a>
+              <a id="zillow-link" href="#" target="_blank" style="color: #006aff; font-weight: bold; text-decoration: none;">Zillow <i data-lucide="external-link" class="inline-icon" style="width: 10px; height: 10px; margin-left: 2px;"></i></a>
               <span style="color: rgba(255,255,255,0.1)">|</span>
-              <a id="redfin-link" href="#" target="_blank" style="color: #e60000; font-weight: bold; text-decoration: none;">Redfin 🔗</a>
+              <a id="redfin-link" href="#" target="_blank" style="color: #e60000; font-weight: bold; text-decoration: none;">Redfin <i data-lucide="external-link" class="inline-icon" style="width: 10px; height: 10px; margin-left: 2px;"></i></a>
             </div>
           </div>
         </div>
 
         <!-- Market Comparison Analysis (MCA) Comps -->
         <div class="detail-card" id="mca-card" style="display: none;">
-          <div class="detail-card-title">📈 Comparables de Mercado (MCA)</div>
+          <div class="detail-card-title"><i data-lucide="trending-up"></i> Comparables de Mercado (MCA)</div>
           
           <div style="font-size: 0.75rem; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center;">
             <div><strong>ARV MCA Sugerido:</strong> <span id="mca-suggested-arv" style="font-weight: bold; color: var(--color-radar-green);">$0</span></div>
@@ -1479,7 +2141,7 @@
 
         <!-- Distress History / Timeline logs -->
         <div class="detail-card">
-          <div class="detail-card-title">📜 Registro de Distress Coincidentes</div>
+          <div class="detail-card-title"><i data-lucide="file-text"></i> Registro de Distress Coincidentes</div>
           <div id="distress-logs-container">
             <!-- Dynamically populated -->
           </div>
@@ -1487,7 +2149,7 @@
 
         <!-- OSINT Contacts -->
         <div class="detail-card">
-          <div class="detail-card-title">📞 Contactos Cruzados (OSINT)</div>
+          <div class="detail-card-title"><i data-lucide="phone"></i> Contactos Cruzados Verificados</div>
           <div id="contacts-container">
             <!-- Dynamically populated -->
           </div>
@@ -1495,13 +2157,13 @@
 
         <!-- Call Script Generator -->
         <div class="detail-card">
-          <div class="detail-card-title">💬 Guion Táctico de Llamada</div>
+          <div class="detail-card-title"><i data-lucide="message-square"></i> Guion Táctico de Llamada</div>
           <div class="script-tabs" id="script-tabs-container">
             <!-- Tabs added dynamically depending on distress type -->
           </div>
           <div class="script-box">
             <button class="copy-script-btn" onclick="copyCallScript()">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+              <i data-lucide="copy" class="inline-icon"></i>
               Copiar
             </button>
             <div id="call-script-content">
@@ -1538,25 +2200,25 @@
   <div id="surplus-vault-modal" class="surplus-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background-color: var(--bg-darker); z-index: 9999; overflow-y: auto; padding: 40px; box-sizing: border-box; font-family: 'Inter', sans-serif;">
     <div class="surplus-modal-header" style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid var(--border-glass); padding-bottom: 20px; margin-bottom: 30px;">
       <div style="display: flex; align-items: center; gap: 15px;">
-        <span style="font-size: 2rem;">💰</span>
+        <i data-lucide="dollar-sign" style="width: 32px; height: 32px; color: var(--color-radar-green-dark)"></i>
         <div>
-          <h1 style="font-family: 'Orbitron', sans-serif; font-size: 1.8rem; color: #ffffff; text-shadow: 0 0 10px rgba(16, 185, 129, 0.4); margin: 0;">BÓVEDA DE EXCEDENTES</h1>
+          <h1 style="font-family: 'Inter', sans-serif; font-weight: 800; font-size: 1.8rem; color: var(--text-main); margin: 0;">BÓVEDA DE EXCEDENTES</h1>
           <p style="color: var(--text-muted); font-size: 0.85rem; margin: 4px 0 0 0;">Auditoría de Fondos Excedentes (Surplus Funds) Post-Subasta</p>
         </div>
       </div>
-      <button id="close-surplus-btn" style="background: rgba(255,255,255,0.05); border: 1px solid var(--border-glass); color: #ffffff; font-size: 1.5rem; width: 45px; height: 45px; border-radius: 50%; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; justify-content: center; outline: none;">&times;</button>
+      <button id="close-surplus-btn" style="background: rgba(0,0,0,0.03); border: 1px solid var(--border-glass); color: var(--text-main); font-size: 1.5rem; width: 45px; height: 45px; border-radius: 50%; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; justify-content: center; outline: none;">&times;</button>
     </div>
 
     <!-- Ledger Table Wrapper -->
-    <div class="ledger-container" style="background: var(--bg-glass); border: 1px solid var(--border-glass); border-radius: 12px; padding: 24px; box-shadow: 0 8px 32px rgba(0,0,0,0.5); backdrop-filter: blur(10px);">
+    <div class="ledger-container" style="background: var(--bg-dark); border: 1px solid var(--border-glass); border-radius: 20px; padding: 24px; box-shadow: var(--shadow-level-3);">
       <table class="ledger-table" style="width: 100%; border-collapse: collapse; text-align: left; font-size: 0.9rem; color: var(--text-main);">
         <thead>
-          <tr style="border-bottom: 2px solid rgba(255,255,255,0.1); color: var(--text-muted); font-family: 'Orbitron', sans-serif; font-size: 0.8rem; letter-spacing: 0.5px;">
+          <tr style="border-bottom: 2px solid var(--border-glass); color: var(--text-muted); font-family: 'Inter', sans-serif; font-weight: 700; font-size: 0.8rem; letter-spacing: 0.5px;">
             <th style="padding: 12px 16px;">EX-PROPIETARIO</th>
             <th style="padding: 12px 16px;">DIRECCIÓN ORIGINAL</th>
             <th style="padding: 12px 16px; text-align: right;">JUDGMENT AMOUNT</th>
             <th style="padding: 12px 16px; text-align: right;">WINNING BID</th>
-            <th style="padding: 12px 16px; text-align: right; color: var(--color-radar-green);">EXCEDENTE A RECLAMAR</th>
+            <th style="padding: 12px 16px; text-align: right; color: var(--color-radar-green-dark);">EXCEDENTE A RECLAMAR</th>
             <th style="padding: 12px 16px;">TELÉFONO CELULAR</th>
             <th style="padding: 12px 16px; text-align: center;">DÍAS DESDE SUBASTA</th>
             <th style="padding: 12px 16px; text-align: center;">ACCIONES</th>
@@ -1576,20 +2238,20 @@
   <div id="zero-debt-vault-modal" class="surplus-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background-color: var(--bg-darker); z-index: 9999; overflow-y: auto; padding: 40px; box-sizing: border-box; font-family: 'Inter', sans-serif;">
     <div class="surplus-modal-header" style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid var(--border-glass); padding-bottom: 20px; margin-bottom: 30px;">
       <div style="display: flex; align-items: center; gap: 15px;">
-        <span style="font-size: 2rem;">🛡️</span>
+        <i data-lucide="shield" style="width: 32px; height: 32px; color: var(--color-radar-green-dark)"></i>
         <div>
-          <h1 style="font-family: 'Orbitron', sans-serif; font-size: 1.8rem; color: #ffffff; text-shadow: 0 0 10px rgba(59, 130, 246, 0.4); margin: 0;">BÓVEDA DE DEUDA CERO</h1>
+          <h1 style="font-family: 'Inter', sans-serif; font-weight: 800; font-size: 1.8rem; color: var(--text-main); margin: 0;">BÓVEDA DE DEUDA CERO</h1>
           <p style="color: var(--text-muted); font-size: 0.85rem; margin: 4px 0 0 0;">Propiedades sin deudas activas o gravámenes detectados</p>
         </div>
       </div>
-      <button id="close-zero-debt-btn" style="background: rgba(255,255,255,0.05); border: 1px solid var(--border-glass); color: #ffffff; font-size: 1.5rem; width: 45px; height: 45px; border-radius: 50%; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; justify-content: center; outline: none;">&times;</button>
+      <button id="close-zero-debt-btn" style="background: rgba(0,0,0,0.03); border: 1px solid var(--border-glass); color: var(--text-main); font-size: 1.5rem; width: 45px; height: 45px; border-radius: 50%; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; justify-content: center; outline: none;">&times;</button>
     </div>
 
     <!-- Zero Debt Table Wrapper -->
-    <div class="ledger-container" style="background: var(--bg-glass); border: 1px solid var(--border-glass); border-radius: 12px; padding: 24px; box-shadow: 0 8px 32px rgba(0,0,0,0.5); backdrop-filter: blur(10px);">
+    <div class="ledger-container" style="background: var(--bg-dark); border: 1px solid var(--border-glass); border-radius: 20px; padding: 24px; box-shadow: var(--shadow-level-3);">
       <table class="ledger-table" style="width: 100%; border-collapse: collapse; text-align: left; font-size: 0.9rem; color: var(--text-main);">
         <thead>
-          <tr style="border-bottom: 2px solid rgba(255,255,255,0.1); color: var(--text-muted); font-family: 'Orbitron', sans-serif; font-size: 0.8rem; letter-spacing: 0.5px;">
+          <tr style="border-bottom: 2px solid var(--border-glass); color: var(--text-muted); font-family: 'Inter', sans-serif; font-weight: 700; font-size: 0.8rem; letter-spacing: 0.5px;">
             <th style="padding: 12px 16px;">PROPIETARIO / DEMANDADO</th>
             <th style="padding: 12px 16px;">DIRECCIÓN</th>
             <th style="padding: 12px 16px;">CONDADO / ESTADO</th>
@@ -1609,17 +2271,60 @@
     </div>
   </div>
 
+  <!-- Floating Comparison Bar -->
+  <div id="comparison-bar" class="comparison-bar">
+    <div class="comparison-info">
+      <span id="comparison-count">0</span> propiedades seleccionadas
+    </div>
+    <div class="comparison-actions">
+      <button class="comp-action-btn-main" onclick="openComparisonModal()">Comparar Ahora</button>
+      <button class="comp-action-btn-sec" onclick="clearComparison()">Limpiar</button>
+    </div>
+  </div>
+
+  <!-- Comparison Side-by-Side Modal -->
+  <div id="comparison-modal-overlay" class="comp-modal-overlay">
+    <div class="comp-modal-container">
+      <div class="comp-modal-header">
+        <h3 class="comp-modal-title" style="display: flex; align-items: center; gap: 8px;"><i data-lucide="bar-chart-2"></i> Comparación de Propiedades</h3>
+        <button class="close-btn" onclick="closeComparisonModal()">&times;</button>
+      </div>
+      <div class="comp-modal-body">
+        <table class="comp-table">
+          <tbody id="comparison-table-body">
+            <!-- Dynamically populated via JS -->
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
   <!-- Leaflet JS CDN -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+  <!-- Lucide Icons CDN -->
+  <script src="https://unpkg.com/lucide@latest"></script>
   
   <!-- Client Dashboard Code -->
   <script>
+    const SVG_ICONS = {
+      star: `<svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>`,
+      gavel: `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m14 5-3-3H4v7h3l3 3 4-4z"/><path d="m14 5 4 4-4 4-4-4z"/><path d="m16 9 2-2 4 4-2 2z"/><path d="m7 21 6-6"/><path d="m5 16 3 3"/></svg>`,
+      clock: `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>`,
+      flame: `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/></svg>`,
+      scale: `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m16 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z"/><path d="m2 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z"/><path d="M7 21h10"/><path d="M12 3v18"/><path d="M3 7h18"/></svg>`,
+      user: `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>`
+    };
+
     let map;
     let markersLayer;
     let allLeads = [];
     let selectedLead = null;
     let mapMarkers = new Map(); // key -> leaflet marker
     let financialFilter = 'deals'; // 'deals' or 'underwater'
+
+    // Favorites & Comparison State
+    let favoriteKeys = JSON.parse(localStorage.getItem('tzel_favorites') || '[]');
+    let comparedKeys = [];
 
     // Variables para el arrastre / swipe del carrusel de fotos
     let isDraggingPhoto = false;
@@ -1629,6 +2334,7 @@
     let animationID = 0;
     let currentPhotoIndex = 0;
     let photoUrlsCount = 0;
+    let currentTranslateX = 0;
 
     // Initialize Map on load
     window.addEventListener('DOMContentLoaded', () => {
@@ -1642,6 +2348,7 @@
       document.getElementById('pill-physical').addEventListener('change', applyFilters);
       document.getElementById('pill-others').addEventListener('change', applyFilters);
       document.getElementById('pill-stack').addEventListener('change', applyFilters);
+      document.getElementById('pill-favorites').addEventListener('change', applyFilters);
       document.getElementById('btn-surplus-vault').addEventListener('click', openSurplusVault);
       document.getElementById('close-surplus-btn').addEventListener('click', closeSurplusVault);
       document.getElementById('btn-zero-debt-vault').addEventListener('click', openZeroDebtVault);
@@ -1692,29 +2399,27 @@
       const btnUnder = document.getElementById('btn-underwater');
       const btnUnvalued = document.getElementById('btn-unvalued');
       
-      // Reset all buttons to default inactive style
+      // Reset all buttons to default inactive style (handled by CSS class segment-btn)
       [btnDeals, btnUnder, btnUnvalued].forEach(b => {
         b.classList.remove('active');
-        b.style.background = 'transparent';
-        b.style.borderColor = 'transparent';
-        b.style.color = 'var(--text-muted)';
+        b.style.background = '';
+        b.style.color = '';
+        b.style.boxShadow = '';
       });
       
       const activeBtn = filter === 'deals' ? btnDeals : (filter === 'underwater' ? btnUnder : btnUnvalued);
       activeBtn.classList.add('active');
       
+      // Dynamic color/shadow matching the neomorphic active tab style
+      activeBtn.style.background = '#ffffff';
+      activeBtn.style.boxShadow = 'var(--shadow-level-1)';
+      
       if (filter === 'deals') {
-        activeBtn.style.background = 'rgba(16, 185, 129, 0.15)';
-        activeBtn.style.borderColor = 'var(--color-radar-green)';
-        activeBtn.style.color = '#ffffff';
+        activeBtn.style.color = 'var(--color-radar-green-dark)';
       } else if (filter === 'underwater') {
-        activeBtn.style.background = 'rgba(239, 68, 68, 0.15)';
-        activeBtn.style.borderColor = 'var(--color-high-motivation)';
-        activeBtn.style.color = '#ffffff';
+        activeBtn.style.color = 'var(--color-high-motivation)';
       } else if (filter === 'unvalued') {
-        activeBtn.style.background = 'rgba(148, 163, 184, 0.15)';
-        activeBtn.style.borderColor = 'var(--text-muted)';
-        activeBtn.style.color = '#ffffff';
+        activeBtn.style.color = 'var(--text-main)';
       }
       
       applyFilters();
@@ -1818,6 +2523,62 @@
       }
     }
 
+    window.navigateDrawerPhotos = function(direction) {
+      if (photoUrlsCount <= 1) return;
+      let targetIndex = currentPhotoIndex + direction;
+      if (targetIndex < 0) {
+        targetIndex = photoUrlsCount - 1;
+      } else if (targetIndex >= photoUrlsCount) {
+        targetIndex = 0;
+      }
+      switchDrawerPhoto(targetIndex);
+    };
+
+    window.navigateCardPhotos = function(btn, direction) {
+      const carousel = btn.closest('.lead-card-photo-carousel');
+      const slider = carousel.querySelector('.lead-card-photo-slider');
+      const indicator = carousel.querySelector('.lead-card-carousel-indicator');
+      
+      let currentIndex = parseInt(slider.getAttribute('data-current-index') || '0', 10);
+      const count = parseInt(slider.getAttribute('data-photo-count') || '1', 10);
+      
+      currentIndex += direction;
+      if (currentIndex < 0) {
+        currentIndex = count - 1;
+      } else if (currentIndex >= count) {
+        currentIndex = 0;
+      }
+      
+      slider.setAttribute('data-current-index', currentIndex);
+      slider.style.transform = `translateX(-${currentIndex * 60}px)`;
+      if (indicator) {
+        indicator.textContent = `${currentIndex + 1}/${count}`;
+      }
+    };
+
+    window.navigateCompPhotos = function(btn, direction) {
+      const carousel = btn.closest('.comp-prop-photo-carousel');
+      const slider = carousel.querySelector('.comp-prop-photo-slider');
+      const indicator = carousel.querySelector('.comp-prop-carousel-indicator');
+      
+      let currentIndex = parseInt(slider.getAttribute('data-current-index') || '0', 10);
+      const count = parseInt(slider.getAttribute('data-photo-count') || '1', 10);
+      
+      currentIndex += direction;
+      if (currentIndex < 0) {
+        currentIndex = count - 1;
+      } else if (currentIndex >= count) {
+        currentIndex = 0;
+      }
+      
+      const containerWidth = carousel.offsetWidth || 150;
+      slider.setAttribute('data-current-index', currentIndex);
+      slider.style.transform = `translateX(-${currentIndex * containerWidth}px)`;
+      if (indicator) {
+        indicator.textContent = `${currentIndex + 1}/${count}`;
+      }
+    };
+
     function initMap() {
       // Coordinates default to Louisville, KY area (middle of KY & IN border)
       map = L.map('map', {
@@ -1825,8 +2586,8 @@
         attributionControl: false
       }).setView([38.2527, -85.7585], 11);
 
-      // CartoDB DarkMatter layers (Clean dark Hacker aesthetic)
-      L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+      // CartoDB Positron layers (Clean light minimal aesthetic matching styleguide)
+      L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
         maxZoom: 20
       }).addTo(map);
 
@@ -1957,11 +2718,15 @@
       const showPhysical = document.getElementById('pill-physical').checked;
       const showOthers = document.getElementById('pill-others').checked;
       const showStackOnly = document.getElementById('pill-stack').checked;
+      const showFavorites = document.getElementById('pill-favorites').checked;
 
       return allLeads.filter(lead => {
         // Excluir propiedades sin deuda (van a la Bóveda de Deuda Cero)
         const totalDebt = (lead.primaryDebt || 0) + (lead.hiddenMortgages || 0) + (lead.hiddenLiensAmount || 0);
         if (totalDebt === 0) return false;
+
+        // Favorites filter
+        if (showFavorites && !favoriteKeys.includes(lead.groupingKey)) return false;
 
         // Search text filter
         const matchesSearch = 
@@ -2046,29 +2811,56 @@
         const hasManualReview = lead.auctions && lead.auctions.some(a => a.needs_manual_review === 1);
         
         let badgesHtml = '';
-        if (isHigh) badgesHtml += `<span class="badge badge-high">🔥 ALTA MOTIVACIÓN</span>`;
-        if (isAbsentee) badgesHtml += `<span class="badge badge-absentee">Absentee</span>`;
-        if (hasHibernated) badgesHtml += `<span class="badge" style="background: rgba(139, 92, 246, 0.15); color: #c084fc; border: 1px solid rgba(139, 92, 246, 0.3)">🤖 Hibernado</span>`;
-        if (hasManualReview) badgesHtml += `<span class="badge" style="background: rgba(239, 68, 68, 0.15); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.3)">⚠️ Review</span>`;
+        if (isHigh) badgesHtml += `<span class="badge badge-high"><i data-lucide="flame" class="inline-icon"></i> ALTA MOTIVACIÓN</span>`;
+        if (isAbsentee) badgesHtml += `<span class="badge badge-absentee"><i data-lucide="user" class="inline-icon"></i> Absentee</span>`;
+        if (hasHibernated) badgesHtml += `<span class="badge" style="background: rgba(139, 92, 246, 0.15); color: #c084fc; border: 1px solid rgba(139, 92, 246, 0.3)"><i data-lucide="bot" class="inline-icon"></i> Hibernado</span>`;
+        if (hasManualReview) badgesHtml += `<span class="badge" style="background: rgba(239, 68, 68, 0.15); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.3)"><i data-lucide="alert-triangle" class="inline-icon"></i> Review</span>`;
         if (!hasCoords) {
-          badgesHtml += `<span class="badge" style="background: rgba(255,255,255,0.05); color: var(--text-muted); border: 1px solid var(--border-glass)">⏳ Geocodificando</span>`;
+          badgesHtml += `<span class="badge" style="background: rgba(255,255,255,0.05); color: var(--text-muted); border: 1px solid var(--border-glass)"><i data-lucide="clock" class="inline-icon"></i> Geocodificando</span>`;
         }
 
-        const firstPhoto = lead.photoUrls && lead.photoUrls.length > 0 ? lead.photoUrls[0] : null;
-        const photoHtml = firstPhoto
-          ? `<img class="lead-card-photo" src="${firstPhoto}" alt="Foto Propiedad">`
-          : `<div class="lead-card-photo-placeholder">🏠</div>`;
+        const hasPhotos = lead.photoUrls && lead.photoUrls.length > 0;
+        let photoHtml = '';
+        if (hasPhotos) {
+          if (lead.photoUrls.length === 1) {
+            photoHtml = `<img class="lead-card-photo" src="${lead.photoUrls[0]}" alt="Foto Propiedad">`;
+          } else {
+            photoHtml = `
+              <div class="lead-card-photo-carousel" onclick="event.stopPropagation()">
+                <div class="lead-card-photo-slider" data-current-index="0" data-photo-count="${lead.photoUrls.length}">
+                  ${lead.photoUrls.map(url => `<img class="lead-card-carousel-photo" src="${url}" alt="Foto Propiedad" draggable="false">`).join('')}
+                </div>
+                <button class="lead-card-carousel-arrow prev" onclick="navigateCardPhotos(this, -1)">&lsaquo;</button>
+                <button class="lead-card-carousel-arrow next" onclick="navigateCardPhotos(this, 1)">&rsaquo;</button>
+                <div class="lead-card-carousel-indicator">1/${lead.photoUrls.length}</div>
+              </div>
+            `;
+          }
+        } else {
+          photoHtml = `<div class="lead-card-photo-placeholder"><i data-lucide="home" style="width: 2rem; height: 2rem; color: var(--text-muted);"></i></div>`;
+        }
 
         card.innerHTML = `
+          <div class="lead-card-header-row" style="margin-bottom: 6px;">
+            <div class="lead-address" style="max-width: 160px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: bold; color: var(--text-main);" title="${lead.displayAddress}">${lead.displayAddress}</div>
+            <div class="card-actions-wrapper" onclick="event.stopPropagation()">
+              <label class="compare-check-label">
+                <input type="checkbox" class="compare-check-input" data-key="${lead.groupingKey}" ${comparedKeys.includes(lead.groupingKey) ? 'checked' : ''} onchange="handleCompareCheckbox(this)">
+                <span>Comparar</span>
+              </label>
+              <button class="fav-btn ${favoriteKeys.includes(lead.groupingKey) ? 'fav-active' : ''}" onclick="toggleFavoriteCard(this, '${lead.groupingKey}')" title="Favorito">
+                <i data-lucide="star"></i>
+              </button>
+            </div>
+          </div>
           <div style="display: flex; gap: 12px; align-items: flex-start; margin-bottom: 8px;">
             <div style="flex: 1; min-width: 0;">
               <div class="lead-header" style="margin-bottom: 4px;">
-                <div class="lead-address" style="max-width: 180px;">${lead.displayAddress}</div>
-                <div class="lead-badges">${badgesHtml}</div>
+                <div class="lead-badges" style="display: flex; flex-wrap: wrap; gap: 4px;">${badgesHtml}</div>
               </div>
               <div class="lead-details" style="margin-top: 4px;">
-                <span>👤 ${lead.ownerName}</span>
-                <span>📍 ${lead.county}, ${lead.state}</span>
+                <span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 150px; display: inline-block;"><i data-lucide="user" class="inline-icon"></i> ${lead.ownerName}</span>
+                <span><i data-lucide="map-pin" class="inline-icon"></i> ${lead.county}, ${lead.state}</span>
               </div>
             </div>
             ${photoHtml}
@@ -2102,7 +2894,7 @@
         // 2. Render marker on Map (only if geocoded successfully)
         if (hasCoords && !isNaN(lead.lat) && !isNaN(lead.lon)) {
           let markerColor = 'var(--color-others-purple)';
-          let emoji = '👤';
+          let svgIconKey = 'user';
           let markerClass = 'others';
 
           // Precedence logic:
@@ -2117,33 +2909,39 @@
           const hasPhysical = (lead.physicalDistress && lead.physicalDistress.length > 0) || (lead.violations && lead.violations.length > 0);
           const hasFinancial = (lead.financialDistress && lead.financialDistress.length > 0);
 
-          if (hasScheduledAuction) {
+          const isFav = favoriteKeys.includes(lead.groupingKey);
+
+          if (isFav) {
+            markerColor = '#fbbf24';
+            svgIconKey = 'star';
+            markerClass = 'favorite-marker';
+          } else if (hasScheduledAuction) {
             markerColor = 'var(--color-execution-red)';
-            emoji = '🚨';
+            svgIconKey = 'gavel';
             markerClass = 'execution-scheduled';
           } else if (hasAuctions) {
             markerColor = 'var(--color-execution-orange)';
-            emoji = '⏳';
+            svgIconKey = 'clock';
             markerClass = 'execution-pre';
           } else if (hasPhysical) {
             markerColor = 'var(--color-physical-amber)';
-            emoji = '🔥';
+            svgIconKey = 'flame';
             markerClass = 'physical';
           } else if (hasFinancial) {
             markerColor = 'var(--color-financial-yellow)';
-            emoji = '⚖️';
+            svgIconKey = 'scale';
             markerClass = 'financial';
           } else {
             markerColor = 'var(--color-others-purple)';
-            emoji = '👤';
+            svgIconKey = 'user';
             markerClass = 'others';
           }
 
           // Custom Leaflet HTML Pin
           const radarPinHtml = `
             <div class="ping-pulse" style="--marker-color: ${markerColor}"></div>
-            <div class="ping-marker" style="--marker-color: ${markerColor}">
-              ${emoji}
+            <div class="ping-marker" style="--marker-color: ${markerColor}; color: ${markerColor}; display: flex; align-items: center; justify-content: center;">
+              ${SVG_ICONS[svgIconKey]}
             </div>
           `;
 
@@ -2198,6 +2996,7 @@
       });
 
       calculateFooterMetrics();
+      lucide.createIcons();
     }
 
     function selectLead(lead, flyTo = true) {
@@ -2275,6 +3074,353 @@
       });
     };
 
+    // ----------------------------------------------------
+    // FAVORITES & COMPARISON FUNCTIONS & CONTACT FORMATTING
+    // ----------------------------------------------------
+    function formatContact(contactStr, isEmail = false) {
+      let cleanVal = contactStr || '';
+      let cleanLabel = isEmail ? 'Correo de Contacto' : 'Teléfono de Contacto';
+      let dncWarning = false;
+      
+      // Clean prefixes
+      if (cleanVal.startsWith('OSINT: ')) {
+        cleanVal = cleanVal.substring(7);
+        cleanLabel = isEmail ? 'Correo Cruzado' : 'Teléfono Móvil';
+      } else if (cleanVal.startsWith('BatchData: ')) {
+        cleanVal = cleanVal.substring(11);
+        cleanLabel = isEmail ? 'Correo Verificado' : 'Teléfono Móvil';
+      } else if (cleanVal.includes('BatchData (')) {
+        const match = cleanVal.match(/BatchData \(([^)]+)\):\s*(.*)/);
+        if (match) {
+          const rawType = match[1].toLowerCase();
+          cleanVal = match[2];
+          
+          if (rawType.includes('mobile')) {
+            cleanLabel = 'Móvil Verificado';
+          } else if (rawType.includes('landline')) {
+            cleanLabel = 'Teléfono Fijo';
+          } else if (rawType.includes('voip')) {
+            cleanLabel = 'Teléfono de Contacto';
+          }
+          
+          if (rawType.includes('dnc')) {
+            dncWarning = true;
+          }
+        }
+      }
+      
+      cleanVal = cleanVal.replace(/OSINT:\s*/gi, '');
+      cleanVal = cleanVal.replace(/BatchData:\s*/gi, '');
+      
+      return {
+        value: cleanVal.trim(),
+        label: cleanLabel,
+        isDNC: dncWarning
+      };
+    }
+
+    function cleanAllPhoneTags(phonesStr) {
+      if (!phonesStr) return 'Sin teléfono';
+      return phonesStr.split(',').map(phone => {
+        const contactInfo = formatContact(phone.trim(), false);
+        return contactInfo.value;
+      }).join(', ');
+    }
+
+    function saveFavorites() {
+      localStorage.setItem('tzel_favorites', JSON.stringify(favoriteKeys));
+    }
+
+    window.toggleFavoriteCard = function(btn, key) {
+      if (favoriteKeys.includes(key)) {
+        favoriteKeys = favoriteKeys.filter(k => k !== key);
+        btn.classList.remove('fav-active');
+      } else {
+        favoriteKeys.push(key);
+        btn.classList.add('fav-active');
+      }
+      saveFavorites();
+      
+      const showFavorites = document.getElementById('pill-favorites').checked;
+      if (showFavorites) {
+        applyFilters();
+      } else {
+        updateMapMarkerFavorite(key);
+      }
+    }
+
+    window.toggleSelectedFavorite = function() {
+      if (!selectedLead) return;
+      const key = selectedLead.groupingKey;
+      
+      if (favoriteKeys.includes(key)) {
+        favoriteKeys = favoriteKeys.filter(k => k !== key);
+      } else {
+        favoriteKeys.push(key);
+      }
+      saveFavorites();
+      
+      const showFavorites = document.getElementById('pill-favorites').checked;
+      if (showFavorites) {
+        applyFilters();
+      } else {
+        updateMapMarkerFavorite(key);
+        updateDrawerFavButton();
+        // Sincronizar el botón de la tarjeta en la lista
+        const cardBtn = document.querySelector(`.compare-check-input[data-key="${key}"]`)?.nextElementSibling;
+        if (cardBtn && cardBtn.classList.contains('fav-btn')) {
+          const isFav = favoriteKeys.includes(key);
+          if (isFav) cardBtn.classList.add('fav-active');
+          else cardBtn.classList.remove('fav-active');
+        }
+      }
+    }
+
+    function updateDrawerFavButton() {
+      const btn = document.getElementById('drawer-fav-btn');
+      if (btn && selectedLead) {
+        const isFav = favoriteKeys.includes(selectedLead.groupingKey);
+        if (isFav) {
+          btn.classList.add('fav-active');
+        } else {
+          btn.classList.remove('fav-active');
+        }
+      }
+    }
+
+    function updateMapMarkerFavorite(key) {
+      const marker = mapMarkers.get(key);
+      if (!marker) return;
+      const lead = allLeads.find(l => l.groupingKey === key);
+      if (!lead) return;
+      
+      const isFav = favoriteKeys.includes(key);
+      let markerColor = isFav ? '#fbbf24' : 'var(--color-others-purple)';
+      let svgIconKey = isFav ? 'star' : 'user';
+      let markerClass = isFav ? 'favorite-marker' : 'others';
+      
+      if (!isFav) {
+        const hasAuctions = lead.auctions && lead.auctions.length > 0;
+        const hasScheduledAuction = hasAuctions && lead.auctions.some(auc => getDaysRemaining(auc.auction_date) !== null);
+        const hasPhysical = (lead.physicalDistress && lead.physicalDistress.length > 0) || (lead.violations && lead.violations.length > 0);
+        const hasFinancial = (lead.financialDistress && lead.financialDistress.length > 0);
+
+        if (hasScheduledAuction) {
+          markerColor = 'var(--color-execution-red)';
+          svgIconKey = 'gavel';
+          markerClass = 'execution-scheduled';
+        } else if (hasAuctions) {
+          markerColor = 'var(--color-execution-orange)';
+          svgIconKey = 'clock';
+          markerClass = 'execution-pre';
+        } else if (hasPhysical) {
+          markerColor = 'var(--color-physical-amber)';
+          svgIconKey = 'flame';
+          markerClass = 'physical';
+        } else if (hasFinancial) {
+          markerColor = 'var(--color-financial-yellow)';
+          svgIconKey = 'scale';
+          markerClass = 'financial';
+        }
+      }
+      
+      const radarPinHtml = `
+        <div class="ping-pulse" style="--marker-color: ${markerColor}"></div>
+        <div class="ping-marker" style="--marker-color: ${markerColor}; color: ${markerColor}; display: flex; align-items: center; justify-content: center;">
+          ${SVG_ICONS[svgIconKey]}
+        </div>
+      `;
+
+      const customIcon = L.divIcon({
+        html: radarPinHtml,
+        className: `radar-ping-icon ${markerClass}`,
+        iconSize: [36, 36],
+        iconAnchor: [18, 18],
+        popupAnchor: [0, -18]
+      });
+      
+      marker.setIcon(customIcon);
+    }
+
+    window.handleCompareCheckbox = function(input) {
+      const key = input.dataset.key;
+      if (input.checked) {
+        if (comparedKeys.length >= 4) {
+          alert('Puedes comparar un máximo de 4 propiedades.');
+          input.checked = false;
+          return;
+        }
+        if (!comparedKeys.includes(key)) {
+          comparedKeys.push(key);
+        }
+      } else {
+        comparedKeys = comparedKeys.filter(k => k !== key);
+      }
+      updateComparisonBar();
+    };
+
+    function updateComparisonBar() {
+      const bar = document.getElementById('comparison-bar');
+      const countSpan = document.getElementById('comparison-count');
+      if (bar && countSpan) {
+        countSpan.textContent = comparedKeys.length;
+        if (comparedKeys.length > 0) {
+          bar.classList.add('show');
+        } else {
+          bar.classList.remove('show');
+        }
+      }
+    }
+
+    window.clearComparison = function() {
+      comparedKeys = [];
+      updateComparisonBar();
+      const checkboxes = document.querySelectorAll('.compare-check-input');
+      checkboxes.forEach(cb => {
+        cb.checked = false;
+      });
+    };
+
+    window.openComparisonModal = function() {
+      buildComparisonTable();
+      const overlay = document.getElementById('comparison-modal-overlay');
+      if (overlay) {
+        overlay.classList.add('show');
+        document.body.style.overflow = 'hidden';
+      }
+    };
+
+    window.closeComparisonModal = function() {
+      const overlay = document.getElementById('comparison-modal-overlay');
+      if (overlay) {
+        overlay.classList.remove('show');
+        document.body.style.overflow = '';
+      }
+    };
+
+    window.removeComparedProperty = function(key) {
+      comparedKeys = comparedKeys.filter(k => k !== key);
+      updateComparisonBar();
+      buildComparisonTable();
+      
+      const cb = document.querySelector(`.compare-check-input[data-key="${key}"]`);
+      if (cb) {
+        cb.checked = false;
+      }
+      
+      if (comparedKeys.length === 0) {
+        closeComparisonModal();
+      }
+    };
+
+    function buildComparisonTable() {
+      const tbody = document.getElementById('comparison-table-body');
+      tbody.innerHTML = '';
+      
+      const leads = allLeads.filter(l => comparedKeys.includes(l.groupingKey));
+      if (leads.length === 0) {
+        tbody.innerHTML = '<tr><td style="text-align: center; color: var(--text-muted); padding: 40px;">No hay propiedades seleccionadas para comparar.</td></tr>';
+        return;
+      }
+      
+      let rPhotos = `<tr><th>Propiedad</th>`;
+      let rOwner = `<tr><th>Propietario</th>`;
+      let rCounty = `<tr><th>Condado</th>`;
+      let rArv = `<tr><th>Valor MLS (ARV)</th>`;
+      let rDebt = `<tr><th>Deuda Primaria</th>`;
+      let rHidden = `<tr><th>Deudas/Gravámenes Ocultos</th>`;
+      let rMao = `<tr><th>Oferta MAO</th>`;
+      let rRehab = `<tr><th>Costo Rehab</th>`;
+      let rRoi = `<tr><th>Retorno (ROI)</th>`;
+      let rDistress = `<tr><th>Distress Activo</th>`;
+      
+      leads.forEach(lead => {
+        const hasPhotos = lead.photoUrls && lead.photoUrls.length > 0;
+        let photoHtml = '';
+        if (hasPhotos) {
+          if (lead.photoUrls.length === 1) {
+            photoHtml = `<img class="comp-prop-img" src="${lead.photoUrls[0]}" alt="Foto">`;
+          } else {
+            photoHtml = `
+              <div class="comp-prop-photo-carousel" onclick="event.stopPropagation()">
+                <div class="comp-prop-photo-slider" data-current-index="0" data-photo-count="${lead.photoUrls.length}">
+                  ${lead.photoUrls.map(url => `<img class="comp-prop-carousel-photo" src="${url}" alt="Foto" draggable="false">`).join('')}
+                </div>
+                <button class="comp-prop-carousel-arrow prev" onclick="navigateCompPhotos(this, -1)">&lsaquo;</button>
+                <button class="comp-prop-carousel-arrow next" onclick="navigateCompPhotos(this, 1)">&rsaquo;</button>
+                <div class="comp-prop-carousel-indicator">1/${lead.photoUrls.length}</div>
+              </div>
+            `;
+          }
+        } else {
+          photoHtml = `<div class="comp-prop-img-placeholder"><i data-lucide="home" style="width: 2rem; height: 2rem; color: var(--text-muted);"></i></div>`;
+        }
+          
+        rPhotos += `
+          <td class="comp-col-prop">
+            <div class="comp-prop-card">
+              <button class="comp-prop-remove" onclick="removeComparedProperty('${lead.groupingKey}')" title="Quitar">&times;</button>
+              ${photoHtml}
+              <div style="font-weight: bold; margin-top: 8px; font-size: 0.8rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${lead.displayAddress}">
+                ${lead.displayAddress}
+              </div>
+            </div>
+          </td>
+        `;
+        
+        rOwner += `<td class="comp-col-prop"><strong>${lead.ownerName || 'N/A'}</strong></td>`;
+        rCounty += `<td class="comp-col-prop">${lead.county || 'N/A'}, ${lead.state || ''}</td>`;
+        rArv += `<td class="comp-col-prop">${lead.mlsValue > 0 ? '$' + lead.mlsValue.toLocaleString() : 'N/A'}</td>`;
+        rDebt += `<td class="comp-col-prop" style="color: var(--color-high-motivation)">$${(lead.primaryDebt || 0).toLocaleString()}</td>`;
+        
+        const hiddenDebt = (lead.hiddenMortgages || 0) + (lead.hiddenLiensAmount || 0);
+        rHidden += `<td class="comp-col-prop" style="color: ${hiddenDebt > 0 ? 'var(--color-high-motivation)' : 'var(--text-muted)'}">$${hiddenDebt.toLocaleString()}</td>`;
+        
+        rMao += `<td class="comp-col-prop" style="color: var(--color-radar-green); font-weight: bold;">${lead.mlsValue > 0 ? '$' + (lead.mao || 0).toLocaleString() : 'N/A'}</td>`;
+        rRehab += `<td class="comp-col-prop">$${(lead.rehab || 0).toLocaleString()}</td>`;
+        rRoi += `
+          <td class="comp-col-prop" style="font-weight: bold; color: ${lead.roi > 0 && lead.mlsValue > 0 ? 'var(--color-radar-green)' : 'var(--text-muted)'}">
+            ${lead.mlsValue > 0 ? lead.roi + '%' : 'N/A'}
+          </td>
+        `;
+        
+        let distressList = [];
+        if (lead.auctions && lead.auctions.length > 0) distressList.push('<span class="badge badge-high" style="margin: 2px;"><i data-lucide="gavel" class="inline-icon"></i> Ejecución</span>');
+        if ((lead.physicalDistress && lead.physicalDistress.length > 0) || (lead.violations && lead.violations.length > 0)) {
+          distressList.push('<span class="badge" style="background: rgba(249,115,22,0.15); color: var(--color-physical-amber); border: 1px solid rgba(249,115,22,0.3); margin: 2px;"><i data-lucide="flame" class="inline-icon"></i> Físico</span>');
+        }
+        if ((lead.financialDistress && lead.financialDistress.length > 0) || 
+            (lead.lifeEvents && lead.lifeEvents.length > 0) || 
+            (lead.probates && lead.probates.length > 0) || 
+            (lead.divorces && lead.divorces.length > 0) || 
+            (lead.bankruptcies && lead.bankruptcies.length > 0)) {
+          distressList.push('<span class="badge" style="background: rgba(139,92,246,0.15); color: var(--color-others-purple); border: 1px solid rgba(139,92,246,0.3); margin: 2px;"><i data-lucide="alert-triangle" class="inline-icon"></i> Otros</span>');
+        }
+        if (lead.isHighMotivation) distressList.push('<span class="badge badge-high" style="margin: 2px; animation: pulse-glow 1.5s infinite alternate;"><i data-lucide="zap" class="inline-icon"></i> STACKED</span>');
+        
+        rDistress += `
+          <td class="comp-col-prop">
+            <div style="display: flex; flex-wrap: wrap; justify-content: center; gap: 4px;">
+              ${distressList.join('') || '<span style="color: var(--text-muted);">Ninguno</span>'}
+            </div>
+          </td>
+        `;
+      });
+      
+      rPhotos += `</tr>`;
+      rOwner += `</tr>`;
+      rCounty += `</tr>`;
+      rArv += `</tr>`;
+      rDebt += `</tr>`;
+      rHidden += `</tr>`;
+      rMao += `</tr>`;
+      rRehab += `</tr>`;
+      rRoi += `</tr>`;
+      rDistress += `</tr>`;
+      
+      tbody.innerHTML = rPhotos + rOwner + rCounty + rArv + rDebt + rHidden + rMao + rRehab + rRoi + rDistress;
+    }
+
     function hydrateDrawer(lead) {
       document.getElementById('drawer-address').textContent = lead.displayAddress;
 
@@ -2291,8 +3437,19 @@
       photosNav.innerHTML = '';
       photosSlider.style.transition = 'transform 0.3s ease'; // Asegurar transición por defecto
       
+      const prevArrow = document.getElementById('drawer-photos-prev');
+      const nextArrow = document.getElementById('drawer-photos-next');
+
       if (lead.photoUrls && lead.photoUrls.length > 0) {
         photosCard.style.display = 'block';
+        
+        if (lead.photoUrls.length > 1) {
+          if (prevArrow) prevArrow.style.display = 'flex';
+          if (nextArrow) nextArrow.style.display = 'flex';
+        } else {
+          if (prevArrow) prevArrow.style.display = 'none';
+          if (nextArrow) nextArrow.style.display = 'none';
+        }
         lead.photoUrls.forEach((url, index) => {
           const img = document.createElement('img');
           img.src = url;
@@ -2327,6 +3484,11 @@
       document.getElementById('prop-county').textContent = `${lead.county}, ${lead.state}`;
       document.getElementById('prop-mls-id').textContent = lead.mlsId || 'N/A';
       document.getElementById('prop-owner-type').textContent = lead.isAbsentee ? 'Propietario Ausente (Absentee)' : 'Residente';
+      
+      const beds = lead.beds || 'N/A';
+      const baths = lead.baths || 'N/A';
+      document.getElementById('prop-beds-baths').textContent = (beds !== 'N/A' || baths !== 'N/A') ? `${beds} hab / ${baths} baños` : 'N/A';
+      document.getElementById('prop-sqft').textContent = lead.sqft ? `${lead.sqft.toLocaleString()} SqFt` : 'N/A';
 
       // Underwriting
       if (lead.mlsValue > 0) {
@@ -2442,10 +3604,10 @@
             } else {
               res.comps.forEach(comp => {
                 const tr = document.createElement('tr');
-                tr.style.borderBottom = '1px solid rgba(255,255,255,0.03)';
+                tr.style.borderBottom = '1px solid var(--border-glass)';
                 tr.innerHTML = `
-                  <td style="padding: 6px; color: #ffffff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 140px;" title="${comp.address}">${comp.address}</td>
-                  <td style="padding: 6px; text-align: right; font-weight: bold; color: var(--color-radar-green);">$${comp.price.toLocaleString()}</td>
+                  <td style="padding: 6px; color: var(--text-main); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 140px;" title="${comp.address}">${comp.address}</td>
+                  <td style="padding: 6px; text-align: right; font-weight: bold; color: var(--color-radar-green-dark);">$${comp.price.toLocaleString()}</td>
                   <td style="padding: 6px; text-align: right; color: var(--text-muted);">${comp.beds}H / ${comp.sqft}ft²</td>
                   <td style="padding: 6px; text-align: right; color: var(--text-muted);">${comp.date}</td>
                 `;
@@ -2481,7 +3643,7 @@
           const daysRemaining = getDaysRemaining(auc.auction_date);
           const isScheduled = daysRemaining !== null;
           const borderClr = isScheduled ? 'var(--color-execution-red)' : 'var(--color-execution-orange)';
-          const emoji = isScheduled ? '🚨' : '⏳';
+          const iconName = isScheduled ? 'gavel' : 'clock';
           const titleStr = isScheduled ? 'ZONA DE EJECUCIÓN: SUBASTA PROGRAMADA' : 'ZONA DE EJECUCIÓN: DETECCIÓN PRE-SUBASTA';
           
           div.style.borderLeftColor = borderClr;
@@ -2495,7 +3657,7 @@
           if (auc.needs_manual_review === 2) {
             manualReviewAlert = `
               <div style="margin-top: 8px; padding: 8px; background: rgba(139, 92, 246, 0.15); border: 1px solid rgba(139, 92, 246, 0.3); border-radius: 4px; font-size: 0.72rem; color: #d8b4fe; display: flex; align-items: flex-start; gap: 6px; line-height: 1.4;">
-                <span>🤖</span>
+                <i data-lucide="bot" class="inline-icon" style="color: #c084fc"></i>
                 <div>
                   <strong>Sinceridad del Sistema (Hibernación):</strong> Búsqueda gratuita falló o datos incompletos. Al faltar más de 30 días, se programó un reintento para el <strong>${auc.next_retry_date || 'dentro de 15 días'}</strong> para optimizar costos de API de pago.
                 </div>
@@ -2504,7 +3666,7 @@
           } else if (auc.needs_manual_review === 1) {
             manualReviewAlert = `
               <div style="margin-top: 8px; padding: 8px; background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.3); border-radius: 4px; font-size: 0.72rem; color: #fca5a5; display: flex; align-items: flex-start; gap: 6px; line-height: 1.4;">
-                <span>⚠️</span>
+                <i data-lucide="alert-triangle" class="inline-icon" style="color: #ef4444"></i>
                 <div>
                   <strong>Revisión Manual Requerida:</strong> La extracción automática no pudo resolver detalles críticos de esta propiedad. Requiere inspección manual del PDF o registros de la corte.
                 </div>
@@ -2522,7 +3684,7 @@
 
           div.innerHTML = `
             <div class="distress-log-header">
-              <span style="color: ${borderClr}; font-weight: bold;">${emoji} ${titleStr} ${titleCheckBadge}</span>
+              <span style="color: ${borderClr}; font-weight: bold; display: flex; align-items: center; gap: 4px;"><i data-lucide="${iconName}" class="inline-icon" style="color: ${borderClr}"></i> ${titleStr} ${titleCheckBadge}</span>
               <span style="color: ${borderClr}">${auc.auction_date}</span>
             </div>
             <div><strong>Caso Judicial:</strong> ${auc.case_number}</div>
@@ -2543,7 +3705,7 @@
           div.style.borderLeftColor = 'var(--color-others-purple)';
           div.innerHTML = `
             <div class="distress-log-header">
-              <span style="color: var(--color-others-purple); font-weight: bold;">⚠️ Otros: Violación de Código Activa</span>
+              <span style="color: var(--color-others-purple); font-weight: bold; display: flex; align-items: center; gap: 4px;"><i data-lucide="alert-triangle" class="inline-icon" style="color: var(--color-others-purple)"></i> Otros: Violación de Código Activa</span>
               <span style="color: var(--color-others-purple)">${v.report_date || 'Reciente'}</span>
             </div>
             <div><strong>Caso Violación:</strong> ${v.case_number}</div>
@@ -2563,7 +3725,7 @@
           div.style.borderLeftColor = 'var(--color-others-purple)';
           div.innerHTML = `
             <div class="distress-log-header">
-              <span style="color: var(--color-others-purple); font-weight: bold;">👤 Otros: Sucesiones (Probate)</span>
+              <span style="color: var(--color-others-purple); font-weight: bold; display: flex; align-items: center; gap: 4px;"><i data-lucide="file-text" class="inline-icon" style="color: var(--color-others-purple)"></i> Otros: Sucesiones (Probate)</span>
               <span style="color: var(--color-others-purple)">Caso: ${p.case_number}</span>
             </div>
             <div><strong>De Cujus (Fallecido):</strong> ${p.deceased_name}</div>
@@ -2582,7 +3744,7 @@
           div.style.borderLeftColor = 'var(--color-others-purple)';
           div.innerHTML = `
             <div class="distress-log-header">
-              <span style="color: var(--color-others-purple); font-weight: bold;">👤 Otros: Demanda de Divorcio</span>
+              <span style="color: var(--color-others-purple); font-weight: bold; display: flex; align-items: center; gap: 4px;"><i data-lucide="heart-off" class="inline-icon" style="color: var(--color-others-purple)"></i> Otros: Demanda de Divorcio</span>
               <span style="color: var(--color-others-purple)">Caso: ${d.case_number}</span>
             </div>
             <div><strong>Cónyuge A:</strong> ${d.spouse_a}</div>
@@ -2601,7 +3763,7 @@
           div.style.borderLeftColor = 'var(--color-others-purple)';
           div.innerHTML = `
             <div class="distress-log-header">
-              <span style="color: var(--color-others-purple); font-weight: bold;">👤 Otros: Declaración de Bancarrota</span>
+              <span style="color: var(--color-others-purple); font-weight: bold; display: flex; align-items: center; gap: 4px;"><i data-lucide="trending-down" class="inline-icon" style="color: var(--color-others-purple)"></i> Otros: Declaración de Bancarrota</span>
               <span style="color: var(--color-others-purple)">Caso: ${b.case_number}</span>
             </div>
             <div><strong>Deudor Principal:</strong> ${b.debtor_name}</div>
@@ -2620,7 +3782,7 @@
           div.style.borderLeftColor = 'var(--color-physical-amber)';
           div.innerHTML = `
             <div class="distress-log-header">
-              <span style="color: var(--color-physical-amber); font-weight: bold;">🔥 Estrés Físico / Abandono Municipal</span>
+              <span style="color: var(--color-physical-amber); font-weight: bold; display: flex; align-items: center; gap: 4px;"><i data-lucide="flame" class="inline-icon" style="color: var(--color-physical-amber)"></i> Estrés Físico / Abandono Municipal</span>
               <span style="color: var(--color-physical-amber)">${pd.report_date || 'Reciente'}</span>
             </div>
             <div><strong>Infracción:</strong> ${pd.distress_type}</div>
@@ -2640,7 +3802,7 @@
           const debtStr = fd.debt_amount ? `$${fd.debt_amount.toLocaleString()}` : 'No especificada';
           div.innerHTML = `
             <div class="distress-log-header">
-              <span style="color: var(--color-financial-yellow); font-weight: bold;">⚖️ Otros: Gravamen / Demanda Financiera</span>
+              <span style="color: var(--color-financial-yellow); font-weight: bold; display: flex; align-items: center; gap: 4px;"><i data-lucide="scale" class="inline-icon" style="color: var(--color-financial-yellow)"></i> Otros: Gravamen / Demanda Financiera</span>
               <span style="color: var(--color-financial-yellow)">${fd.report_date || 'Reciente'}</span>
             </div>
             <div><strong>Tipo:</strong> ${fd.record_type}</div>
@@ -2661,7 +3823,7 @@
           div.style.borderLeftColor = 'var(--color-others-purple)';
           div.innerHTML = `
             <div class="distress-log-header">
-              <span style="color: var(--color-others-purple); font-weight: bold;">👤 Otros: Evento de Vida Crítico</span>
+              <span style="color: var(--color-others-purple); font-weight: bold; display: flex; align-items: center; gap: 4px;"><i data-lucide="alert-circle" class="inline-icon" style="color: var(--color-others-purple)"></i> Otros: Evento de Vida Crítico</span>
               <span style="color: var(--color-others-purple)">${le.report_date || 'Reciente'}</span>
             </div>
             <div><strong>Tipo:</strong> ${le.event_type}</div>
@@ -2676,7 +3838,7 @@
         logsContainer.innerHTML = `<div style="font-size: 0.75rem; color: var(--text-muted);">Sin registros específicos de distress.</div>`;
       }
 
-      // OSINT Contacts
+      // Contactos de Propietario (Format & Clean source prefixes)
       const contactsContainer = document.getElementById('contacts-container');
       contactsContainer.innerHTML = '';
       
@@ -2684,40 +3846,51 @@
       const emails = lead.emails || [];
 
       phones.forEach(phone => {
+        const contactInfo = formatContact(phone, false);
         const div = document.createElement('div');
         div.className = 'contact-item';
+        const badgeHtml = contactInfo.isDNC 
+          ? `<span style="font-size: 0.6rem; font-weight: bold; background: rgba(239, 68, 68, 0.15); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.3); padding: 1px 4px; border-radius: 3px; margin-left: 6px; display: inline-flex; align-items: center; gap: 2px;"><i data-lucide="shield-alert" class="inline-icon" style="width: 10px; height: 10px; margin-right: 2px; stroke-width: 2.2;"></i> CONTACTO RESTRINGIDO</span>`
+          : '';
         div.innerHTML = `
           <div class="contact-info">
-            <span class="contact-type">Teléfono Celular / Propietario</span>
-            <span class="contact-value">${phone}</span>
+            <span class="contact-type" style="display: flex; align-items: center; gap: 4px;">
+              ${contactInfo.label} ${badgeHtml}
+            </span>
+            <span class="contact-value">${contactInfo.value}</span>
           </div>
-          <a class="contact-action-btn" href="tel:${phone}">Llamar</a>
+          <a class="contact-action-btn" href="tel:${contactInfo.value}">Llamar</a>
         `;
         contactsContainer.appendChild(div);
       });
 
       emails.forEach(email => {
+        const contactInfo = formatContact(email, true);
         const div = document.createElement('div');
         div.className = 'contact-item';
         div.innerHTML = `
           <div class="contact-info">
-            <span class="contact-type">Correo Electrónico Cruzado</span>
-            <span class="contact-value">${email}</span>
+            <span class="contact-type">${contactInfo.label}</span>
+            <span class="contact-value">${contactInfo.value}</span>
           </div>
-          <a class="contact-action-btn" href="mailto:${email}">Enviar Mail</a>
+          <a class="contact-action-btn" href="mailto:${contactInfo.value}">Enviar Mail</a>
         `;
         contactsContainer.appendChild(div);
       });
 
       if (phones.length === 0 && emails.length === 0) {
-        contactsContainer.innerHTML = `<div style="font-size: 0.75rem; color: var(--text-muted);">Sin contactos cruzados en OSINT Skip-Trace.</div>`;
+        contactsContainer.innerHTML = `<div style="font-size: 0.75rem; color: var(--text-muted);">Sin contactos de propietario registrados.</div>`;
       }
+      
+      // Update favorite button in the drawer header
+      updateDrawerFavButton();
 
       // Build call scripts tabs and content
       buildCallScripts(lead, activeDistressCategories);
 
       // Open drawer in screen
       openDrawer();
+      lucide.createIcons();
     }
 
     function buildCallScripts(lead, categories) {
@@ -2729,7 +3902,8 @@
       // 1. Stacking Script (Always first if High Motivation)
       if (lead.isHighMotivation) {
         scripts['alta-motivacion'] = {
-          name: '🔥 Alta Mot.',
+          name: 'Alta Mot.',
+          icon: 'flame',
           text: `[GUION ALTA MOTIVACIÓN - URGENTE]\nHola, buenas tardes. ¿Hablo con ${lead.ownerName}? Le llamo en relación con la propiedad en ${lead.displayAddress}.\nVi que tiene programada una subasta hipotecaria muy pronto y además cuenta con algunos reportes pendientes con la municipalidad.\nEntiendo perfectamente que esta situación es estresante. Represento a un fondo de inversión local. Nos especializamos en detener subastas de ejecución hipotecaria antes de la fecha límite cubriendo la deuda judicial de $${(lead.primaryDebt || 0).toLocaleString()} directamente y absorbiendo las multas y reparaciones de inmediato, dejándole a usted con liquidez en mano y salvando su historial de crédito.\n¿Le interesaría revisar una propuesta de compra directa en efectivo hoy mismo antes de que la propiedad vaya a subasta pública?`
         };
       }
@@ -2738,7 +3912,8 @@
       if (categories.includes('auction')) {
         const firstAuc = lead.auctions[0];
         scripts['subasta'] = {
-          name: '⏳ Subasta',
+          name: 'Subasta',
+          icon: 'gavel',
           text: `[GUION DE SUBASTA HIPOTECARIA]\nHola, buenas tardes. ¿Hablo con ${lead.ownerName}? Le llamo respecto a la propiedad en ${lead.displayAddress}.\nVi en los registros de la corte del condado que tienen programada una subasta de ejecución hipotecaria para el ${firstAuc.auction_date} por la demanda presentada por ${firstAuc.plaintiff || 'el banco'}.\n¿Está enterado de esta fecha? Quería poner a su disposición nuestra ayuda. Nosotros podemos liquidar la deuda pendiente de $${(lead.primaryDebt || 0).toLocaleString()} con el juzgado de forma directa para cancelar la subasta de inmediato. Esto le evita perder todo su capital acumulado y protege su récord crediticio de una ejecución formal.\n¿Le gustaría evaluar una oferta de rescate de capital hoy?`
         };
       }
@@ -2746,56 +3921,64 @@
       if (categories.includes('violation')) {
         const firstViol = lead.violations[0];
         scripts['violacion'] = {
-          name: '⚠️ Violación',
+          name: 'Violación',
+          icon: 'alert-triangle',
           text: `[GUION DE VIOLACIÓN DE CÓDIGO]\nHola, buenas tardes. ¿Hablo con ${lead.ownerName}? Le llamo en relación a su propiedad ubicada en ${lead.displayAddress}.\nEstaba revisando los registros del departamento de cumplimiento de códigos y noté que tiene un caso activo abierto (${firstViol.violation_type}) y entiendo que las multas de la ciudad pueden acumularse con mucha rapidez.\nCompramos propiedades en su zona exactamente en el estado en que se encuentran (as-is), haciéndonos cargo de todas las reparaciones mayores necesarias y liquidando todas las multas acumuladas con la municipalidad en el momento del cierre. Así usted se desentiende de este problema sin gastar un solo dólar de su bolsillo.\n¿Estaría dispuesto a recibir una oferta de compra en efectivo por la propiedad?`
         };
       }
 
       if (categories.includes('probate')) {
         scripts['probate'] = {
-          name: '🪦 Probate',
+          name: 'Probate',
+          icon: 'file-text',
           text: `[GUION DE SUCESIONES - SENSIBLE]\nHola, buenas tardes. ¿Hablo con ${lead.ownerName}? Ante todo, mi más sincero pésame por la pérdida familiar.\nLe contacto con mucho respeto en relación con la sucesión del inmueble en ${lead.displayAddress}.\nSabemos que administrar una sucesión y una propiedad heredada a menudo implica trámites legales complejos, mantenimiento costoso o deudas atrasadas. Nosotros compramos propiedades heredadas directamente al contado, absorbiendo los costos del proceso de legalización que falten y nos encargamos de vaciar o limpiar la casa tal como esté.\n¿Tiene planes de conservar la propiedad o consideraría una oferta en efectivo sin compromiso de su parte?`
         };
       }
 
       if (categories.includes('divorce')) {
         scripts['divorce'] = {
-          name: '💔 Divorcio',
+          name: 'Divorcio',
+          icon: 'heart-off',
           text: `[GUION DE LIQUIDACIÓN RÁPIDA - NEUTRAL]\nHola, buenas tardes. ¿Hablo con ${lead.ownerName}? Le llamo de forma directa respecto a la propiedad en ${lead.displayAddress}.\nSomos un grupo de inversión local y compramos casas al contado en esta zona. Vi que esta propiedad podría estar disponible para una venta de liquidación rápida.\nNosotros estructuramos compras simplificadas: cerramos en menos de 10 días, no requerimos inspecciones bancarias ni comisiones de agentes, y distribuimos los fondos del cheque de manera limpia entre las partes según lo disponga su acuerdo. Esto permite un cierre rápido y sin fricciones.\n¿Estarían interesados en recibir una cotización de compra en efectivo para esta propiedad?`
         };
       }
 
       if (categories.includes('bankruptcy')) {
         scripts['bankruptcy'] = {
-          name: '💸 Bancarrota',
+          name: 'Bancarrota',
+          icon: 'trending-down',
           text: `[GUION DE BANCARROTA / REESTRUCTURACIÓN]\nHola, buenas tardes. ¿Hablo con ${lead.ownerName}? Le contacto respecto a la propiedad en ${lead.displayAddress}.\nTrabajamos frecuentemente con propietarios en procesos de reestructuración financiera. Podemos formular una oferta de compra formal en efectivo lista para ser sometida a la aprobación del juez de quiebras.\nEsto le permite liquidar a sus acreedores garantizados de forma rápida, deteniendo acumulaciones de intereses y liberando su capital restante de forma limpia antes de que finalice el proceso judicial.\n¿Podríamos coordinar esta propuesta con usted o con su abogado de bancarrotas?`
         };
       }
 
       if (categories.includes('physical')) {
         scripts['physical'] = {
-          name: '🔥 Físico',
+          name: 'Físico',
+          icon: 'hammer',
           text: `[GUION DE ESTRÉS FÍSICO / DAÑO SEVERO]\nHola, buenas tardes. ¿Hablo con \${lead.ownerName}? Le contacto respecto a la propiedad en \${lead.displayAddress}.\nRevisando los registros de seguridad e inspección urbana, notamos reportes por daños o suspensión de servicios. Nos especializamos en adquirir propiedades con problemas de mantenimiento severos en efectivo.\nNosotros nos encargamos de vaciar el inmueble, resolver problemas estructurales y liquidar adeudos de servicios municipales. Usted recibe su pago en efectivo sin tener que invertir dinero ni tiempo en reparaciones.\n¿Consideraría evaluar una oferta en efectivo en las condiciones actuales de la casa?`
         };
       }
 
       if (categories.includes('financial')) {
         scripts['financial'] = {
-          name: '⚖️ Finanzas',
+          name: 'Finanzas',
+          icon: 'scale',
           text: `[GUION DE ESTRÉS FINANCIERO / GRAVAMENES]\nHola, buenas tardes. ¿Hablo con \${lead.ownerName}? Le llamo en relación a la propiedad en \${lead.displayAddress}.\nRevisando los registros del condado, notamos algunos gravámenes pendientes o reclamaciones comerciales. Nuestro fondo adquiere propiedades directamente haciéndose cargo de saldar estas deudas pendientes en el momento de la compra.\nEsto le permite liberar el título de la casa de inmediato, detener recargos y recuperar una parte sustancial de su dinero en efectivo.\n¿Le interesaría recibir una oferta para liquidar la propiedad y saldar estos saldos pendientes de forma directa?`
         };
       }
 
       if (categories.includes('life-event')) {
         scripts['life-event'] = {
-          name: '🚨 Evento Vida',
+          name: 'Evento Vida',
+          icon: 'alert-circle',
           text: `[GUION DE EVENTOS DE VIDA CRÍTICOS]\nHola, buenas tardes. ¿Hablo con \${lead.ownerName}? Le contacto en relación al inmueble en \${lead.displayAddress}.\nCompramos propiedades al contado de forma rápida y confidencial en su condado. Sabemos que a veces surgen situaciones imprevistas o cambios familiares que requieren liquidez de forma inmediata.\nPodemos formalizar un contrato de compra en 24 horas y cerrar la transacción en pocos días sin intermediarios, comisiones, ni visitas públicas al inmueble.\n¿Le gustaría evaluar una propuesta de compra rápida en efectivo hoy de forma totalmente privada?`
         };
       }
 
       // Default script (Always available)
       scripts['general'] = {
-        name: '📞 General',
+        name: 'General',
+        icon: 'phone',
         text: `[GUION GENERAL DE COMPRA DIRECTA]\nHola, buenas tardes. ¿Hablo con ${lead.ownerName}? Le llamo respecto a la propiedad en ${lead.displayAddress}.\nSomos inversionistas locales y compramos casas al contado en esta zona. No cobramos comisiones de intermediarios y compramos la casa en cualquier condición física.\n¿Ha considerado vender la propiedad o recibir una propuesta de compra en efectivo sin ningún compromiso de su parte?\nEstaremos listos para enviar una cotización formal en menos de 24 horas.`
       };
 
@@ -2806,7 +3989,7 @@
         
         const tab = document.createElement('button');
         tab.className = `script-tab ${idx === 0 ? 'active' : ''}`;
-        tab.textContent = scripts[key].name;
+        tab.innerHTML = `<i data-lucide="${scripts[key].icon}" class="inline-icon"></i> <span>${scripts[key].name}</span>`;
         tab.onclick = () => {
           // Switch active tab
           const tabs = tabContainer.querySelectorAll('.script-tab');
@@ -2868,19 +4051,19 @@
             const judgmentAmt = item.judgment_amount || 0;
             
             tr.innerHTML = `
-              <td style="font-weight: bold; color: #ffffff; padding: 14px 16px;">${item.owner_name}</td>
+              <td style="font-weight: bold; color: var(--text-main); padding: 14px 16px;">${item.owner_name}</td>
               <td style="color: var(--text-muted); padding: 14px 16px;">${item.address}</td>
               <td style="text-align: right; color: var(--text-muted); padding: 14px 16px;">$${judgmentAmt.toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
               <td style="text-align: right; color: var(--text-muted); padding: 14px 16px;">$${winningBid.toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
-              <td style="text-align: right; font-weight: bold; color: var(--color-radar-green); font-size: 1rem; padding: 14px 16px;">$${surplusVal.toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
+              <td style="text-align: right; font-weight: bold; color: var(--color-radar-green-dark); font-size: 1rem; padding: 14px 16px;">$${surplusVal.toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
               <td style="padding: 14px 16px;">
-                <code style="background: rgba(255,255,255,0.05); padding: 4px 8px; border-radius: 4px; color: var(--color-financial-yellow); font-family: monospace; font-size: 0.85rem;">
-                  ${item.defendant_phones || 'Sin teléfono'}
+                <code style="background: var(--bg-darker); padding: 4px 8px; border-radius: 4px; color: #854d0e; font-family: monospace; font-size: 0.85rem;">
+                  ${cleanAllPhoneTags(item.defendant_phones)}
                 </code>
               </td>
               <td style="text-align: center; color: var(--text-muted); padding: 14px 16px;">${daysStr}</td>
               <td style="text-align: center; padding: 14px 16px;">
-                <button class="copy-surplus-script-btn" onclick="copySurplusScript('${item.owner_name.replace(/'/g, "\\'")}', '${item.address.replace(/'/g, "\\'")}', '${item.county ? item.county.replace(/'/g, "\\'") : 'Jefferson'}', ${winningBid}, ${judgmentAmt}, ${surplusVal}, this)" style="background: rgba(16, 185, 129, 0.1); border: 1px solid var(--color-radar-green); color: var(--color-radar-green); padding: 6px 12px; border-radius: 4px; font-size: 0.75rem; cursor: pointer; transition: all 0.2s; font-family: 'Orbitron', sans-serif; font-weight: bold; outline: none;">
+                <button class="copy-surplus-script-btn" onclick="copySurplusScript('${item.owner_name.replace(/'/g, "\\'")}', '${item.address.replace(/'/g, "\\'")}', '${item.county ? item.county.replace(/'/g, "\\'") : 'Jefferson'}', ${winningBid}, ${judgmentAmt}, ${surplusVal}, this)" style="background: var(--color-radar-green-pastel); border: 1px solid var(--color-radar-green-border); color: var(--color-radar-green-dark); padding: 6px 12px; border-radius: 30px; font-size: 0.75rem; cursor: pointer; transition: all 0.2s; font-family: 'Inter', sans-serif; font-weight: bold; outline: none;">
                   Copiar Guión
                 </button>
               </td>
@@ -2979,23 +4162,24 @@ Este dinero le pertenece legalmente a usted, pero si no se reclama a tiempo pued
         const redfinUrl = `https://www.redfin.com/property/search?queryString=${searchEscaped}`;
         
         tr.innerHTML = `
-          <td style="padding: 12px 16px; font-weight: bold; color: #ffffff;">${lead.ownerName}</td>
+          <td style="padding: 12px 16px; font-weight: bold; color: var(--text-main);">${lead.ownerName}</td>
           <td style="padding: 12px 16px; color: var(--text-main);">${lead.displayAddress}</td>
           <td style="padding: 12px 16px; color: var(--text-muted);">${lead.county}, ${lead.state}</td>
           <td style="padding: 12px 16px; color: var(--text-main);">${lead.isAbsentee ? 'Ausente' : 'Residente'}</td>
-          <td style="padding: 12px 16px;"><span class="badge" style="background: rgba(255,255,255,0.03); color: ${typeColor}; border: 1px solid ${typeColor};">${typeText}</span></td>
-          <td style="padding: 12px 16px; text-align: center;"><span class="badge" style="background: rgba(255,255,255,0.03); color: ${tcColor}; border: 1px solid ${tcColor};">${tcText}</span></td>
+          <td style="padding: 12px 16px;"><span class="badge" style="background: var(--bg-darker); color: ${typeColor}; border: 1px solid ${typeColor};">${typeText}</span></td>
+          <td style="padding: 12px 16px; text-align: center;"><span class="badge" style="background: var(--bg-darker); color: ${tcColor}; border: 1px solid ${tcColor};">${tcText}</span></td>
           <td style="padding: 12px 16px; text-align: center;">
             <div style="display: flex; gap: 8px; justify-content: center;">
-              <a href="${zillowUrl}" target="_blank" class="contact-action-btn" style="background: rgba(0, 106, 255, 0.15); border-color: rgba(0, 106, 255, 0.3); color: #3b82f6; text-decoration: none;">Zillow 🔗</a>
-              <a href="${redfinUrl}" target="_blank" class="contact-action-btn" style="background: rgba(230, 0, 0, 0.15); border-color: rgba(230, 0, 0, 0.3); color: #ef4444; text-decoration: none;">Redfin 🔗</a>
-              <button onclick="closeZeroDebtVault(); window.openLeadDrawer('${lead.groupingKey}')" class="contact-action-btn" style="background: rgba(16, 185, 129, 0.15); border-color: rgba(16, 185, 129, 0.3); color: var(--color-radar-green); cursor: pointer;">Ficha Táctica</button>
+              <a href="${zillowUrl}" target="_blank" class="contact-action-btn" style="background: rgba(0, 106, 255, 0.08); border-color: rgba(0, 106, 255, 0.2); color: #2563eb; text-decoration: none; display: inline-flex; align-items: center;">Zillow <i data-lucide="external-link" class="inline-icon" style="width: 10px; height: 10px; margin-left: 2px;"></i></a>
+              <a href="${redfinUrl}" target="_blank" class="contact-action-btn" style="background: rgba(220, 38, 38, 0.08); border-color: rgba(220, 38, 38, 0.2); color: #dc2626; text-decoration: none; display: inline-flex; align-items: center;">Redfin <i data-lucide="external-link" class="inline-icon" style="width: 10px; height: 10px; margin-left: 2px;"></i></a>
+              <button onclick="closeZeroDebtVault(); window.openLeadDrawer('${lead.groupingKey}')" class="contact-action-btn" style="background: var(--color-radar-green-pastel); border-color: var(--color-radar-green-border); color: var(--color-radar-green-dark); cursor: pointer;">Ficha Táctica</button>
             </div>
           </td>
         `;
         
         tbody.appendChild(tr);
       });
+      lucide.createIcons();
     }
   </script>
 </body>

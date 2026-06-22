@@ -1,6 +1,7 @@
 import axios from "axios";
 import { createClient } from "@libsql/client";
 import * as dotenv from "dotenv";
+import * as path from "path";
 import { calculateRehab, calculateMAO, calculateROI, isJuniorLien, calculateNetEquity, isUnderwater, checkCriticalRisk } from "./underwriting/underwriter";
 import { querySearXNG } from "./searxng_client";
 
@@ -1518,14 +1519,31 @@ async function notifyOpportunities(mode?: 'legal' | 'physical') {
     const googleMapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(lead.displayAddress)}`;
     const pvaUrl = getPvaUrl(lead.county, lead.state);
     
-    const replyMarkup = {
-      inline_keyboard: [
-        [
-          { text: "📍 Google Maps (Street View)", url: googleMapsUrl },
-          { text: "🏢 Consultar Catastro PVA", url: pvaUrl }
-        ]
+    const inline_keyboard: any[][] = [
+      [
+        { text: "📍 Google Maps (Street View)", url: googleMapsUrl },
+        { text: "🏢 Consultar Catastro PVA", url: pvaUrl }
       ]
-    };
+    ];
+
+    const pvaPhoto = lead.photoUrls.find(p => p.includes("pva_photos"));
+    const svPhotos = lead.photoUrls.filter(p => p.includes("streetview_images"));
+
+    const photoButtons: any[] = [];
+    if (pvaPhoto) {
+      const cleanPath = path.relative(path.resolve("./"), path.resolve(pvaPhoto)).replace(/\\/g, "/");
+      photoButtons.push({ text: "📸 Ver Foto PVA", url: `http://localhost:3000/${cleanPath}` });
+    }
+    if (svPhotos.length > 0) {
+      const cleanPath = path.relative(path.resolve("./"), path.resolve(svPhotos[0])).replace(/\\/g, "/");
+      photoButtons.push({ text: "⏳ Fachada SV Histórica", url: `http://localhost:3000/${cleanPath}` });
+    }
+
+    if (photoButtons.length > 0) {
+      inline_keyboard.push(photoButtons);
+    }
+
+    const replyMarkup = { inline_keyboard };
 
     console.log(`[ALERTANDO] Enviando alerta agrupada para: ${lead.displayAddress} (Subastas: ${lead.auctions.length}, Violaciones: ${lead.violations.length}, Herencias: ${lead.probates.length}, Divorcios: ${lead.divorces.length}, Quiebras: ${lead.bankruptcies.length})...`);
     

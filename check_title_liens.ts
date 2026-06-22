@@ -83,17 +83,18 @@ async function scrapeCountyClerk(ownerName: string, county: string, state: strin
     return 0;
   }
 
-  const browser = await chromium.launch({ headless: true });
-  const context = await browser.newContext({
-    userAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-    viewport: { width: 1280, height: 800 },
-    locale: "en-US",
-  });
-  const page = await context.newPage();
-
+  let browser;
   let totalSecondaryDebt = 0;
 
   try {
+    browser = await chromium.launch({ headless: true });
+    const context = await browser.newContext({
+      userAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+      viewport: { width: 1280, height: 800 },
+      locale: "en-US",
+    });
+    const page = await context.newPage();
+
     const cleanOwner = ownerName.replace(/["']/g, "").trim();
     // Búsqueda de registros públicos del secretario/registrador de ese deudor
     const query = `"${cleanOwner}" ${county} county clerk recorder (Mortgage OR Lien OR Judgment OR Mechanic)`;
@@ -153,7 +154,9 @@ async function scrapeCountyClerk(ownerName: string, county: string, state: strin
   } catch (err: any) {
     console.error(`[FALLBACK CLERK ERROR] Falló el crawling de registros: ${err.message}`);
   } finally {
-    await browser.close();
+    if (browser) {
+      await browser.close();
+    }
   }
 
   return totalSecondaryDebt;

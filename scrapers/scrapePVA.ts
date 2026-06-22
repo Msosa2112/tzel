@@ -91,7 +91,14 @@ function simulatePVAPortal(address: string): { ownerName: string; mailingAddress
  * peticiones HTTP POST con el número de casa y nombre de la calle, cargando cheerio para extraer
  * la tabla de resultados.
  */
+let consecutiveSolverErrors = 0;
+let disableRealScrapeMode = false;
+
 async function attemptRealPVAScrape(address: string): Promise<{ ownerName: string; mailingAddress: string } | null> {
+  if (disableRealScrapeMode) {
+    return null;
+  }
+
   const cleanAddr = address.split(",")[0].trim();
   const addressParts = cleanAddr.split(/\s+/);
   
@@ -132,20 +139,35 @@ async function attemptRealPVAScrape(address: string): Promise<{ ownerName: strin
     const hasCF = htmlContent ? cfKeywords.some(kw => htmlContent.includes(kw)) : true;
 
     if (!htmlContent || hasCF) {
+      if (consecutiveSolverErrors >= 3) {
+        console.log(`[PVA SCRAPER] Demasiados errores consecutivos de FlareSolverr (${consecutiveSolverErrors}). Saltando scrapeo real para evitar lentitud.`);
+        disableRealScrapeMode = true;
+        return null;
+      }
+      
       console.log(`[PVA SCRAPER] Cloudflare detectado o respuesta vacía. Canalizando a través de FlareSolverr local...`);
       const solverUrl = process.env.FLARESOLVERR_URL || "http://localhost:8191/v1";
       const postData = `StreetNumber=${encodeURIComponent(houseNumber)}&StreetName=${encodeURIComponent(streetName)}&btnSearch=Search`;
       
-      const solverRes = await axios.post(solverUrl, {
-        cmd: "request.post",
-        url: url,
-        postData: postData,
-        maxTimeout: 60000
-      }, { timeout: 65000 });
+      try {
+        const solverRes = await axios.post(solverUrl, {
+          cmd: "request.post",
+          url: url,
+          postData: postData,
+          maxTimeout: 10000
+        }, { timeout: 12000 });
 
-      if (solverRes.data && solverRes.data.status === "ok") {
-        htmlContent = solverRes.data.solution.response;
-        console.log(`[PVA SCRAPER] FlareSolverr bypass exitoso para ${cleanAddr}.`);
+        if (solverRes.data && solverRes.data.status === "ok") {
+          htmlContent = solverRes.data.solution.response;
+          console.log(`[PVA SCRAPER] FlareSolverr bypass exitoso para ${cleanAddr}.`);
+          consecutiveSolverErrors = 0; // reset on success
+        } else {
+          console.log(`[PVA SCRAPER] FlareSolverr retornó estado no-ok para ${cleanAddr}.`);
+          consecutiveSolverErrors++;
+        }
+      } catch (err: any) {
+        console.log(`[PVA SCRAPER] Petición a FlareSolverr falló/timeout para ${cleanAddr}: ${err.message}`);
+        consecutiveSolverErrors++;
       }
     }
 

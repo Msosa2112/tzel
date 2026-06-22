@@ -20,6 +20,9 @@ import { runBatchDataIngestor } from "./scrapers/batchdata_ingestor";
 import { scrapeStatePublicNotices } from "./scrapers/state_public_notices_scraper";
 import { runCountyDeedsAuditor } from "./scrapers/county_deeds_auditor";
 import { runDebtRetrySweep } from "./scrapers/debt_retry_sweep";
+import { runFuzzyOwnerUnification } from "./scrapers/fuzzy_identity_matcher";
+import { runCountyMediaRetriever } from "./scrapers/county_media_retriever";
+import { runStreetViewStitcher } from "./scrapers/streetview_stitcher";
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -186,6 +189,13 @@ async function runPipeline() {
     console.error("[CAPA 2 ERROR] Falló el módulo de Skip Tracing:", err.message);
   }
 
+  try {
+    console.log("\n[CAPA 2 - FASE 4.5] Ejecutando Unificación Difusa de Propietarios (Levenshtein)...");
+    await runFuzzyOwnerUnification();
+  } catch (err: any) {
+    console.error("[CAPA 2 ERROR] Falló la unificación difusa de propietarios:", err.message);
+  }
+
   // =================================================================
   // CAPA 3: AUDITORÍA FINANCIERA Y GRAVÁMENES (FINANCIAL AUDIT & TITLE CHECK)
   // =================================================================
@@ -216,6 +226,20 @@ async function runPipeline() {
     await runDebtRetrySweep();
   } catch (err: any) {
     console.error("[CAPA 3 ERROR] Falló la barrida de reintentos profundos de deudas:", err.message);
+  }
+
+  try {
+    console.log("\n[CAPA 3 - FASE 2.7] Descargando Fotos Oficiales de Catastro (PVA/eCCLIX)...");
+    await runCountyMediaRetriever();
+  } catch (err: any) {
+    console.error("[CAPA 3 ERROR] Falló la descarga de fotos de PVA/eCCLIX:", err.message);
+  }
+
+  try {
+    console.log("\n[CAPA 3 - FASE 2.8] Descargando e Hilando Street View de Alta Resolución... [OMITIDO POR SOLICITUD DEL USUARIO]");
+    // await runStreetViewStitcher();
+  } catch (err: any) {
+    console.error("[CAPA 3 ERROR] Falló la costura de Street View:", err.message);
   }
 
   // =================================================================

@@ -228,10 +228,10 @@ async function resolveMissingValuations() {
   console.log("=================================================================");
 
   const tables = [
-    { name: "foreclosure_auctions", idCol: "auction_id", query: "SELECT auction_id, address, state FROM foreclosure_auctions WHERE mls_estimated_value IS NULL OR mls_estimated_value = 0 OR mls_status = 'not_found'" },
-    { name: "code_violations", idCol: "violation_id", query: "SELECT violation_id, address, 'KY' as state FROM code_violations WHERE mls_estimated_value IS NULL OR mls_estimated_value = 0 OR mls_status = 'not_found'" },
-    { name: "physical_distress", idCol: "distress_id", query: "SELECT distress_id, address, state FROM physical_distress WHERE mls_estimated_value IS NULL OR mls_estimated_value = 0 OR mls_status = 'not_found'" },
-    { name: "financial_distress", idCol: "record_id", query: "SELECT record_id, address, state FROM financial_distress WHERE mls_estimated_value IS NULL OR mls_estimated_value = 0 OR mls_status = 'not_found'" }
+    { name: "foreclosure_auctions", idCol: "auction_id", query: "SELECT auction_id, address, state FROM foreclosure_auctions WHERE (mls_estimated_value IS NULL OR mls_estimated_value = 0) AND mls_status = 'not_found'" },
+    { name: "code_violations", idCol: "violation_id", query: "SELECT violation_id, address, 'KY' as state FROM code_violations WHERE (mls_estimated_value IS NULL OR mls_estimated_value = 0) AND mls_status = 'not_found'" },
+    { name: "physical_distress", idCol: "distress_id", query: "SELECT distress_id, address, state FROM physical_distress WHERE (mls_estimated_value IS NULL OR mls_estimated_value = 0) AND mls_status = 'not_found'" },
+    { name: "financial_distress", idCol: "record_id", query: "SELECT record_id, address, state FROM financial_distress WHERE (mls_estimated_value IS NULL OR mls_estimated_value = 0) AND mls_status = 'not_found'" }
   ];
 
   let totalProcessed = 0;
