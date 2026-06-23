@@ -82,6 +82,7 @@ CREATE TABLE IF NOT EXISTS code_violations (
     defendant_phones TEXT,
     defendant_emails TEXT,
     telegram_sent INTEGER DEFAULT 0,
+    needs_manual_review INTEGER DEFAULT 0,
     mailing_address TEXT,
     absentee_owner INTEGER DEFAULT 0,
     sqft INTEGER,
@@ -158,6 +159,7 @@ CREATE TABLE IF NOT EXISTS physical_distress (
     mls_id TEXT,
     defendant_phones TEXT,
     defendant_emails TEXT,
+    needs_manual_review INTEGER DEFAULT 0,
     mailing_address TEXT,
     absentee_owner INTEGER DEFAULT 0,
     sqft INTEGER,
@@ -190,6 +192,7 @@ CREATE TABLE IF NOT EXISTS financial_distress (
     mls_id TEXT,
     defendant_phones TEXT,
     defendant_emails TEXT,
+    needs_manual_review INTEGER DEFAULT 0,
     mailing_address TEXT,
     absentee_owner INTEGER DEFAULT 0,
     sqft INTEGER,
@@ -220,6 +223,7 @@ CREATE TABLE IF NOT EXISTS life_events (
     mls_id TEXT,
     defendant_phones TEXT,
     defendant_emails TEXT,
+    needs_manual_review INTEGER DEFAULT 0,
     mailing_address TEXT,
     absentee_owner INTEGER DEFAULT 0,
     sqft INTEGER,
@@ -260,6 +264,30 @@ CREATE TABLE IF NOT EXISTS portfolio_clusters (
     risk_score REAL DEFAULT 0,
     stress_score INTEGER DEFAULT 0,
     telegram_ssi_sent INTEGER DEFAULT 0,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Tabla de Pre-Leads para el scraper Go-Colly y Google Dorking
+CREATE TABLE IF NOT EXISTS pre_leads (
+    pre_lead_id TEXT PRIMARY KEY, -- Hash o llave única de la dirección/fuente
+    address TEXT NOT NULL,
+    parcel_id TEXT,
+    defendant TEXT,
+    auction_date TEXT,
+    source TEXT, -- 'Colly' o 'GoogleDorking'
+    status TEXT DEFAULT 'pending', -- 'pending', 'converted', 'ignored'
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Tabla de Enriquecimiento OSINT (LLC Unmasking, Sherlock/Holehe, Overpass OSM)
+CREATE TABLE IF NOT EXISTS osint_enrichment (
+    address_key TEXT PRIMARY KEY, -- Llave de agrupación (dirección normalizada)
+    llc_directors TEXT, -- Array JSON de nombres de directores/agentes
+    corporate_address TEXT, -- Dirección de oficina corporativa registrada
+    social_profiles TEXT, -- Array JSON de perfiles de redes sociales/pagos (Venmo, LinkedIn, etc.)
+    usernames_found TEXT, -- Array JSON de perfiles de Sherlock por coincidencia de usuario
+    env_stressors TEXT, -- Array JSON de estresores OSM (railways, landfills, etc.)
+    env_attractors TEXT, -- Array JSON de atractores OSM (schools, parks, transit, etc.)
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 

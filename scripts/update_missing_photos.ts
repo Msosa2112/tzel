@@ -212,6 +212,8 @@ async function main() {
   console.log(`- Total de registros con nuevas fotos: ${totalUpdated}`);
   console.log("=================================================================");
 
+  const appUrl = process.env.APP_URL || "https://tzel.vercel.app";
+
   // Enviar mensaje de finalización a Telegram
   const telegramMessage = `📸 <b>TZEL PHOTO SCRAPER COMPLETADO</b> 📸\n\n` +
     `La búsqueda de fotos para registros existentes en Turso DB ha finalizado:\n` +
@@ -221,9 +223,10 @@ async function main() {
     `- Gravámenes actualizados: ${financialUpdated}\n` +
     `- Eventos de vida actualizados: ${lifeUpdated}\n\n` +
     `🎉 <b>Total de propiedades enriquecidas con nuevas fotos: ${totalUpdated}</b>\n` +
-    `👉 Abre http://localhost:3000 para visualizarlas en el mapa táctico.`;
+    `👉 Abre ${appUrl} para visualizarlas en el mapa táctico.`;
 
   await sendTelegram(telegramMessage);
+
 }
 
 main().catch(console.error);

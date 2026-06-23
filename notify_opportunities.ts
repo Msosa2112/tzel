@@ -172,10 +172,11 @@ function getDaysRemaining(dateStr: string): number | null {
   return null;
 }
 
+
 /**
  * Valida la existencia de un PDF de tasación judicial.
  */
-async function checkPdfUrl(pdfUrl: string): Promise<string> {
+async function checkPdfUrl(pdfUrl: string, parseMode: "Markdown" | "HTML" = "Markdown"): Promise<string> {
   try {
     console.log(`[CHECK PDF] Validando existencia de PDF: ${pdfUrl}`);
     const headResp = await axios.head(pdfUrl, {
@@ -185,12 +186,25 @@ async function checkPdfUrl(pdfUrl: string): Promise<string> {
       timeout: 3000
     });
     if (headResp.status === 200) {
-      return `📁 [Ver PDF de Tasación](${pdfUrl})`;
+      return parseMode === "HTML"
+        ? `📁 <a href="${pdfUrl}">Ver PDF de Tasación</a>`
+        : `📁 [Ver PDF de Tasación](${pdfUrl})`;
     }
   } catch (err) {
     // Falla silenciosa
   }
   return `📁 Tasación PDF: No disponible aún (se publica 1-2 semanas antes)`;
+}
+
+/**
+ * Escapa caracteres especiales de HTML para evitar errores de parseo en Telegram.
+ */
+function escapeHtml(text: string): string {
+  if (!text) return "";
+  return String(text)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
 }
 
 /**
@@ -200,6 +214,7 @@ async function sendTelegramNotification(
   message: string,
   replyMarkup?: any,
   photoUrl: string | null = null,
+  parseMode: "Markdown" | "HTML" = "Markdown",
   retryCount = 0
 ): Promise<boolean> {
   const token = process.env.TELEGRAM_BOT_TOKEN;
@@ -222,7 +237,7 @@ async function sendTelegramNotification(
         chat_id: chatId,
         photo: photoUrl,
         caption: message,
-        parse_mode: "Markdown"
+        parse_mode: parseMode
       };
       if (replyMarkup) {
         payload.reply_markup = replyMarkup;
@@ -235,27 +250,30 @@ async function sendTelegramNotification(
           const retryAfter = err.response?.data?.parameters?.retry_after || 9;
           console.warn(`[TELEGRAM 429] Rate limit en sendPhoto. Esperando ${retryAfter}s (Intento ${retryCount + 1})...`);
           await sleep(retryAfter * 1000);
-          return sendTelegramNotification(message, replyMarkup, photoUrl, retryCount + 1);
+          return sendTelegramNotification(message, replyMarkup, photoUrl, parseMode, retryCount + 1);
         }
         console.warn(`[TELEGRAM PHOTO WARNING] Falló el envío de foto con caption: ${err.message}. Reintentando texto...`);
       }
     } else {
       console.log("[TELEGRAM] Reporte largo detectado (> 1024). Enviando foto primero y luego el reporte...");
       const urlPhoto = `https://api.telegram.org/bot${token}/sendPhoto`;
-      const title = `📸 *Foto de Propiedad para:* ${message.split("\n")[0] || "Reporte de Oportunidad"}`;
+      const firstLine = message.split("\n")[0] || "Reporte de Oportunidad";
+      const title = parseMode === "HTML"
+        ? `📸 <b>Foto de Propiedad para:</b> ${firstLine}`
+        : `📸 *Foto de Propiedad para:* ${firstLine}`;
       try {
         await axios.post(urlPhoto, {
           chat_id: chatId,
           photo: photoUrl,
           caption: title,
-          parse_mode: "Markdown"
+          parse_mode: parseMode
         }, { timeout: 10000 });
       } catch (err: any) {
         if (err.response?.status === 429) {
           const retryAfter = err.response?.data?.parameters?.retry_after || 9;
           console.warn(`[TELEGRAM 429] Rate limit en sendPhoto previa. Esperando ${retryAfter}s (Intento ${retryCount + 1})...`);
           await sleep(retryAfter * 1000);
-          return sendTelegramNotification(message, replyMarkup, photoUrl, retryCount + 1);
+          return sendTelegramNotification(message, replyMarkup, photoUrl, parseMode, retryCount + 1);
         }
         console.warn(`[TELEGRAM PHOTO WARNING] Falló el envío de la foto previa: ${err.message}`);
       }
@@ -266,7 +284,7 @@ async function sendTelegramNotification(
   const payload: any = {
     chat_id: chatId,
     text: message,
-    parse_mode: "Markdown",
+    parse_mode: parseMode,
     disable_web_page_preview: true
   };
 
@@ -282,9 +300,12 @@ async function sendTelegramNotification(
       const retryAfter = e.response?.data?.parameters?.retry_after || 9;
       console.warn(`[TELEGRAM 429] Rate limit en sendMessage. Esperando ${retryAfter}s (Intento ${retryCount + 1})...`);
       await sleep(retryAfter * 1000);
-      return sendTelegramNotification(message, replyMarkup, photoUrl, retryCount + 1);
+      return sendTelegramNotification(message, replyMarkup, photoUrl, parseMode, retryCount + 1);
     }
     console.error(`[TELEGRAM EXCEPTION] Error al enviar mensaje: ${e.message || e}`);
+    if (e.response && e.response.data) {
+      console.error("[TELEGRAM RESPONSE ERROR DETAIL]:", JSON.stringify(e.response.data));
+    }
     return false;
   }
 }
@@ -385,12 +406,56 @@ async function searchLegalRadar(ownerName: string, city: string): Promise<boolea
 }
 
 /**
+ * Realiza una consulta rápida en el archivo Hister local.
+ */
+async function queryLocalArchive(addressOrName: string): Promise<{ total: number; documents: any[] }> {
+  try {
+    const searchUrl = `http://localhost:5005/search?q=${encodeURIComponent(addressOrName)}&format=json`;
+    const response = await axios.get(searchUrl, {
+      headers: {
+        "Origin": "hister://"
+      },
+      timeout: 4000
+    });
+    if (response.status === 200 && response.data) {
+      const total = response.data.total || 0;
+      const documents = response.data.documents || [];
+      return { total, documents };
+    }
+  } catch (err: any) {
+    console.warn(`[HISTER ARCHIVE WARN] Error al buscar en archivo local para "${addressOrName}": ${err.message}`);
+  }
+  return { total: 0, documents: [] };
+}
+
+/**
  * Despacha notificaciones para oportunidades de alta rentabilidad o revisiones manuales no notificadas,
  * agrupando múltiples incidencias (claims y violaciones) bajo una misma dirección física.
  */
 async function notifyOpportunities(mode?: 'legal' | 'physical') {
   console.log(`[INICIO] Buscando oportunidades sin notificar (Modo: ${mode || 'TODOS'})...`);
-  
+  const appUrl = process.env.APP_URL || "https://tzel.vercel.app";
+
+  // Cargar mapa de enriquecimiento OSINT
+  const osintMap = new Map<string, any>();
+  try {
+    const osintRes = await db.execute("SELECT address_key, llc_directors, corporate_address, social_profiles, usernames_found, env_stressors, env_attractors FROM osint_enrichment");
+    for (const row of osintRes.rows) {
+      if (row.address_key) {
+        osintMap.set(row.address_key as string, {
+          llcDirectors: row.llc_directors ? JSON.parse(row.llc_directors as string) : [],
+          corporateAddress: row.corporate_address as string || "",
+          socialProfiles: row.social_profiles ? JSON.parse(row.social_profiles as string) : [],
+          usernamesFound: row.usernames_found ? JSON.parse(row.usernames_found as string) : [],
+          envStressors: row.env_stressors ? JSON.parse(row.env_stressors as string) : [],
+          envAttractors: row.env_attractors ? JSON.parse(row.env_attractors as string) : [],
+        });
+      }
+    }
+  } catch (err: any) {
+    console.error("[OSINT LOAD WARNING] Failed to load osint enrichment for notifier:", err.message);
+  }
+
   // 1. Consultar subastas judiciales no notificadas
   let opportunities: any[] = [];
   if (mode !== 'physical') {
@@ -1185,114 +1250,37 @@ async function notifyOpportunities(mode?: 'legal' | 'physical') {
       }
     }
 
-    let painBanners: string[] = [];
-    let isPrimaryObjective = false;
-    
-    // CATEGORÍA 1: ZONA DE EJECUCIÓN (Prioridad Máxima)
-    if (lead.auctions.length > 0) {
-      const hasScheduled = lead.auctions.some(auc => getDaysRemaining(auc.auction_date) !== null);
-      if (hasScheduled) {
-        painBanners.push(`🛑 *ZONA DE EJECUCIÓN: SUBASTA PROGRAMADA* 🚨`);
-      } else {
-        painBanners.push(`🛑 *ZONA DE EJECUCIÓN: DETECCIÓN PRE-SUBASTA* ⏳`);
-      }
-      isPrimaryObjective = true;
-    }
-    
-    // CATEGORÍA 2: ESTRÉS FÍSICO
-    if (lead.physicalDistress.length > 0) {
-      painBanners.push(`🔥 *ESTRÉS FÍSICO: CASA QUEMADA / CONDENADA*`);
-    }
-    
-    // CATEGORÍA 3: OTROS ESTRESORES (Estrés Acumulado)
-    const hasFinancialDistress = lead.financialDistress.length > 0 || lead.bankruptcies.length > 0;
-    const hasLifeEventDistress = lead.lifeEvents.length > 0 || lead.probates.length > 0 || lead.divorces.length > 0 || lead.violations.length > 0;
-    if (hasFinancialDistress || hasLifeEventDistress) {
-      let details: string[] = [];
-      if (lead.financialDistress.some(d => d.record_type === "Eviction")) details.push("DESALOJO EN CURSO");
-      if (lead.financialDistress.some(d => d.record_type && d.record_type !== "Eviction")) details.push("TAX LIEN/SENTENCIA");
-      if (lead.lifeEvents.length > 0) details.push("ARRESTO/OBITUARIO");
-      if (lead.probates.length > 0) details.push("SUCESIÓN");
-      if (lead.divorces.length > 0) details.push("DIVORCIO");
-      if (lead.violations.length > 0) details.push("VIOLACIÓN DE CÓDIGO");
-      
-      const detailsStr = details.length > 0 ? ` (${details.join(" / ")})` : "";
-      painBanners.push(`⚠️ *OTROS ESTRESORES: ESTRÉS ACUMULADO${detailsStr}*`);
-    }
 
-    let msg = "";
-    if (isPrimaryObjective) {
-      msg += `🎯 *[OBJETIVO PRINCIPAL DEL DÍA]* 🎯\n`;
-    }
-    if (painBanners.length > 0) {
-      msg += painBanners.join("\n") + "\n\n";
-    }
-    if (isHighMotivation) {
-      msg += `🔥 *ALTA MOTIVACIÓN* 🔥\n\n`;
-    }
+    const pvaVal = (lead.auctions && lead.auctions.length > 0 && (lead.auctions[0] as any).appraisal_value > 0) ? (lead.auctions[0] as any).appraisal_value : 0;
+    const mcaVal = lead.mlsValue || 0;
+    const pvaOrMca = pvaVal > 0 ? pvaVal : mcaVal;
+    const totalDebt = primaryDebt + hiddenDebt;
+    const equitySpread = pvaOrMca > 0 ? (pvaOrMca - totalDebt) : 0;
+    const df = lead.state === 'KY' ? 0.66 : 0.70;
+    const mpo = Math.max(0, Math.round((pvaOrMca * df) - totalDebt));
 
-    if (hiddenDebt > 0) {
-      msg += `🏦 *HIPOTECAS OCULTAS DETECTADAS* 🏦\n`;
-      msg += `_Se detectaron deudas o gravámenes secundarios adicionales por $${hiddenDebt.toLocaleString("en-US", { minimumFractionDigits: 2 })}_\n\n`;
-    }
+    const pvaStr = pvaVal > 0 ? pvaVal.toLocaleString("en-US", { maximumFractionDigits: 0 }) : "0";
+    const mcaStr = mcaVal > 0 ? mcaVal.toLocaleString("en-US", { maximumFractionDigits: 0 }) : "0";
 
-    const hasProbates = lead.probates && lead.probates.length > 0;
-    const hasDivorces = lead.divorces && lead.divorces.length > 0;
-    const hasBankruptcies = lead.bankruptcies && lead.bankruptcies.length > 0;
+    const cleanAddr = escapeHtml(lead.displayAddress);
+    const cleanOwner = escapeHtml(lead.ownerName);
+    const cleanMail = escapeHtml(lead.mailingAddress || "");
 
-    if (isUnderwater(lead.mlsValue, primaryDebt, hiddenDebt)) {
-      msg += `⚠️ *ALERTA CRÍTICA: PROPIEDAD BAJO EL AGUA* ⚠️\n`;
-      msg += `_La deuda total acumulada supera el valor estimado de mercado (ARV)_\n\n`;
-    } else if ((hasAuctions && hasViolations) || [hasAuctions, hasViolations, hasProbates, hasDivorces, hasBankruptcies].filter(Boolean).length >= 2) {
-      msg += `🚨 *ALERTA DE OPORTUNIDAD: ESTRÉS MULTIDIMENSIONAL* 🚨\n`;
-      msg += `_Propiedad con acumulación de múltiples factores de estrés legal o físico_\n\n`;
-    } else if (hasAuctions) {
-      if (isIndianaHibernated) {
-        msg += `🤖 *SINCERIDAD DEL SISTEMA: BÚSQUEDA PAUSADA* 🤖\n`;
-        msg += `La búsqueda gratuita falló. Como la subasta es en ${daysRemaining} días (entre 30 y 60), he pausado el proceso para no gastar saldo de API. Hay un 75% de probabilidad de que la corte publique los datos pronto. Volveré a buscar automáticamente el ${nextRetryDate}.\n\n`;
-      } else if (isIndianaManual) {
-        msg += `⚠️ *REVISIÓN MANUAL REQUERIDA (INDIANA)* ⚠️\n`;
-        msg += `_El crawler no pudo extraer automáticamente la deuda de este expediente._\n\n`;
-      } else {
-        msg += `🚨 *OPORTUNIDAD DE ADQUISICIÓN PRE-SUBASTA* 🚨\n`;
-        msg += `_Propiedad identificada con margen de ganancia >= 30% del valor comercial MLS_\n\n`;
-      }
-    } else if (hasViolations) {
-      msg += `🚨 *OPORTUNIDAD PRE-PÚBLICA: VIOLACIÓN DE CÓDIGO* 🚨\n`;
-      msg += `_Propiedad con infracción física detectada y valorada mediante Spark MLS_\n\n`;
-    } else if (hasProbates) {
-      msg += `🚨 *ALERTA DE OPORTUNIDAD: SUCESIÓN / HERENCIA* 🚨\n`;
-      msg += `_Propiedad en proceso de sucesión (Probate) sin notificar_\n\n`;
-    } else if (hasDivorces) {
-      msg += `🚨 *ALERTA DE OPORTUNIDAD: DIVORCIO EN CURSO* 🚨\n`;
-      msg += `_Propiedad asociada a un expediente de divorcio activo_\n\n`;
-    } else {
-      msg += `🚨 *ALERTA DE OPORTUNIDAD: QUIEBRA / BANCARROTA* 🚨\n`;
-      msg += `_Propiedad vinculada a un expediente de quiebra activo_\n\n`;
-    }
+    let msg = `🚨 <b>NUEVO LEAD DE EQUIDAD DETECTADO:</b> ${cleanAddr}
+--------------------------------------------------
+Propietario: ${cleanOwner}
+Valor Catastral PVA: $${pvaStr} | MCA Crudo: $${mcaStr}
+Deuda Consolidada: $${totalDebt.toLocaleString("en-US", { maximumFractionDigits: 0 })} (Impuestos + Liens)
 
-    if (hasLegalRadarMatch) {
-      msg += `🔎 *INVESTIGACIÓN WEB:* Posible Obituario/Divorcio\n\n`;
-    }
-
-    // Datos generales de la propiedad
-    msg += `📍 *Dirección:* ${lead.displayAddress}\n`;
-    msg += `🏢 *Ubicación:* ${lead.county} County, ${lead.state}\n`;
-    if (lead.stressScore !== undefined && lead.stressScore > 0) {
-      msg += `⚡ *Índice de Estrés (SSI):* ${lead.stressScore}/100\n`;
-    }
-    msg += `\n`;
-
-    // Alerta de hipotecas ocultas
-    if (hiddenDebt > 0) {
-      msg += `🏦 *HIPOTECAS OCULTAS DETECTADAS:* $${hiddenDebt.toLocaleString("en-US", { minimumFractionDigits: 2 })}\n\n`;
-    }
+💰 Margen de Equidad (Spread): $${equitySpread.toLocaleString("en-US", { maximumFractionDigits: 0 })}
+📢 Oferta Máxima Sugerida (MPO): $${mpo.toLocaleString("en-US", { maximumFractionDigits: 0 })}
+--------------------------------------------------`;
 
     // Datos de contacto del dueño
-    const absenteeStatus = lead.isAbsentee ? "*(Dueño Ausente)*" : "*(Dueño Ocupante)*";
-    msg += `👤 *Propietario / Demandado:* ${lead.ownerName} ${absenteeStatus}\n`;
+    const absenteeStatus = lead.isAbsentee ? "<b>(Dueño Ausente)</b>" : "<b>(Dueño Ocupante)</b>";
+    msg += `\n👤 <b>Estatus:</b> ${absenteeStatus}\n`;
     if (lead.mailingAddress) {
-      msg += `✉️ *Dirección Postal:* ${lead.mailingAddress}\n`;
+      msg += `✉️ <b>Dirección Postal:</b> ${cleanMail}\n`;
     }
 
     // Filtrar contactos regulares vs OSINT
@@ -1301,9 +1289,9 @@ async function notifyOpportunities(mode?: 'legal' | 'physical') {
     for (const phone of lead.phones) {
       const lower = phone.toLowerCase();
       if (lower.startsWith("osint:")) {
-        osintPhones.push(phone.substring(6).trim());
+        osintPhones.push(escapeHtml(phone.substring(6).trim()));
       } else {
-        regularPhones.push(phone);
+        regularPhones.push(escapeHtml(phone));
       }
     }
 
@@ -1315,239 +1303,234 @@ async function notifyOpportunities(mode?: 'legal' | 'physical') {
       if (lower.startsWith("osint link:")) {
         osintLinks.push(emailOrLink.substring(11).trim());
       } else if (lower.startsWith("osint:")) {
-        osintEmails.push(emailOrLink.substring(6).trim());
-      } else if (lower.startsWith("osint")) {
-        // Ignorar posibles splits erróneos
+        osintEmails.push(escapeHtml(emailOrLink.substring(6).trim()));
       } else {
-        regularEmails.push(emailOrLink);
+        regularEmails.push(escapeHtml(emailOrLink));
       }
     }
 
     if (regularPhones.length > 0) {
-      msg += `📞 *Teléfonos:* \`${regularPhones.join(", ")}\`\n`;
+      msg += `📞 <b>Teléfonos:</b> <code>${regularPhones.join(", ")}</code>\n`;
     }
     if (regularEmails.length > 0) {
-      msg += `✉️ *Correos:* \`${regularEmails.join(", ")}\`\n`;
+      msg += `✉️ <b>Correos:</b> <code>${regularEmails.join(", ")}</code>\n`;
     }
 
     if (osintPhones.length > 0 || osintLinks.length > 0 || osintEmails.length > 0) {
-      msg += `\n📞 *Contactos (OSINT / Scraping Gratuito):*\n`;
+      msg += `\n📞 <b>Contactos OSINT:</b>\n`;
       if (osintPhones.length > 0) {
-        msg += `  - Teléfonos: \`${osintPhones.join(", ")}\`\n`;
+        msg += `  - Teléfonos: <code>${osintPhones.join(", ")}</code>\n`;
       }
       if (osintEmails.length > 0) {
-        msg += `  - Correos: \`${osintEmails.join(", ")}\`\n`;
+        msg += `  - Correos: <code>${osintEmails.join(", ")}</code>\n`;
       }
       if (osintLinks.length > 0) {
         msg += `  - Enlaces públicos:\n`;
         for (const link of osintLinks) {
-          msg += `    • ${link}\n`;
+          const escLink = escapeHtml(link);
+          msg += `    • <a href="${escLink}">${escLink}</a>\n`;
         }
       }
     }
-    msg += `\n`;
 
-    // Datos del MLS (ARV) y Características
-    if (lead.mlsValue > 0) {
-      msg += `📊 *Valor Comercial ARV (MLS):* $${lead.mlsValue.toLocaleString("en-US", { minimumFractionDigits: 2 })}\n`;
-    }
-    if (lead.sqft && lead.sqft > 0) {
-      const bedsStr = lead.beds ? `, ${lead.beds} Rec` : "";
-      const bathsStr = lead.baths ? `, ${lead.baths} Baños` : "";
-      msg += `📐 *Características:* ${lead.sqft.toLocaleString()} SqFt${bedsStr}${bathsStr}\n`;
-    }
-    if (lead.mlsId && lead.mlsId !== "N/A") {
-      msg += `🔗 *MLS ID:* [${lead.mlsId}](https://replication.sparkapi.com/Reso/OData/Property('${lead.mlsId}'))\n`;
-    }
+    // OSINT Enrichment details (LLC unmasking and Overpass OSM)
+    const osint = osintMap.get(lead.groupingKey) || {
+      llcDirectors: [],
+      corporateAddress: "",
+      socialProfiles: [],
+      usernamesFound: [],
+      envStressors: [],
+      envAttractors: []
+    };
 
-    // --- SECCIÓN DE UNDERWRITING ---
-    msg += `\n📊 *ANÁLISIS FINANCIERO (UNDERWRITING)*:\n`;
-    msg += `• *Costo de Rehab:* $${rehab.toLocaleString()} (Estimación automática)\n`;
-    msg += `• *Oferta Máxima Permitida (MAO):* $${mao.toLocaleString()}\n`;
-    msg += `• *Equity Neto:* $${netEquity.toLocaleString()}\n`;
-    if (lead.mlsValue > 0 && purchasePrice > 0) {
-      msg += `• *ROI Proyectado:* ${roi}% (Costo total proyecto: $${totalCost.toLocaleString()})\n`;
-    } else {
-      msg += `• *ROI Proyectado:* N/A (Faltan comps de mercado)\n`;
-    }
-    
-    if (riskCheck.isRisk) {
-      msg += `⚠️ *FACTORES DE RIESGO DETECTADOS:*\n`;
-      for (const reason of riskCheck.reasons) {
-        msg += `  - ${reason}\n`;
+    if (osint.llcDirectors.length > 0) {
+      msg += `\n🏢 <b>LLC UNMASKING / CORPORATIVO:</b>\n`;
+      msg += `  - Directores: <code>${escapeHtml(osint.llcDirectors.join(", "))}</code>\n`;
+      if (osint.corporateAddress) {
+        msg += `  - Oficina: <i>${escapeHtml(osint.corporateAddress)}</i>\n`;
       }
     }
 
+    if (osint.socialProfiles.length > 0) {
+      msg += `\n🔗 <b>CANALES Y CONTACTO OSINT:</b>\n`;
+      for (const p of osint.socialProfiles) {
+        const escPlatform = escapeHtml(p.platform);
+        const escUrl = escapeHtml(p.url);
+        msg += `  - ${escPlatform}: <a href="${escUrl}">${escUrl}</a>\n`;
+      }
+    }
+
+    if (osint.envStressors.length > 0 || osint.envAttractors.length > 0) {
+      msg += `\n🗺️ <b>AUDITORÍA AMBIENTAL (OSM):</b>\n`;
+      if (osint.envStressors.length > 0) {
+        msg += `  - Stressors (⚠️): ${escapeHtml(osint.envStressors.join(", "))}\n`;
+      }
+      if (osint.envAttractors.length > 0) {
+        msg += `  - Attractors (✅): ${escapeHtml(osint.envAttractors.join(", "))}\n`;
+      }
+    }
+
+    const hasProbates = lead.probates && lead.probates.length > 0;
+    const hasDivorces = lead.divorces && lead.divorces.length > 0;
+    const hasBankruptcies = lead.bankruptcies && lead.bankruptcies.length > 0;
+
     // Detalles de Subasta (si existen)
     if (hasAuctions) {
-      msg += `\n---\n`;
-      msg += `⚖️ *PROCESOS JUDICIALES (FORECLOSURE)*:\n`;
+      msg += `\n⚖️ <b>PROCESOS JUDICIALES (FORECLOSURE)</b>:\n`;
       for (const a of lead.auctions) {
-        const debtAmount = a.debt_amount as number || 0;
-        const auctionDate = a.auction_date as string;
-        const daysRemaining = getDaysRemaining(auctionDate);
+        const auctionDate = escapeHtml(a.auction_date as string);
+        const daysRemaining = getDaysRemaining(a.auction_date as string);
         const daysStr = daysRemaining !== null 
           ? (daysRemaining < 0 ? `Hace ${Math.abs(daysRemaining)} días (Pasada)` : `${daysRemaining} días`)
           : "Fecha indefinida";
         
-        msg += `• *Caso ${a.case_number}*:\n`;
-        if (debtAmount > 0) {
-          msg += `  - Deuda: $${debtAmount.toLocaleString("en-US", { minimumFractionDigits: 2 })}\n`;
-          if (lead.mlsValue > 0) {
-            const discountPct = ((lead.mlsValue - debtAmount) / lead.mlsValue) * 100;
-            msg += `  - Descuento Potencial: *${discountPct.toFixed(1)}%*\n`;
-          }
-        }
-        msg += `  - Subasta: ${auctionDate} *(${daysStr} restantes)*\n`;
+        msg += `• <b>Caso ${escapeHtml(a.case_number)}</b>:\n`;
+        msg += `  - Subasta: ${auctionDate} <b>(${daysStr} restantes)</b>\n`;
         if (a.plaintiff) {
-          msg += `  - Acreedor: ${a.plaintiff}\n`;
+          msg += `  - Acreedor: ${escapeHtml(a.plaintiff)}\n`;
         }
-        
         if (a.pdf_url) {
-          const pdfSection = await checkPdfUrl(a.pdf_url);
+          const pdfSection = await checkPdfUrl(a.pdf_url as string, "HTML");
           msg += `  - ${pdfSection}\n`;
-        }
-        
-        if (a.needs_manual_review === 1 && lead.state === "IN") {
-          msg += `  - 🔗 [Abrir buscador MyCase](https://public.courts.in.gov/mycase/)\n`;
         }
       }
     }
 
     // Detalles de Violaciones de Código (si existen)
     if (hasViolations) {
-      msg += `\n---\n`;
-      msg += `⚠️ *VIOLACIONES DE CÓDIGO (ESTRÉS FÍSICO)*:\n`;
+      msg += `\n⚠️ <b>VIOLACIONES DE CÓDIGO (ESTRÉS FÍSICO)</b>:\n`;
       for (const v of lead.violations) {
-        const reportDate = v.report_date || "No especificada";
-        const status = v.status || "No especificado";
-        msg += `• *Caso ${v.case_number}* (Reportado: ${reportDate}):\n`;
-        msg += `  - Tipo: _${v.violation_type}_\n`;
-        msg += `  - Estatus: _${status}_\n`;
+        const reportDate = escapeHtml(v.report_date || "No especificada");
+        msg += `• <b>Caso ${escapeHtml(v.case_number)}</b> (Reportado: ${reportDate}):\n`;
+        msg += `  - Tipo: <i>${escapeHtml(v.violation_type)}</i>\n`;
       }
     }
 
     // Detalles de Estrés Físico (si existen)
     if (lead.physicalDistress.length > 0) {
-      msg += `\n---\n`;
-      msg += `🔥 *ESTRÉS FÍSICO / ABANDONO MUNICIPAL*:\n`;
+      msg += `\n🔥 <b>ESTRÉS FÍSICO / ABANDONO MUNICIPAL</b>:\n`;
       for (const pd of lead.physicalDistress) {
-        const reportDate = pd.report_date || "No especificada";
-        msg += `• *Tipo: ${pd.distress_type}* (Reportado: ${reportDate}):\n`;
-        if (pd.details) msg += `  - Detalles: _${pd.details}_\n`;
+        const reportDate = escapeHtml(pd.report_date || "No especificada");
+        msg += `• <b>Tipo: ${escapeHtml(pd.distress_type)}</b> (Reportado: ${reportDate}):\n`;
+        if (pd.details) msg += `  - Detalles: <i>${escapeHtml(pd.details)}</i>\n`;
       }
     }
 
     // Detalles de Estrés Financiero Extra (si existen)
     if (lead.financialDistress.length > 0) {
-      msg += `\n---\n`;
-      msg += `⚖️ *ESTRÉS FINANCIERO (CLERK / COURTS)*:\n`;
+      msg += `\n⚖️ <b>ESTRÉS FINANCIERO (CLERK / COURTS)</b>:\n`;
       for (const fd of lead.financialDistress) {
-        const reportDate = fd.report_date || "No especificada";
+        const reportDate = escapeHtml(fd.report_date || "No especificada");
         const debt = fd.debt_amount as number || 0;
-        msg += `• *Caso/Registro:* ${fd.case_number || "N/A"} (Tipo: ${fd.record_type}, Reportado: ${reportDate}):\n`;
+        msg += `• <b>Caso/Registro:</b> ${escapeHtml(fd.case_number || "N/A")} (Tipo: ${escapeHtml(fd.record_type)}, Reportado: ${reportDate}):\n`;
         if (debt > 0) msg += `  - Monto de Deuda: $${debt.toLocaleString("en-US", { minimumFractionDigits: 2 })}\n`;
-        if (fd.plaintiff) msg += `  - Acreedor/Demandante: ${fd.plaintiff}\n`;
+        if (fd.plaintiff) msg += `  - Acreedor/Demandante: ${escapeHtml(fd.plaintiff)}\n`;
       }
     }
 
     // Detalles de Eventos de Vida Críticos (si existen)
     if (lead.lifeEvents.length > 0) {
-      msg += `\n---\n`;
-      msg += `💔 *EVENTOS DE VIDA CRÍTICOS*:\n`;
+      msg += `\n💔 <b>EVENTOS DE VIDA CRÍTICOS</b>:\n`;
       for (const le of lead.lifeEvents) {
-        const reportDate = le.report_date || "No especificada";
-        msg += `• *Tipo: ${le.event_type}* (Fecha: ${reportDate}):\n`;
-        if (le.subject_name) msg += `  - Sujeto: ${le.subject_name}\n`;
-        if (le.details) msg += `  - Detalles: _${le.details}_\n`;
+        const reportDate = escapeHtml(le.report_date || "No especificada");
+        msg += `• <b>Tipo: ${escapeHtml(le.event_type)}</b> (Fecha: ${reportDate}):\n`;
+        if (le.subject_name) msg += `  - Sujeto: ${escapeHtml(le.subject_name)}\n`;
+        if (le.details) msg += `  - Detalles: <i>${escapeHtml(le.details)}</i>\n`;
       }
     }
 
     // Detalles de Herencias (si existen)
     if (hasProbates) {
-      msg += `\n---\n`;
-      msg += `📋 *HERENCIAS / SUCESIONES (PROBATE)*:\n`;
+      msg += `\n📋 <b>HERENCIAS / SUCESIONES (PROBATE)</b>:\n`;
       for (const p of lead.probates) {
-        msg += `• *Caso ${p.case_number}*:\n`;
-        if (p.deceased_name) msg += `  - Finado: ${p.deceased_name}\n`;
-        if (p.heir_name) msg += `  - Heredero: ${p.heir_name}\n`;
+        msg += `• <b>Caso ${escapeHtml(p.case_number)}</b>:\n`;
+        if (p.deceased_name) msg += `  - Finado: ${escapeHtml(p.deceased_name)}\n`;
+        if (p.heir_name) msg += `  - Heredero: ${escapeHtml(p.heir_name)}\n`;
       }
     }
 
     // Detalles de Divorcios (si existen)
     if (hasDivorces) {
-      msg += `\n---\n`;
-      msg += `💔 *DIVORCIOS (DIVORCES)*:\n`;
+      msg += `\n💔 <b>DIVORCIOS (DIVORCES)</b>:\n`;
       for (const d of lead.divorces) {
-        msg += `• *Caso ${d.case_number}*:\n`;
-        msg += `  - Cónyuges: ${d.spouse_a} & ${d.spouse_b}\n`;
+        msg += `• <b>Caso ${escapeHtml(d.case_number)}</b>:\n`;
+        if (d.spouse_a) msg += `  - Cónyuges: ${escapeHtml(d.spouse_a)} & ${escapeHtml(d.spouse_b)}\n`;
       }
     }
 
     // Detalles de Bancarrotas (si existen)
     if (hasBankruptcies) {
-      msg += `\n---\n`;
-      msg += `📉 *QUIEBRAS (BANKRUPTCIES)*:\n`;
+      msg += `\n📉 <b>QUIEBRAS (BANKRUPTCIES)</b>:\n`;
       for (const b of lead.bankruptcies) {
-        msg += `• *Caso ${b.case_number}*:\n`;
-        msg += `  - Deudor: ${b.debtor_name}\n`;
-        if (b.bankruptcy_type) msg += `  - Tipo: ${b.bankruptcy_type}\n`;
+        msg += `• <b>Caso ${escapeHtml(b.case_number)}</b>:\n`;
+        if (b.debtor_name) msg += `  - Deudor: ${escapeHtml(b.debtor_name)}\n`;
+        if (b.bankruptcy_type) msg += `  - Tipo: ${escapeHtml(b.bankruptcy_type)}\n`;
       }
     }
 
-    msg += `\n---\n`;
-
-    // Instrucción / Recomendación Final
-    if (hasAuctions && hasViolations) {
-      msg += `💡 *Estrategia Recomendada:* Contactar al propietario/deudor de inmediato para negociar una compra directa debido a la acumulación de múltiples factores de estrés (deuda judicial y abandono físico).`;
-    } else if (hasAuctions) {
-      if (isIndianaHibernated) {
-        msg += `💡 *Instrucciones:* Esta subasta está en lista de espera (hibernación). Se volverá a buscar automáticamente en la fecha indicada. Si es urgente, puedes buscar el caso manualmente en MyCase.`;
-      } else if (isIndianaManual) {
-        msg += `💡 *Instrucciones:* Busca por el nombre del demandado en MyCase para el condado correspondiente de Indiana y extrae el monto de la deuda para actualizar Turso.`;
-      } else {
-        const firstAuction = lead.auctions[0];
-        msg += `💡 *Estrategia Recomendada:* Contactar al deudor de inmediato para negociar una compra directa antes de la subasta el ${firstAuction.auction_date}.`;
-      }
-    } else if (hasViolations) {
-      msg += `💡 *Estrategia Recomendada:* Contactar al propietario de inmediato para negociar una compra directa debido a estrés físico por violación de código.`;
-    } else {
-      msg += `💡 *Estrategia Recomendada:* Contactar a las partes involucradas para proponer compra directa / solución legal ante estrés de propiedad.`;
-    }
+    // Recomendación
+    msg += `\n💡 <b>Estrategia:</b> Negociar compra as-is directa al propietario ofreciendo hasta la MPO ($${mpo.toLocaleString("en-US", { maximumFractionDigits: 0 })}).`;
 
     // --- BOTONERA INTERACTIVA DE TELEGRAM ---
     const googleMapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(lead.displayAddress)}`;
-    const pvaUrl = getPvaUrl(lead.county, lead.state);
+    const pvaSiteUrl = getPvaUrl(lead.county, lead.state);
     
+    // Find photos
+    const pvaPhoto = lead.photoUrls.find(p => p.includes("pva_photos"));
+    const svPhotos = lead.photoUrls.filter(p => p.includes("streetview_images"));
+    
+    let btnPvaUrl = pvaSiteUrl;
+    if (pvaPhoto) {
+      const cleanPath = path.relative(path.resolve("./"), path.resolve(pvaPhoto)).replace(/\\/g, "/");
+      btnPvaUrl = `${appUrl}/${cleanPath}`;
+    }
+    
+    let btnSvUrl = googleMapsUrl;
+    if (svPhotos.length > 0) {
+      const cleanPath = path.relative(path.resolve("./"), path.resolve(svPhotos[0])).replace(/\\/g, "/");
+      btnSvUrl = `${appUrl}/${cleanPath}`;
+    }
+    
+    // --- CONSULTA AL ARCHIVO LOCAL HISTER ---
+    let archiveMatches = 0;
+    let archiveQuery = "";
+    const debtorName = lead.ownerName || (lead.auctions[0] ? lead.auctions[0].defendant : "");
+    if (debtorName && debtorName !== "Desconocido (Dorking)" && debtorName !== "DUEÑO DESCONOCIDO" && debtorName !== "No especificado") {
+      archiveQuery = debtorName;
+      const res = await queryLocalArchive(debtorName);
+      archiveMatches = res.total;
+    }
+    if (archiveMatches === 0) {
+      archiveQuery = lead.displayAddress;
+      const res = await queryLocalArchive(lead.displayAddress);
+      archiveMatches = res.total;
+    }
+
     const inline_keyboard: any[][] = [
       [
-        { text: "📍 Google Maps (Street View)", url: googleMapsUrl },
-        { text: "🏢 Consultar Catastro PVA", url: pvaUrl }
+        { text: "📸 Ver Fotos de Fachada PVA", url: btnPvaUrl },
+        { text: "⏳ Ver Historial Street View", url: btnSvUrl }
+      ],
+      [
+        { text: "🔎 Unmask LLC/Owner", url: `${appUrl}/?lead=${lead.groupingKey}` },
+        { text: "🗺️ Auditoría OSM", url: `${appUrl}/?lead=${lead.groupingKey}` }
+      ],
+      [
+        { text: "📍 Abrir en Google Maps", url: googleMapsUrl }
       ]
     ];
 
-    const pvaPhoto = lead.photoUrls.find(p => p.includes("pva_photos"));
-    const svPhotos = lead.photoUrls.filter(p => p.includes("streetview_images"));
-
-    const photoButtons: any[] = [];
-    if (pvaPhoto) {
-      const cleanPath = path.relative(path.resolve("./"), path.resolve(pvaPhoto)).replace(/\\/g, "/");
-      photoButtons.push({ text: "📸 Ver Foto PVA", url: `http://localhost:3000/${cleanPath}` });
+    if (archiveMatches > 0) {
+      inline_keyboard.push([
+        { text: `🗄️ Ver Coincidencias en Archivo (${archiveMatches})`, url: `http://127.0.0.1.nip.io:5005/?q=${encodeURIComponent(archiveQuery)}` }
+      ]);
     }
-    if (svPhotos.length > 0) {
-      const cleanPath = path.relative(path.resolve("./"), path.resolve(svPhotos[0])).replace(/\\/g, "/");
-      photoButtons.push({ text: "⏳ Fachada SV Histórica", url: `http://localhost:3000/${cleanPath}` });
-    }
-
-    if (photoButtons.length > 0) {
-      inline_keyboard.push(photoButtons);
-    }
-
+    
     const replyMarkup = { inline_keyboard };
 
     console.log(`[ALERTANDO] Enviando alerta agrupada para: ${lead.displayAddress} (Subastas: ${lead.auctions.length}, Violaciones: ${lead.violations.length}, Herencias: ${lead.probates.length}, Divorcios: ${lead.divorces.length}, Quiebras: ${lead.bankruptcies.length})...`);
     
-    const success = await sendTelegramNotification(msg, replyMarkup, lead.photoUrls && lead.photoUrls.length > 0 ? lead.photoUrls[0] : null);
+    const success = await sendTelegramNotification(msg, replyMarkup, lead.photoUrls && lead.photoUrls.length > 0 ? lead.photoUrls[0] : null, "HTML");
 
     
     if (success) {

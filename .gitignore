@@ -23,3 +23,6 @@ scratch/
 
 # Crawlee storage
 storage/
+
+# Cache files
+.indexed_files.json

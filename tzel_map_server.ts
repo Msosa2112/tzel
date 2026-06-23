@@ -990,6 +990,26 @@ app.get("/api/prospectos", async (req, res) => {
       console.error("[GEOCODE CACHE LOAD ERROR] Failed to pre-load geocode cache:", err);
     }
 
+    // Pre-cargar la base de datos de enriquecimiento OSINT en lote
+    const osintMap = new Map<string, any>();
+    try {
+      const osintRes = await db.execute("SELECT address_key, llc_directors, corporate_address, social_profiles, usernames_found, env_stressors, env_attractors FROM osint_enrichment");
+      for (const row of osintRes.rows) {
+        if (row.address_key) {
+          osintMap.set(row.address_key as string, {
+            llcDirectors: row.llc_directors ? JSON.parse(row.llc_directors as string) : [],
+            corporateAddress: row.corporate_address as string || "",
+            socialProfiles: row.social_profiles ? JSON.parse(row.social_profiles as string) : [],
+            usernamesFound: row.usernames_found ? JSON.parse(row.usernames_found as string) : [],
+            envStressors: row.env_stressors ? JSON.parse(row.env_stressors as string) : [],
+            envAttractors: row.env_attractors ? JSON.parse(row.env_attractors as string) : [],
+          });
+        }
+      }
+    } catch (err: any) {
+      console.error("[OSINT LOAD ERROR] Failed to load osint enrichment:", err.message);
+    }
+
     // Geocodificar y calcular variables en lote
     const responseData: any[] = [];
 
@@ -1024,6 +1044,16 @@ app.get("/api/prospectos", async (req, res) => {
 
       // Check geocode cache first from memory map
       const coords = geocodeMap.get(lead.displayAddress) || null;
+
+      // Fetch OSINT Enrichment
+      const osint = osintMap.get(lead.groupingKey) || {
+        llcDirectors: [],
+        corporateAddress: "",
+        socialProfiles: [],
+        usernamesFound: [],
+        envStressors: [],
+        envAttractors: []
+      };
 
       responseData.push({
         groupingKey: lead.groupingKey,
@@ -1060,9 +1090,16 @@ app.get("/api/prospectos", async (req, res) => {
         photoUrls: lead.photoUrls,
         beds: lead.beds,
         baths: lead.baths,
-        sqft: lead.sqft
+        sqft: lead.sqft,
+        llcDirectors: osint.llcDirectors,
+        corporateAddress: osint.corporateAddress,
+        socialProfiles: osint.socialProfiles,
+        usernamesFound: osint.usernamesFound,
+        envStressors: osint.envStressors,
+        envAttractors: osint.envAttractors
       });
     }
+
 
     // Trigger background geocoding check without blocking the response
     startBackgroundGeocoding().catch(err => {

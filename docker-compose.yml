@@ -73,9 +73,46 @@ services:
     networks:
       - tzel-network
 
+  hister:
+    image: ghcr.io/asciimoo/hister:latest
+    container_name: hister_local
+    restart: always
+    ports:
+      - "5005:4433"
+    volumes:
+      - hister_data:/hister/data
+    environment:
+      - HISTER__SERVER__ADDRESS=0.0.0.0:4433
+      - HISTER__SERVER__DATABASE=/hister/data/hister.db
+      - HISTER__SEMANTIC_SEARCH__ENABLE=true
+      - HISTER__SEMANTIC_SEARCH__EMBEDDING_ENDPOINT=http://ollama:11434/v1/embeddings
+      - HISTER__SEMANTIC_SEARCH__EMBEDDING_MODEL=nomic-embed-text
+      - HISTER__SEMANTIC_SEARCH__DIMENSIONS=768
+      - HISTER__APP__TELEMETRY_ENABLED=false
+      - HISTER__APP__LOG_LEVEL=info
+    networks:
+      - tzel-network
+    depends_on:
+      - ollama
+
+  crawl4ai_service:
+    image: unclecode/crawl4ai:latest
+    container_name: crawl4ai_local
+    restart: always
+    ports:
+      - "127.0.0.1:11235:11235"
+    shm_size: "1gb"
+    deploy:
+      resources:
+        limits:
+          memory: 2g
+    networks:
+      - tzel-network
+
 volumes:
   ollama_data:
   neo4j_data:
+  hister_data:
 
 networks:
   tzel-network:

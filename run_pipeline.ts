@@ -21,6 +21,7 @@ import { scrapeStatePublicNotices } from "./scrapers/state_public_notices_scrape
 import { runCountyDeedsAuditor } from "./scrapers/county_deeds_auditor";
 import { runDebtRetrySweep } from "./scrapers/debt_retry_sweep";
 import { runFuzzyOwnerUnification } from "./scrapers/fuzzy_identity_matcher";
+import { runOSINTEnrichment } from "./enrichment_pipeline";
 import { runCountyMediaRetriever } from "./scrapers/county_media_retriever";
 import { runStreetViewStitcher } from "./scrapers/streetview_stitcher";
 
@@ -194,6 +195,13 @@ async function runPipeline() {
     await runFuzzyOwnerUnification();
   } catch (err: any) {
     console.error("[CAPA 2 ERROR] Falló la unificación difusa de propietarios:", err.message);
+  }
+
+  try {
+    console.log("\n[CAPA 2 - FASE 4.6] Ejecutando Enriquecimiento OSINT Avanzado (LLC, Socials, OSM)...");
+    await runOSINTEnrichment();
+  } catch (err: any) {
+    console.error("[CAPA 2 ERROR] Falló el pipeline de enriquecimiento OSINT:", err.message);
   }
 
   // =================================================================
