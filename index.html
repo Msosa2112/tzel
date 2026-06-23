@@ -1996,7 +1996,7 @@
     .bottom-cards-carousel .lead-card-photo-placeholder,
     .bottom-cards-carousel .lead-card-photo-carousel {
       width: 100%;
-      height: 180px;
+      height: 150px;
       border-radius: 0;
       border: none;
       margin: 0;
@@ -2012,7 +2012,7 @@
 
     .bottom-cards-carousel .lead-card-carousel-photo {
       width: 300px;
-      height: 180px;
+      height: 150px;
       object-fit: cover;
       border-radius: 0;
     }
@@ -3399,7 +3399,7 @@
         }
 
         card.innerHTML = `
-          <div style="position: relative; width: 100%; height: 180px;">
+          <div style="position: relative; width: 100%; height: 150px;">
             ${photoHtml}
             <div class="card-actions-wrapper" onclick="event.stopPropagation()">
               <button class="fav-btn ${favoriteKeys.includes(lead.groupingKey) ? 'fav-active' : ''}" onclick="toggleFavoriteCard(this, '${lead.groupingKey}')" title="Favorito">
