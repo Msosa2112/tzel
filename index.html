@@ -587,6 +587,7 @@
       z-index: 950;
       background: var(--bg-glass);
       border: 1px solid var(--border-glass);
+      transition: bottom 0.4s cubic-bezier(0.16, 1, 0.3, 1);
       backdrop-filter: blur(12px);
       -webkit-backdrop-filter: blur(12px);
       border-radius: 12px;
@@ -1903,16 +1904,45 @@
       background: var(--bg-glass);
       backdrop-filter: blur(12px);
       -webkit-backdrop-filter: blur(12px);
-      padding: 6px 16px;
+      padding: 8px 18px;
       border-radius: 20px;
       display: inline-flex;
       align-items: center;
-      gap: 6px;
+      justify-content: space-between;
+      gap: 12px;
       font-size: 0.85rem;
       border: 1px solid var(--border-glass);
-      box-shadow: var(--shadow-level-1);
+      box-shadow: var(--shadow-level-2);
       width: fit-content;
       pointer-events: auto;
+      cursor: pointer;
+      user-select: none;
+      transition: all 0.2s ease;
+    }
+
+    .bottom-cards-header:hover {
+      background: #ffffff;
+      box-shadow: var(--shadow-level-3);
+      border-color: var(--color-radar-green-border);
+    }
+
+    .bottom-cards-carousel-inner {
+      max-height: 410px;
+      opacity: 1;
+      transform: translateY(0);
+      transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+      pointer-events: auto;
+    }
+
+    .bottom-cards-carousel-wrapper.collapsed .bottom-cards-carousel-inner {
+      max-height: 0;
+      opacity: 0;
+      transform: translateY(20px);
+      pointer-events: none;
+    }
+
+    .bottom-cards-carousel-wrapper.collapsed ~ .map-legend {
+      bottom: 80px;
     }
 
     /* Bottom Cards Carousel list styling */
@@ -2291,13 +2321,16 @@
       <div class="radar-scan-overlay"></div>
 
       <!-- Horizontal Cards Carousel -->
-      <div class="bottom-cards-carousel-wrapper" id="bottom-cards-wrapper">
-        <div class="bottom-cards-header">
+      <div class="bottom-cards-carousel-wrapper collapsed" id="bottom-cards-wrapper">
+        <div class="bottom-cards-header" onclick="toggleBottomCarousel()">
           <span class="carousel-title"><i data-lucide="list" class="inline-icon"></i> Objetivos en esta Zona (<span id="count-indicator">0</span>)</span>
+          <i data-lucide="chevron-up" id="carousel-toggle-icon"></i>
         </div>
-        <div class="bottom-cards-carousel" id="bottom-cards-container">
-          <div style="text-align: center; color: var(--text-muted); width: 100%; padding: 20px; font-size: 0.85rem;">
-            Cargando objetivos en el mapa...
+        <div class="bottom-cards-carousel-inner">
+          <div class="bottom-cards-carousel" id="bottom-cards-container">
+            <div style="text-align: center; color: var(--text-muted); width: 100%; padding: 20px; font-size: 0.85rem;">
+              Cargando objetivos en el mapa...
+            </div>
           </div>
         </div>
       </div>
@@ -3452,6 +3485,33 @@
 
       // Hydrate Tactical Drawer
       hydrateDrawer(lead);
+
+      // Expand bottom cards carousel wrapper if collapsed
+      const wrapper = document.getElementById('bottom-cards-wrapper');
+      if (wrapper && wrapper.classList.contains('collapsed')) {
+        wrapper.classList.remove('collapsed');
+        const toggleIcon = document.getElementById('carousel-toggle-icon');
+        if (toggleIcon) {
+          toggleIcon.setAttribute('data-lucide', 'chevron-down');
+          if (typeof lucide !== 'undefined') {
+            lucide.createIcons();
+          }
+        }
+      }
+    }
+
+    function toggleBottomCarousel() {
+      const wrapper = document.getElementById('bottom-cards-wrapper');
+      const toggleIcon = document.getElementById('carousel-toggle-icon');
+      if (wrapper) {
+        const isCollapsed = wrapper.classList.toggle('collapsed');
+        if (toggleIcon) {
+          toggleIcon.setAttribute('data-lucide', isCollapsed ? 'chevron-up' : 'chevron-down');
+          if (typeof lucide !== 'undefined') {
+            lucide.createIcons();
+          }
+        }
+      }
     }
 
     function openDrawer() {
