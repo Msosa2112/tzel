@@ -215,7 +215,8 @@
 
     /* Left Sidebar: Filters & Prospect list */
     .sidebar-left {
-      width: 380px;
+      width: var(--sidebar-width, 380px);
+      position: relative; /* Added to support absolute resizer */
       background: var(--bg-glass);
       backdrop-filter: blur(16px);
       -webkit-backdrop-filter: blur(16px);
@@ -225,6 +226,39 @@
       z-index: 999;
       transition: transform 0.3s ease;
       overflow-y: auto;
+    }
+
+    /* Sidebar resizer handle */
+    .sidebar-resizer {
+      position: absolute;
+      top: 0;
+      right: 0;
+      width: 8px;
+      height: 100%;
+      cursor: ew-resize;
+      z-index: 1005;
+      background: transparent;
+      transition: background-color 0.2s;
+    }
+    
+    .sidebar-resizer::after {
+      content: '';
+      position: absolute;
+      top: 0;
+      right: 3px;
+      width: 2px;
+      height: 100%;
+      background: transparent;
+      transition: background-color 0.2s;
+    }
+    
+    .sidebar-resizer:hover::after,
+    .sidebar-resizer.resizing::after {
+      background-color: var(--color-radar-green);
+    }
+
+    .sidebar-resizer:hover {
+      background-color: rgba(16, 185, 129, 0.05);
     }
 
     .sidebar-section {
@@ -579,24 +613,145 @@
       background-color: var(--bg-darker);
     }
 
-    /* Floating map legend */
-    .map-legend {
+    /* Right side floating controls wrapper */
+    .map-controls-right {
       position: absolute;
-      bottom: 460px;
+      bottom: 420px;
       right: 15px;
       z-index: 950;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      pointer-events: none;
+      transition: bottom 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    /* Floating map legend */
+    .map-legend {
       background: var(--bg-glass);
       border: 1px solid var(--border-glass);
-      transition: bottom 0.4s cubic-bezier(0.16, 1, 0.3, 1);
       backdrop-filter: blur(12px);
       -webkit-backdrop-filter: blur(12px);
       border-radius: 12px;
       padding: 12px 16px;
       box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
-      max-width: 250px;
+      width: 250px;
+      box-sizing: border-box;
       font-size: 11px;
       color: var(--text-main);
       pointer-events: auto;
+    }
+
+    /* Floating map style selector */
+    .map-style-card {
+      background: var(--bg-glass);
+      border: 1px solid var(--border-glass);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border-radius: 12px;
+      padding: 10px 14px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+      width: 250px;
+      box-sizing: border-box;
+      font-size: 11px;
+      color: var(--text-main);
+      pointer-events: auto;
+    }
+
+    .map-style-options {
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+      margin-top: 6px;
+    }
+
+    .map-style-btn {
+      flex: 1;
+      background: transparent;
+      border: 1px solid transparent;
+      border-radius: 8px;
+      padding: 4px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      font-size: 10px;
+      color: var(--text-muted);
+      font-family: 'Inter', sans-serif;
+    }
+
+    .map-style-btn:hover {
+      background: rgba(0, 0, 0, 0.03);
+    }
+
+    .map-style-btn.active {
+      border-color: var(--color-radar-green);
+      background: var(--color-radar-green-pastel);
+      color: var(--color-radar-green-dark);
+      font-weight: 600;
+    }
+
+    .map-style-preview {
+      width: 100%;
+      height: 36px;
+      border-radius: 6px;
+      margin-bottom: 4px;
+      border: 1px solid rgba(0, 0, 0, 0.08);
+      background-size: cover;
+      background-position: center;
+      transition: all 0.2s ease;
+    }
+
+    .map-style-btn.active .map-style-preview {
+      border-color: var(--color-radar-green);
+      box-shadow: 0 0 4px rgba(16, 185, 129, 0.3);
+    }
+
+    /* Styled CSS Previews mimicking Google Maps options */
+    .style-light {
+      background: linear-gradient(135deg, #e6f2ff 50%, #ffffff 50%);
+      position: relative;
+    }
+    .style-light::after {
+      content: '';
+      position: absolute;
+      top: 50%;
+      left: 0;
+      width: 100%;
+      height: 1px;
+      background: #cbd5e1;
+      transform: rotate(-15deg);
+    }
+    
+    .style-satellite {
+      background: linear-gradient(135deg, #1e3a8a 30%, #064e3b 80%);
+      position: relative;
+      overflow: hidden;
+    }
+    .style-satellite::after {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: radial-gradient(circle, rgba(255,255,255,0.15) 10%, transparent 60%);
+    }
+
+    .style-dark {
+      background: linear-gradient(135deg, #0f172a 50%, #1e293b 50%);
+      position: relative;
+    }
+    .style-dark::after {
+      content: '';
+      position: absolute;
+      top: 50%;
+      left: 0;
+      width: 100%;
+      height: 1px;
+      background: #334155;
+      transform: rotate(25deg);
     }
 
     .map-legend-title {
@@ -1515,6 +1670,9 @@
         box-shadow: 8px 0 24px rgba(0, 0, 0, 0.6);
         background: var(--bg-dark);
       }
+      .sidebar-resizer {
+        display: none;
+      }
       .sidebar-left.open {
         transform: translateX(0);
       }
@@ -1529,10 +1687,16 @@
         background: var(--bg-dark);
       }
       
+      .map-controls-right {
+        position: static;
+        display: block;
+      }
       .map-legend {
+        position: absolute;
         bottom: 15px;
         left: 15px;
         right: 15px;
+        width: auto;
         max-width: none;
         padding: 8px 12px;
         display: flex;
@@ -1548,6 +1712,16 @@
       }
       .map-legend-item {
         margin-bottom: 0;
+      }
+
+      .map-style-card {
+        position: absolute;
+        bottom: 115px;
+        left: 15px;
+        right: 15px;
+        width: auto;
+        max-width: none;
+        padding: 8px 12px;
       }
     }
 
@@ -1941,16 +2115,16 @@
       pointer-events: none;
     }
 
-    .bottom-cards-carousel-wrapper.collapsed ~ .map-legend {
+    .bottom-cards-carousel-wrapper.collapsed ~ .map-controls-right {
       bottom: 80px;
     }
 
     /* Bottom Cards Carousel list styling */
     .bottom-cards-carousel {
       display: flex;
-      gap: 16px;
+      gap: 24px;
       overflow-x: auto;
-      padding: 10px 4px 16px 4px;
+      padding: 10px 20px 16px 20px;
       scroll-behavior: smooth;
       pointer-events: auto;
       -webkit-overflow-scrolling: touch;
@@ -1997,10 +2171,14 @@
     .bottom-cards-carousel .lead-card-photo-carousel {
       width: 100%;
       height: 150px;
-      border-radius: 0;
+      border-top-left-radius: 16px;
+      border-top-right-radius: 16px;
+      border-bottom-left-radius: 0;
+      border-bottom-right-radius: 0;
       border: none;
       margin: 0;
       position: relative;
+      overflow: hidden;
     }
 
     .bottom-cards-carousel .lead-card-photo-slider {
@@ -2014,7 +2192,8 @@
       width: 300px;
       height: 150px;
       object-fit: cover;
-      border-radius: 0;
+      border-top-left-radius: 16px;
+      border-top-right-radius: 16px;
     }
 
     .bottom-cards-carousel .lead-card-carousel-arrow {
@@ -2075,6 +2254,106 @@
       top: 12px;
       right: 12px;
       z-index: 10;
+      display: flex;
+      gap: 6px;
+    }
+
+    .bottom-cards-carousel .streetview-btn {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: #ffffff;
+      border: none;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+      cursor: pointer;
+      transition: all 0.2s ease;
+      text-decoration: none;
+    }
+
+    .bottom-cards-carousel .streetview-btn:hover {
+      transform: scale(1.1);
+      background: #fffbeb;
+    }
+
+    .bottom-cards-carousel .zillow-btn {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: #ffffff;
+      border: none;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+      cursor: pointer;
+      transition: all 0.2s ease;
+      text-decoration: none;
+    }
+
+    .bottom-cards-carousel .zillow-btn:hover {
+      transform: scale(1.1);
+      background: #e0f2fe;
+    }
+
+    /* Floating Street View button for Leaflet popups */
+    .leaflet-popup-content-wrapper {
+      overflow: visible !important;
+    }
+    .leaflet-popup-content {
+      overflow: visible !important;
+    }
+
+    .popup-streetview-floating-btn {
+      position: absolute;
+      bottom: 4px;
+      right: -48px;
+      width: 36px;
+      height: 36px;
+      background: #ffffff;
+      border: 1px solid var(--border-glass);
+      border-radius: 8px; /* Square style matching card */
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      z-index: 1000;
+      text-decoration: none;
+    }
+
+    .popup-streetview-floating-btn:hover {
+      transform: scale(1.1);
+      border-color: #f59e0b;
+      box-shadow: 0 6px 16px rgba(0,0,0,0.25);
+    }
+
+    .popup-zillow-floating-btn {
+      position: absolute;
+      bottom: 48px; /* Stacked 44px above the Street View button */
+      right: -48px;
+      width: 36px;
+      height: 36px;
+      background: #ffffff;
+      border: 1px solid var(--border-glass);
+      border-radius: 8px; /* Square style matching card */
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      z-index: 1000;
+      text-decoration: none;
+    }
+
+    .popup-zillow-floating-btn:hover {
+      transform: scale(1.1);
+      border-color: #006aff;
+      box-shadow: 0 6px 16px rgba(0,0,0,0.25);
     }
 
     .bottom-cards-carousel .fav-btn {
@@ -2193,6 +2472,9 @@
     
     <!-- Left Sidebar: Filters & Alerts list -->
     <aside class="sidebar-left" id="sidebar-left">
+      <!-- Resize Handle -->
+      <div id="sidebar-resizer" class="sidebar-resizer"></div>
+      
       <div class="sidebar-header-mobile">
         <h3>Filtros y Listado</h3>
         <button id="close-sidebar-left-btn" class="close-btn-mobile" aria-label="Close Sidebar Left">&times;</button>
@@ -2331,24 +2613,49 @@
         </div>
       </div>
       
-      <!-- Leyenda de Mapa -->
-      <div class="map-legend">
-        <div class="map-legend-title">Temperatura de Equidad</div>
-        <div class="map-legend-item">
-          <span class="legend-color-dot" style="background-color: #ef4444; box-shadow: 0 0 6px #ef4444"></span>
-          <span class="legend-label"><i data-lucide="gavel" class="inline-icon" style="color: #ef4444"></i> <strong>PIN ROJO: Alta Prioridad</strong><br>Subasta sheriff programada y Margen de Equidad &gt; $30,000</span>
+      <!-- Floating Map Right Controls Wrapper -->
+      <div class="map-controls-right">
+        <!-- Leyenda de Mapa -->
+        <div class="map-legend">
+          <div class="map-legend-title">Temperatura de Equidad</div>
+          <div class="map-legend-item">
+            <span class="legend-color-dot" style="background-color: #ef4444; box-shadow: 0 0 6px #ef4444"></span>
+            <span class="legend-label"><i data-lucide="gavel" class="inline-icon" style="color: #ef4444"></i> <strong>PIN ROJO: Alta Prioridad</strong><br>Subasta sheriff programada y Margen de Equidad &gt; $30,000</span>
+          </div>
+          <div class="map-legend-item">
+            <span class="legend-color-dot" style="background-color: #ca8a04; box-shadow: 0 0 6px #ca8a04"></span>
+            <span class="legend-label"><i data-lucide="flame" class="inline-icon" style="color: #ca8a04"></i> <strong>PIN AMARILLO: Oportunidad</strong><br>Estrés físico/violaciones y Margen de Equidad &gt; $0</span>
+          </div>
+          <div class="map-legend-item">
+            <span class="legend-color-dot" style="background-color: #0284c7; box-shadow: 0 0 6px #0284c7"></span>
+            <span class="legend-label"><i data-lucide="scale" class="inline-icon" style="color: #0284c7"></i> <strong>PIN AZUL: Otros Leads</strong><br>Deudas bajas, datos en recolección con valor catastral PVA</span>
+          </div>
+          <div class="map-legend-item">
+            <span class="legend-color-dot" style="background-color: #fbbf24; box-shadow: 0 0 6px #fbbf24"></span>
+            <span class="legend-label"><i data-lucide="star" class="inline-icon" style="color: #fbbf24"></i> <strong>PIN DORADO: Favorito</strong><br>Propiedad priorizada por el usuario</span>
+          </div>
         </div>
-        <div class="map-legend-item">
-          <span class="legend-color-dot" style="background-color: #ca8a04; box-shadow: 0 0 6px #ca8a04"></span>
-          <span class="legend-label"><i data-lucide="flame" class="inline-icon" style="color: #ca8a04"></i> <strong>PIN AMARILLO: Oportunidad</strong><br>Estrés físico/violaciones y Margen de Equidad &gt; $0</span>
-        </div>
-        <div class="map-legend-item">
-          <span class="legend-color-dot" style="background-color: #0284c7; box-shadow: 0 0 6px #0284c7"></span>
-          <span class="legend-label"><i data-lucide="scale" class="inline-icon" style="color: #0284c7"></i> <strong>PIN AZUL: Otros Leads</strong><br>Deudas bajas, datos en recolección con valor catastral PVA</span>
-        </div>
-        <div class="map-legend-item">
-          <span class="legend-color-dot" style="background-color: #fbbf24; box-shadow: 0 0 6px #fbbf24"></span>
-          <span class="legend-label"><i data-lucide="star" class="inline-icon" style="color: #fbbf24"></i> <strong>PIN DORADO: Favorito</strong><br>Propiedad priorizada por el usuario</span>
+
+        <!-- Selector de Estilo de Mapa (Google Maps Style) -->
+        <div class="map-style-card" onclick="event.stopPropagation()">
+          <div class="map-legend-title">
+            <i data-lucide="layers" class="inline-icon" style="color: var(--color-radar-green);"></i>
+            Estilo del Mapa
+          </div>
+          <div class="map-style-options">
+            <button class="map-style-btn active" onclick="event.stopPropagation(); changeMapStyle('light')" id="btn-style-light" title="Mapa Claro Positron">
+              <div class="map-style-preview style-light"></div>
+              <span class="style-label">Mapa Claro</span>
+            </button>
+            <button class="map-style-btn" onclick="event.stopPropagation(); changeMapStyle('satellite')" id="btn-style-satellite" title="Satélite Esri World Imagery">
+              <div class="map-style-preview style-satellite"></div>
+              <span class="style-label">Satélite</span>
+            </button>
+            <button class="map-style-btn" onclick="event.stopPropagation(); changeMapStyle('dark')" id="btn-style-dark" title="Modo Oscuro Dark Matter">
+              <div class="map-style-preview style-dark"></div>
+              <span class="style-label">Modo Oscuro</span>
+            </button>
+          </div>
         </div>
       </div>
     </main>
@@ -2690,6 +2997,8 @@
     };
 
     let map;
+    let currentTileLayer;
+    let mapLayers = {};
     let markersLayer;
     let allLeads = [];
     let selectedLead = null;
@@ -2768,6 +3077,43 @@
         overlay.addEventListener('click', () => {
           sidebarLeft.classList.remove('open');
           closeDrawer();
+        });
+      }
+      
+      // Sidebar Resizer Controls (Desktop only, constraints: 220px to 380px)
+      const resizer = document.getElementById('sidebar-resizer');
+      if (resizer && sidebarLeft) {
+        resizer.addEventListener('mousedown', (e) => {
+          e.preventDefault();
+          document.body.style.cursor = 'ew-resize';
+          resizer.classList.add('resizing');
+          
+          function onMouseMove(e) {
+            let newWidth = e.clientX;
+            if (newWidth < 220) newWidth = 220;
+            if (newWidth > 380) newWidth = 380;
+            
+            // Set the custom CSS variable on the document
+            document.documentElement.style.setProperty('--sidebar-width', newWidth + 'px');
+            
+            // Trigger Leaflet map layout invalidation
+            if (window.map) {
+              window.map.invalidateSize({ animate: false });
+            }
+          }
+          
+          function onMouseUp() {
+            document.body.style.cursor = '';
+            resizer.classList.remove('resizing');
+            document.removeEventListener('mousemove', onMouseMove);
+            document.removeEventListener('mouseup', onMouseUp);
+            if (window.map) {
+              window.map.invalidateSize();
+            }
+          }
+          
+          document.addEventListener('mousemove', onMouseMove);
+          document.addEventListener('mouseup', onMouseUp);
         });
       }
       
@@ -2975,13 +3321,47 @@
         attributionControl: false
       }).setView([38.2527, -85.7585], 11);
 
-      // CartoDB Positron layers (Clean light minimal aesthetic matching styleguide)
-      L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
-        maxZoom: 20
-      }).addTo(map);
+      // Initialize different layer styles
+      mapLayers = {
+        light: L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+          maxZoom: 20
+        }),
+        satellite: L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+          maxZoom: 19
+        }),
+        dark: L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+          maxZoom: 20
+        })
+      };
+
+      currentTileLayer = mapLayers.light;
+      currentTileLayer.addTo(map);
 
       markersLayer = L.layerGroup().addTo(map);
       map.on('moveend', updateCardsList);
+      map.on('popupopen', () => {
+        if (typeof lucide !== 'undefined') {
+          lucide.createIcons();
+        }
+      });
+    }
+
+    function changeMapStyle(style) {
+      if (!map || !mapLayers[style]) return;
+      if (currentTileLayer === mapLayers[style]) return;
+
+      map.removeLayer(currentTileLayer);
+      currentTileLayer = mapLayers[style];
+      currentTileLayer.addTo(map);
+
+      // Update button classes
+      document.querySelectorAll('.map-style-btn').forEach(btn => {
+        btn.classList.remove('active');
+      });
+      const activeBtn = document.getElementById(`btn-style-${style}`);
+      if (activeBtn) {
+        activeBtn.classList.add('active');
+      }
     }
 
     async function fetchLeads() {
@@ -3267,30 +3647,42 @@
 
           // Popup Content
           const popupContent = `
-            <div class="popup-title">${lead.displayAddress}</div>
-            <div class="popup-body">
-              ${popupPhotoHtml}
-              <div class="popup-row">
-                <span class="popup-row-label">Dueño:</span>
-                <span class="popup-row-value">${lead.ownerName}</span>
+            <div style="position: relative; overflow: visible; width: 100%;">
+              <div class="popup-title">${lead.displayAddress}</div>
+              <div class="popup-body">
+                ${popupPhotoHtml}
+                <div class="popup-row">
+                  <span class="popup-row-label">Dueño:</span>
+                  <span class="popup-row-value">${lead.ownerName}</span>
+                </div>
+                <div class="popup-row">
+                  <span class="popup-row-label">Valor PVA:</span>
+                  <span class="popup-row-value">${marketValue > 0 ? '$' + marketValue.toLocaleString() : 'N/A'}</span>
+                </div>
+                <div class="popup-row">
+                  <span class="popup-row-label">Deuda Total:</span>
+                  <span class="popup-row-value" style="color: #ef4444">$${totalDebt.toLocaleString()}</span>
+                </div>
+                <div class="popup-row">
+                  <span class="popup-row-label">Equidad Spread:</span>
+                  <span class="popup-row-value" style="color: ${equitySpread > 40000 ? 'var(--color-radar-green)' : 'var(--text-main)'}">$${equitySpread.toLocaleString()}</span>
+                </div>
+                <div class="popup-row">
+                  <span class="popup-row-label">Oferta MPO:</span>
+                  <span class="popup-row-value" style="color: var(--color-radar-green); font-weight: bold;">$${mpo.toLocaleString()}</span>
+                </div>
+                <button class="popup-btn" onclick="openLeadDrawer('${lead.groupingKey}')">Ver Ficha Táctica</button>
               </div>
-              <div class="popup-row">
-                <span class="popup-row-label">Valor PVA:</span>
-                <span class="popup-row-value">${marketValue > 0 ? '$' + marketValue.toLocaleString() : 'N/A'}</span>
-              </div>
-              <div class="popup-row">
-                <span class="popup-row-label">Deuda Total:</span>
-                <span class="popup-row-value" style="color: #ef4444">$${totalDebt.toLocaleString()}</span>
-              </div>
-              <div class="popup-row">
-                <span class="popup-row-label">Equidad Spread:</span>
-                <span class="popup-row-value" style="color: ${equitySpread > 40000 ? 'var(--color-radar-green)' : 'var(--text-main)'}">$${equitySpread.toLocaleString()}</span>
-              </div>
-              <div class="popup-row">
-                <span class="popup-row-label">Oferta MPO:</span>
-                <span class="popup-row-value" style="color: var(--color-radar-green); font-weight: bold;">$${mpo.toLocaleString()}</span>
-              </div>
-              <button class="popup-btn" onclick="openLeadDrawer('${lead.groupingKey}')">Ver Ficha Táctica</button>
+              
+              <!-- Floating Zillow Button outside the card (stacked above Street View) -->
+              <a href="https://www.zillow.com/homes/${encodeURIComponent(lead.displayAddress)}" target="_blank" class="popup-zillow-floating-btn" title="Ver en Zillow" onclick="event.stopPropagation()">
+                <img src="/zillow-icon.png" style="width: 22px; height: 22px; object-fit: contain;" alt="Zillow">
+              </a>
+
+              <!-- Floating Street View Button outside the card in the lower right corner -->
+              <a href="https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${lead.lat},${lead.lon}" target="_blank" class="popup-streetview-floating-btn" title="Street View" onclick="event.stopPropagation()">
+                <img src="/street-view-icon.png" style="width: 22px; height: 22px; object-fit: contain;" alt="Street View">
+              </a>
             </div>
           `;
 
@@ -3398,10 +3790,29 @@
           photoHtml = `<div class="lead-card-photo-placeholder"><i data-lucide="home" style="width: 2.5rem; height: 2.5rem; color: var(--text-muted);"></i></div>`;
         }
 
+        const hasCoords = lead.lat !== null && lead.lon !== null && !isNaN(lead.lat) && !isNaN(lead.lon);
+        let streetViewHtml = '';
+        if (hasCoords) {
+          streetViewHtml = `
+            <a href="https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${lead.lat},${lead.lon}" target="_blank" class="streetview-btn" title="Street View" onclick="event.stopPropagation()">
+              <img src="/street-view-icon.png" style="width: 16px; height: 16px; object-fit: contain; margin: 0;" alt="Street View">
+            </a>
+          `;
+        }
+
+        const zillowUrl = `https://www.zillow.com/homes/${encodeURIComponent(lead.displayAddress)}`;
+        const zillowHtml = `
+          <a href="${zillowUrl}" target="_blank" class="zillow-btn" title="Ver en Zillow" onclick="event.stopPropagation()">
+            <img src="/zillow-icon.png" style="width: 16px; height: 16px; object-fit: contain; margin: 0;" alt="Zillow">
+          </a>
+        `;
+
         card.innerHTML = `
           <div style="position: relative; width: 100%; height: 150px;">
             ${photoHtml}
             <div class="card-actions-wrapper" onclick="event.stopPropagation()">
+              ${zillowHtml}
+              ${streetViewHtml}
               <button class="fav-btn ${favoriteKeys.includes(lead.groupingKey) ? 'fav-active' : ''}" onclick="toggleFavoriteCard(this, '${lead.groupingKey}')" title="Favorito">
                 <i data-lucide="star"></i>
               </button>
