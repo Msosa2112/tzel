@@ -582,7 +582,7 @@
     /* Floating map legend */
     .map-legend {
       position: absolute;
-      bottom: 25px;
+      bottom: 460px;
       right: 15px;
       z-index: 950;
       background: var(--bg-glass);
@@ -1882,6 +1882,262 @@
       visibility: visible;
       opacity: 1;
     }
+
+    /* Bottom Cards Carousel Wrapper */
+    .bottom-cards-carousel-wrapper {
+      position: absolute;
+      bottom: 20px;
+      left: 20px;
+      right: 20px;
+      z-index: 950;
+      pointer-events: none;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* Carousel header / title styling */
+    .bottom-cards-header {
+      margin-bottom: 8px;
+      color: var(--text-main);
+      font-weight: bold;
+      background: var(--bg-glass);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      padding: 6px 16px;
+      border-radius: 20px;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.85rem;
+      border: 1px solid var(--border-glass);
+      box-shadow: var(--shadow-level-1);
+      width: fit-content;
+      pointer-events: auto;
+    }
+
+    /* Bottom Cards Carousel list styling */
+    .bottom-cards-carousel {
+      display: flex;
+      gap: 16px;
+      overflow-x: auto;
+      padding: 10px 4px 16px 4px;
+      scroll-behavior: smooth;
+      pointer-events: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    /* Override .lead-card styles when inside the carousel to make them horizontal cards */
+    .bottom-cards-carousel .lead-card {
+      width: 300px;
+      height: 380px;
+      flex-shrink: 0;
+      margin-bottom: 0;
+      display: flex;
+      flex-direction: column;
+      background: #ffffff;
+      border: 1px solid var(--border-glass);
+      border-radius: 16px;
+      overflow: hidden;
+      padding: 0;
+      box-shadow: var(--shadow-level-3);
+      cursor: pointer;
+      transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+      position: relative;
+    }
+
+    .bottom-cards-carousel .lead-card::before {
+      display: none;
+    }
+
+    .bottom-cards-carousel .lead-card:hover {
+      transform: translateY(-5px);
+      box-shadow: var(--shadow-level-4);
+      border-color: var(--color-radar-green-border);
+    }
+
+    .bottom-cards-carousel .lead-card.selected {
+      border-color: var(--color-focus-ring);
+      box-shadow: var(--shadow-level-3), 0 0 0 3px rgba(0, 207, 204, 0.3);
+      background: var(--color-radar-green-pastel);
+    }
+
+    /* Photo carousel & slider override */
+    .bottom-cards-carousel .lead-card-photo,
+    .bottom-cards-carousel .lead-card-photo-placeholder,
+    .bottom-cards-carousel .lead-card-photo-carousel {
+      width: 100%;
+      height: 180px;
+      border-radius: 0;
+      border: none;
+      margin: 0;
+      position: relative;
+    }
+
+    .bottom-cards-carousel .lead-card-photo-slider {
+      display: flex;
+      width: 100%;
+      height: 100%;
+      transition: transform 0.2s ease-in-out;
+    }
+
+    .bottom-cards-carousel .lead-card-carousel-photo {
+      width: 300px;
+      height: 180px;
+      object-fit: cover;
+      border-radius: 0;
+    }
+
+    .bottom-cards-carousel .lead-card-carousel-arrow {
+      width: 24px;
+      height: 30px;
+      font-size: 1.1rem;
+    }
+
+    .bottom-cards-carousel .lead-card-carousel-indicator {
+      position: absolute;
+      bottom: 8px;
+      right: 12px;
+      background: rgba(0, 0, 0, 0.6);
+      color: #ffffff;
+      padding: 2px 8px;
+      border-radius: 10px;
+      font-size: 10px;
+      font-weight: bold;
+      z-index: 5;
+    }
+
+    /* Cards content structure */
+    .bottom-cards-carousel .lead-card-body {
+      padding: 14px;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      min-width: 0;
+    }
+
+    .bottom-cards-carousel .lead-card-header-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 4px;
+    }
+
+    /* Floating badges & action buttons on top of photo */
+    .bottom-cards-carousel .lead-badges {
+      position: absolute;
+      top: 12px;
+      left: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      z-index: 10;
+    }
+
+    .bottom-cards-carousel .badge {
+      font-size: 9px;
+      padding: 4px 8px;
+      border-radius: 20px;
+      font-weight: 700;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+      border: none;
+      text-transform: uppercase;
+    }
+
+    .bottom-cards-carousel .card-actions-wrapper {
+      position: absolute;
+      top: 12px;
+      right: 12px;
+      z-index: 10;
+    }
+
+    .bottom-cards-carousel .fav-btn {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: #ffffff;
+      border: none;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+      cursor: pointer;
+      transition: all 0.2s ease;
+      color: #9ca3af;
+    }
+
+    .bottom-cards-carousel .fav-btn:hover {
+      transform: scale(1.1);
+      color: #f59e0b;
+    }
+
+    .bottom-cards-carousel .fav-btn.fav-active {
+      color: #fbbf24;
+    }
+
+    .bottom-cards-carousel .fav-btn svg {
+      width: 16px;
+      height: 16px;
+    }
+
+    /* Card texts & comps styling */
+    .bottom-cards-carousel .lead-address {
+      font-size: 1.05rem;
+      font-weight: 700;
+      color: var(--text-main);
+      max-width: 100%;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .bottom-cards-carousel .lead-details {
+      margin-top: 4px;
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+
+    .bottom-cards-carousel .lead-details span {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 100%;
+    }
+
+    .bottom-cards-carousel .lead-comps {
+      margin-top: auto;
+      padding-top: 8px;
+      border-top: 1px solid var(--border-glass);
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 6px 10px;
+    }
+
+    .bottom-cards-carousel .comp-item {
+      display: flex;
+      flex-direction: column;
+      gap: 1px;
+    }
+
+    .bottom-cards-carousel .comp-label {
+      font-size: 0.6rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+    }
+
+    .bottom-cards-carousel .comp-val {
+      font-size: 0.85rem;
+      font-weight: 700;
+      color: var(--text-main);
+    }
   </style>
 </head>
 <body>
@@ -2017,9 +2273,9 @@
         </button>
       </div>
 
-      <!-- Prospect List -->
-      <div class="sidebar-section" style="flex: 1; display: flex; flex-direction: column; overflow: hidden; padding-bottom: 0; min-height: 300px; flex-shrink: 0;">
-        <h3>Lista de Objetivos (<span id="count-indicator">0</span>)</h3>
+      <!-- Prospect List (Hidden in sidebar, moved to bottom cards carousel) -->
+      <div class="sidebar-section" style="flex: 1; display: flex; flex-direction: column; overflow: hidden; padding-bottom: 0; min-height: 300px; flex-shrink: 0; display: none;">
+        <h3>Lista de Objetivos (<span id="sidebar-count-indicator">0</span>)</h3>
         <div class="leads-list" id="leads-list-container">
           <!-- Dynamically populated via JS -->
           <div style="text-align: center; color: var(--text-muted); margin-top: 40px; font-size: 0.85rem;">
@@ -2033,6 +2289,18 @@
     <main class="map-container">
       <div id="map"></div>
       <div class="radar-scan-overlay"></div>
+
+      <!-- Horizontal Cards Carousel -->
+      <div class="bottom-cards-carousel-wrapper" id="bottom-cards-wrapper">
+        <div class="bottom-cards-header">
+          <span class="carousel-title"><i data-lucide="list" class="inline-icon"></i> Objetivos en esta Zona (<span id="count-indicator">0</span>)</span>
+        </div>
+        <div class="bottom-cards-carousel" id="bottom-cards-container">
+          <div style="text-align: center; color: var(--text-muted); width: 100%; padding: 20px; font-size: 0.85rem;">
+            Cargando objetivos en el mapa...
+          </div>
+        </div>
+      </div>
       
       <!-- Leyenda de Mapa -->
       <div class="map-legend">
@@ -2684,6 +2952,7 @@
       }).addTo(map);
 
       markersLayer = L.layerGroup().addTo(map);
+      map.on('moveend', updateCardsList);
     }
 
     async function fetchLeads() {
@@ -2899,129 +3168,21 @@
       mapMarkers.clear();
       
       const filtered = getFilteredLeads();
-      document.getElementById('count-indicator').textContent = filtered.length;
-
-      const container = document.getElementById('leads-list-container');
-      container.innerHTML = '';
-
-      if (filtered.length === 0) {
-        container.innerHTML = `
-          <div style="text-align: center; color: var(--text-muted); margin-top: 40px; font-size: 0.85rem;">
-            Ningún objetivo coincide con los filtros.
-          </div>
-        `;
-        return;
-      }
-
+      
       // Order filtered leads by High Motivation (descending)
       filtered.sort((a, b) => (b.isHighMotivation ? 1 : 0) - (a.isHighMotivation ? 1 : 0));
 
       filtered.forEach(lead => {
-        // 1. Create card in list
-        const card = document.createElement('div');
-        card.className = `lead-card ${lead.isHighMotivation ? 'high-motivation' : ''}`;
-        if (selectedLead && selectedLead.groupingKey === lead.groupingKey) {
-          card.classList.add('selected');
-        }
-
-        const isAbsentee = lead.isAbsentee;
-        const isHigh = lead.isHighMotivation;
         const hasCoords = lead.lat !== null && lead.lon !== null;
-        const hasHibernated = lead.auctions && lead.auctions.some(a => a.needs_manual_review === 2);
-        const hasManualReview = lead.auctions && lead.auctions.some(a => a.needs_manual_review === 1);
         
-        // Calculate new variables
+        // Calculate variables for markers / popups
         const totalDebt = (lead.primaryDebt || 0) + (lead.hiddenMortgages || 0) + (lead.hiddenLiensAmount || 0);
         const marketValue = (lead.auctions && lead.auctions.length > 0 && lead.auctions[0].appraisal_value > 0) ? lead.auctions[0].appraisal_value : (lead.mlsValue || 0);
         const equitySpread = marketValue - totalDebt;
         const df = lead.state === 'KY' ? 0.66 : (lead.isHighMotivation ? 0.70 : 0.75);
         const mpo = Math.max(0, Math.round((marketValue * df) - totalDebt));
-        
-        let badgesHtml = '';
-        if (isHigh) badgesHtml += `<span class="badge badge-high"><i data-lucide="flame" class="inline-icon"></i> ALTA MOTIVACIÓN</span>`;
-        if (isAbsentee) badgesHtml += `<span class="badge badge-absentee"><i data-lucide="user" class="inline-icon"></i> Absentee</span>`;
-        if (hasHibernated) badgesHtml += `<span class="badge" style="background: rgba(139, 92, 246, 0.15); color: #c084fc; border: 1px solid rgba(139, 92, 246, 0.3)"><i data-lucide="bot" class="inline-icon"></i> Hibernado</span>`;
-        if (hasManualReview) badgesHtml += `<span class="badge" style="background: rgba(239, 68, 68, 0.15); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.3)"><i data-lucide="alert-triangle" class="inline-icon"></i> Review</span>`;
-        if (equitySpread > 40000) {
-          badgesHtml += `<span class="badge badge-equity-high" style="background: rgba(16, 185, 129, 0.15); color: var(--color-radar-green-dark); border: 1px solid var(--color-radar-green-border); margin-left: 4px;"><i data-lucide="trending-up" class="inline-icon"></i> ALTA EQUIDAD</span>`;
-        }
-        if (!hasCoords) {
-          badgesHtml += `<span class="badge" style="background: rgba(255,255,255,0.05); color: var(--text-muted); border: 1px solid var(--border-glass)"><i data-lucide="clock" class="inline-icon"></i> Geocodificando</span>`;
-        }
 
-        const hasPhotos = lead.photoUrls && lead.photoUrls.length > 0;
-        let photoHtml = '';
-        if (hasPhotos) {
-          if (lead.photoUrls.length === 1) {
-            photoHtml = `<img class="lead-card-photo" src="${lead.photoUrls[0]}" alt="Foto Propiedad">`;
-          } else {
-            photoHtml = `
-              <div class="lead-card-photo-carousel" onclick="event.stopPropagation()">
-                <div class="lead-card-photo-slider" data-current-index="0" data-photo-count="${lead.photoUrls.length}">
-                  ${lead.photoUrls.map(url => `<img class="lead-card-carousel-photo" src="${url}" alt="Foto Propiedad" draggable="false">`).join('')}
-                </div>
-                <button class="lead-card-carousel-arrow prev" onclick="navigateCardPhotos(this, -1)">&lsaquo;</button>
-                <button class="lead-card-carousel-arrow next" onclick="navigateCardPhotos(this, 1)">&rsaquo;</button>
-                <div class="lead-card-carousel-indicator">1/${lead.photoUrls.length}</div>
-              </div>
-            `;
-          }
-        } else {
-          photoHtml = `<div class="lead-card-photo-placeholder"><i data-lucide="home" style="width: 2rem; height: 2rem; color: var(--text-muted);"></i></div>`;
-        }
-
-        card.innerHTML = `
-          <div class="lead-card-header-row" style="margin-bottom: 6px;">
-            <div class="lead-address" style="max-width: 160px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: bold; color: var(--text-main);" title="${lead.displayAddress}">${lead.displayAddress}</div>
-            <div class="card-actions-wrapper" onclick="event.stopPropagation()">
-              <label class="compare-check-label">
-                <input type="checkbox" class="compare-check-input" data-key="${lead.groupingKey}" ${comparedKeys.includes(lead.groupingKey) ? 'checked' : ''} onchange="handleCompareCheckbox(this)">
-                <span>Comparar</span>
-              </label>
-              <button class="fav-btn ${favoriteKeys.includes(lead.groupingKey) ? 'fav-active' : ''}" onclick="toggleFavoriteCard(this, '${lead.groupingKey}')" title="Favorito">
-                <i data-lucide="star"></i>
-              </button>
-            </div>
-          </div>
-          <div style="display: flex; gap: 12px; align-items: flex-start; margin-bottom: 8px;">
-            <div style="flex: 1; min-width: 0;">
-              <div class="lead-header" style="margin-bottom: 4px;">
-                <div class="lead-badges" style="display: flex; flex-wrap: wrap; gap: 4px;">${badgesHtml}</div>
-              </div>
-              <div class="lead-details" style="margin-top: 4px;">
-                <span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 150px; display: inline-block;"><i data-lucide="user" class="inline-icon"></i> ${lead.ownerName}</span>
-                <span><i data-lucide="map-pin" class="inline-icon"></i> ${lead.county}, ${lead.state}</span>
-              </div>
-            </div>
-            ${photoHtml}
-          </div>
-          <div class="lead-comps">
-            <div class="comp-item">
-              <span class="comp-label">Valor PVA</span>
-              <span class="comp-val">${marketValue > 0 ? '$' + marketValue.toLocaleString() : 'N/A'}</span>
-            </div>
-            <div class="comp-item">
-              <span class="comp-label">Deuda Total</span>
-              <span class="comp-val" style="color: #ef4444">$${totalDebt.toLocaleString()}</span>
-            </div>
-            <div class="comp-item">
-              <span class="comp-label">Oferta MPO</span>
-              <span class="comp-val" style="color: var(--color-radar-green); font-weight: bold;">$${mpo.toLocaleString()}</span>
-            </div>
-            <div class="comp-item">
-              <span class="comp-label">Equidad Spread</span>
-              <span class="comp-val" style="color: ${equitySpread > 40000 ? 'var(--color-radar-green)' : 'var(--text-main)'}">$${equitySpread.toLocaleString()}</span>
-            </div>
-          </div>
-        `;
-
-        card.addEventListener('click', () => {
-          selectLead(lead);
-        });
-
-        container.appendChild(card);
-
-        // 2. Render marker on Map (only if geocoded successfully)
+        // Render marker on Map (only if geocoded successfully)
         if (hasCoords && !isNaN(lead.lat) && !isNaN(lead.lon)) {
           let markerColor = '#0284c7';
           let svgIconKey = 'scale';
@@ -3111,20 +3272,167 @@
 
       calculateFooterMetrics();
       lucide.createIcons();
+
+      // Render cards list based on current map bounds
+      updateCardsList();
+    }
+
+    function updateCardsList() {
+      // 1. Get leads that match the sidebar filters
+      const sidebarFiltered = getFilteredLeads();
+      
+      // 2. Filter further by map viewport bounds if map is loaded
+      let visibleLeads = sidebarFiltered;
+      if (map) {
+        const bounds = map.getBounds();
+        visibleLeads = sidebarFiltered.filter(lead => {
+          if (lead.lat === null || lead.lon === null || isNaN(lead.lat) || isNaN(lead.lon)) {
+            return false; // must have coordinates to be within viewport
+          }
+          return bounds.contains(L.latLng(lead.lat, lead.lon));
+        });
+      }
+
+      // Update count indicator in bottom carousel header
+      const countEl = document.getElementById('count-indicator');
+      if (countEl) {
+        countEl.textContent = visibleLeads.length;
+      }
+
+      // 3. Render cards in #bottom-cards-container
+      const container = document.getElementById('bottom-cards-container');
+      if (!container) return;
+      container.innerHTML = '';
+
+      if (visibleLeads.length === 0) {
+        container.innerHTML = `
+          <div style="text-align: center; color: var(--text-muted); width: 100%; padding: 30px; font-size: 0.9rem; background: rgba(255,255,255,0.85); border-radius: 12px; border: 1px dashed var(--border-glass);">
+            Ningún objetivo visible en esta zona del mapa.
+          </div>
+        `;
+        return;
+      }
+
+      // Order visible leads by High Motivation (descending)
+      visibleLeads.sort((a, b) => (b.isHighMotivation ? 1 : 0) - (a.isHighMotivation ? 1 : 0));
+
+      visibleLeads.forEach(lead => {
+        // Create card in bottom carousel
+        const card = document.createElement('div');
+        card.className = `lead-card ${lead.isHighMotivation ? 'high-motivation' : ''}`;
+        card.setAttribute('data-key', lead.groupingKey);
+        if (selectedLead && selectedLead.groupingKey === lead.groupingKey) {
+          card.classList.add('selected');
+        }
+
+        const isAbsentee = lead.isAbsentee;
+        const isHigh = lead.isHighMotivation;
+        const hasHibernated = lead.auctions && lead.auctions.some(a => a.needs_manual_review === 2);
+        const hasManualReview = lead.auctions && lead.auctions.some(a => a.needs_manual_review === 1);
+        
+        // Calculate variables
+        const totalDebt = (lead.primaryDebt || 0) + (lead.hiddenMortgages || 0) + (lead.hiddenLiensAmount || 0);
+        const marketValue = (lead.auctions && lead.auctions.length > 0 && lead.auctions[0].appraisal_value > 0) ? lead.auctions[0].appraisal_value : (lead.mlsValue || 0);
+        const equitySpread = marketValue - totalDebt;
+        const df = lead.state === 'KY' ? 0.66 : (lead.isHighMotivation ? 0.70 : 0.75);
+        const mpo = Math.max(0, Math.round((marketValue * df) - totalDebt));
+        
+        // Badges
+        let badgesHtml = '';
+        if (isHigh) badgesHtml += `<span class="badge badge-high"><i data-lucide="flame" class="inline-icon"></i> ALTA MOTIVACIÓN</span>`;
+        if (isAbsentee) badgesHtml += `<span class="badge badge-absentee"><i data-lucide="user" class="inline-icon"></i> Absentee</span>`;
+        if (hasHibernated) badgesHtml += `<span class="badge" style="background: rgba(139, 92, 246, 0.15); color: #c084fc; border: 1px solid rgba(139, 92, 246, 0.3)"><i data-lucide="bot" class="inline-icon"></i> Hibernado</span>`;
+        if (hasManualReview) badgesHtml += `<span class="badge" style="background: rgba(239, 68, 68, 0.15); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.3)"><i data-lucide="alert-triangle" class="inline-icon"></i> Review</span>`;
+        if (equitySpread > 40000) {
+          badgesHtml += `<span class="badge badge-equity-high" style="background: rgba(16, 185, 129, 0.15); color: var(--color-radar-green-dark); border: 1px solid var(--color-radar-green-border);"><i data-lucide="trending-up" class="inline-icon"></i> ALTA EQUIDAD</span>`;
+        }
+
+        // Photos
+        const hasPhotos = lead.photoUrls && lead.photoUrls.length > 0;
+        let photoHtml = '';
+        if (hasPhotos) {
+          if (lead.photoUrls.length === 1) {
+            photoHtml = `<img class="lead-card-photo" src="${lead.photoUrls[0]}" alt="Foto Propiedad">`;
+          } else {
+            photoHtml = `
+              <div class="lead-card-photo-carousel" onclick="event.stopPropagation()">
+                <div class="lead-card-photo-slider" data-current-index="0" data-photo-count="${lead.photoUrls.length}">
+                  ${lead.photoUrls.map(url => `<img class="lead-card-carousel-photo" src="${url}" alt="Foto Propiedad" draggable="false">`).join('')}
+                </div>
+                <button class="lead-card-carousel-arrow prev" onclick="navigateCardPhotos(this, -1)">&lsaquo;</button>
+                <button class="lead-card-carousel-arrow next" onclick="navigateCardPhotos(this, 1)">&rsaquo;</button>
+                <div class="lead-card-carousel-indicator">1/${lead.photoUrls.length}</div>
+              </div>
+            `;
+          }
+        } else {
+          photoHtml = `<div class="lead-card-photo-placeholder"><i data-lucide="home" style="width: 2.5rem; height: 2.5rem; color: var(--text-muted);"></i></div>`;
+        }
+
+        card.innerHTML = `
+          <div style="position: relative; width: 100%; height: 180px;">
+            ${photoHtml}
+            <div class="lead-badges">${badgesHtml}</div>
+            <div class="card-actions-wrapper" onclick="event.stopPropagation()">
+              <button class="fav-btn ${favoriteKeys.includes(lead.groupingKey) ? 'fav-active' : ''}" onclick="toggleFavoriteCard(this, '${lead.groupingKey}')" title="Favorito">
+                <i data-lucide="star"></i>
+              </button>
+            </div>
+          </div>
+          <div class="lead-card-body">
+            <div class="lead-card-header-row">
+              <div class="lead-address" title="${lead.displayAddress}">${lead.displayAddress}</div>
+            </div>
+            <div class="lead-details">
+              <span><i data-lucide="user" class="inline-icon"></i> ${lead.ownerName}</span>
+              <span><i data-lucide="map-pin" class="inline-icon"></i> ${lead.county}, ${lead.state}</span>
+            </div>
+            <div class="lead-comps">
+              <div class="comp-item">
+                <span class="comp-label">Valor PVA</span>
+                <span class="comp-val">${marketValue > 0 ? '$' + marketValue.toLocaleString() : 'N/A'}</span>
+              </div>
+              <div class="comp-item">
+                <span class="comp-label">Deuda Total</span>
+                <span class="comp-val" style="color: #ef4444">$${totalDebt.toLocaleString()}</span>
+              </div>
+              <div class="comp-item">
+                <span class="comp-label">Oferta MPO</span>
+                <span class="comp-val" style="color: var(--color-radar-green); font-weight: bold;">$${mpo.toLocaleString()}</span>
+              </div>
+              <div class="comp-item">
+                <span class="comp-label">Equidad</span>
+                <span class="comp-val" style="color: ${equitySpread > 40000 ? 'var(--color-radar-green)' : 'var(--text-main)'}">$${equitySpread.toLocaleString()}</span>
+              </div>
+            </div>
+          </div>
+        `;
+
+        card.addEventListener('click', () => {
+          selectLead(lead);
+        });
+
+        container.appendChild(card);
+      });
+
+      // Initialize Lucide icons on newly rendered cards
+      if (typeof lucide !== 'undefined') {
+        lucide.createIcons();
+      }
     }
 
     function selectLead(lead, flyTo = true) {
       selectedLead = lead;
       const hasCoords = lead.lat !== null && lead.lon !== null;
       
-      // Update selected class in sidebar cards
+      // Update selected class in bottom cards
       const cards = document.querySelectorAll('.lead-card');
       cards.forEach(c => {
         c.classList.remove('selected');
-        const addrText = c.querySelector('.lead-address').textContent;
-        if (addrText === lead.displayAddress) {
+        const key = c.getAttribute('data-key');
+        if (key === lead.groupingKey) {
           c.classList.add('selected');
-          c.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+          c.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
         }
       });
 
