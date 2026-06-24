@@ -2443,6 +2443,52 @@
       font-weight: 700;
       color: var(--text-main);
     }
+    
+    /* Modern Premium Mode Switch Toggle */
+    .mode-switch-wrapper {
+      position: relative;
+      display: flex;
+      align-items: center;
+      background: rgba(0, 0, 0, 0.06);
+      padding: 2px;
+      border-radius: 20px;
+      border: 1px solid var(--border-glass);
+      cursor: pointer;
+      width: 160px;
+      height: 28px;
+      user-select: none;
+      box-shadow: var(--shadow-inset);
+    }
+    
+    .mode-switch-bg-indicator {
+      position: absolute;
+      top: 2px;
+      left: 2px;
+      width: 76px;
+      height: 22px;
+      background: var(--color-radar-green);
+      border-radius: 18px;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      box-shadow: 0 1.5px 4px rgba(0, 0, 0, 0.15);
+    }
+    
+    .mode-switch-btn {
+      flex: 1;
+      text-align: center;
+      font-size: 0.62rem;
+      font-weight: 800;
+      color: var(--text-muted);
+      z-index: 2;
+      transition: color 0.3s;
+      line-height: 22px;
+      text-transform: uppercase;
+      font-family: 'Orbitron', 'Inter', sans-serif;
+      letter-spacing: 0.5px;
+    }
+    
+    .mode-switch-btn.active {
+      color: #ffffff !important;
+    }
   </style>
 </head>
 <body>
@@ -2481,7 +2527,15 @@
       </div>
       <!-- Search -->
       <div class="sidebar-section">
-        <h3>Filtros Operativos</h3>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; gap: 8px;">
+          <h3 style="margin: 0;">Filtros Operativos</h3>
+          <!-- Toggle Switch -->
+          <div class="mode-switch-wrapper" onclick="toggleSystemMode(event)">
+             <div id="mode-switch-bg" class="mode-switch-bg-indicator"></div>
+             <div class="mode-switch-btn active" id="mode-btn-investment">Inversión</div>
+             <div class="mode-switch-btn" id="mode-btn-disaster">Roofing</div>
+          </div>
+        </div>
         <input type="text" id="address-search" class="search-input" placeholder="Buscar dirección o dueño...">
         
         <div class="filter-group">
@@ -2492,25 +2546,72 @@
           </select>
         </div>
 
-        <div class="filter-group" style="margin-top: 12px;">
-          <label style="font-size: 0.75rem; font-weight: 600; display: flex; justify-content: space-between;">
-            <span>Margen de Equidad Mínimo:</span>
-            <span id="equity-spread-val" style="color: var(--color-radar-green-dark); font-weight: bold;">$20,000</span>
-          </label>
-          <input type="range" id="equity-spread-filter" min="0" max="100000" step="5000" value="20000" style="width: 100%; accent-color: var(--color-radar-green);">
+        <!-- Group 1: Investment specific filters -->
+        <div id="investment-filters-group">
+          <div class="filter-group" style="margin-top: 12px;">
+            <label style="font-size: 0.75rem; font-weight: 600; display: flex; justify-content: space-between;">
+              <span>Margen de Equidad Mínimo:</span>
+              <span id="equity-spread-val" style="color: var(--color-radar-green-dark); font-weight: bold;">$20,000</span>
+            </label>
+            <input type="range" id="equity-spread-filter" min="0" max="100000" step="5000" value="20000" style="width: 100%; accent-color: var(--color-radar-green);">
+          </div>
+
+          <div class="filter-group" style="margin-top: 12px;">
+            <label style="font-size: 0.75rem; font-weight: 600; display: flex; justify-content: space-between;">
+              <span>Deuda Activa Mínima:</span>
+              <span id="active-debt-val" style="color: #ef4444; font-weight: bold;">$0</span>
+            </label>
+            <input type="range" id="active-debt-filter" min="0" max="150000" step="5000" value="0" style="width: 100%; accent-color: #ef4444;">
+          </div>
         </div>
 
-        <div class="filter-group" style="margin-top: 12px;">
-          <label style="font-size: 0.75rem; font-weight: 600; display: flex; justify-content: space-between;">
-            <span>Deuda Activa Mínima:</span>
-            <span id="active-debt-val" style="color: #ef4444; font-weight: bold;">$0</span>
-          </label>
-          <input type="range" id="active-debt-filter" min="0" max="150000" step="5000" value="0" style="width: 100%; accent-color: #ef4444;">
+        <!-- Group 2: Disaster specific filters -->
+        <div id="disaster-filters-group" style="display: none; margin-top: 12px; border-top: 1px solid var(--border-glass); padding-top: 12px;">
+          <div class="filter-group">
+            <label style="font-size: 0.75rem; font-weight: 600; margin-bottom: 6px; display: block; color: #0891b2;">Eventos y Daños:</label>
+            <div style="display: flex; flex-direction: column; gap: 8px; font-size: 0.75rem;">
+              <label style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
+                <input type="checkbox" id="chk-dis-tornado" checked onchange="renderUI()">
+                <span>🌀 Tornados (NWS DAT)</span>
+              </label>
+              <label style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
+                <input type="checkbox" id="chk-dis-storm" checked onchange="renderUI()">
+                <span>⛈️ Tormentas / Vientos</span>
+              </label>
+              <label style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
+                <input type="checkbox" id="chk-dis-hail" checked onchange="renderUI()">
+                <span>☄️ Granizo Severo</span>
+              </label>
+              <label style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
+                <input type="checkbox" id="chk-dis-violation" checked onchange="renderUI()">
+                <span>🏠 Infracción de Techo (X50)</span>
+              </label>
+            </div>
+          </div>
+
+          <div class="filter-group" style="margin-top: 12px;">
+            <label style="font-size: 0.75rem; font-weight: 600; margin-bottom: 6px; display: block;">Intensidad de Tornado Mínima:</label>
+            <select id="dis-ef-filter" class="filter-select" onchange="renderUI()" style="width: 100%;">
+              <option value="ALL">Todas las Intensidades</option>
+              <option value="EF0">EF-0 o superior</option>
+              <option value="EF1">EF-1 o superior</option>
+              <option value="EF2">EF-2 o superior</option>
+            </select>
+          </div>
+
+          <div class="filter-group" style="margin-top: 12px;">
+            <label style="font-size: 0.75rem; font-weight: 600; margin-bottom: 6px; display: block;">Antigüedad de Reporte:</label>
+            <select id="dis-date-filter" class="filter-select" onchange="renderUI()" style="width: 100%;">
+              <option value="ALL">Historial completo (90 días)</option>
+              <option value="7">Últimos 7 días</option>
+              <option value="30">Últimos 30 días</option>
+            </select>
+          </div>
         </div>
       </div>
 
       <!-- Distress Multi-select Pills -->
-      <div class="sidebar-section">
+      <div class="sidebar-section" id="investment-distress-section">
         <h3>Foco de Distress</h3>
         <div class="pill-selectors">
           <div>
@@ -2559,7 +2660,7 @@
       </div>
 
       <!-- Estatus Financiero Segment Selector -->
-      <div class="sidebar-section">
+      <div class="sidebar-section" id="investment-financial-section">
         <h3>Estatus Financiero</h3>
         <div class="segment-selector">
           <button id="btn-deals" class="segment-btn active">
@@ -2575,14 +2676,14 @@
       </div>
 
       <!-- Surplus Funds Action Button -->
-      <div class="sidebar-section">
+      <div class="sidebar-section" id="investment-surplus-section">
         <button id="btn-surplus-vault" class="surplus-vault-btn">
           <i data-lucide="dollar-sign"></i> Bóveda de Excedentes
         </button>
       </div>
 
       <!-- Zero Debt Vault Action Button -->
-      <div class="sidebar-section" style="padding-top: 0;">
+      <div class="sidebar-section" style="padding-top: 0;" id="investment-zerodebt-section">
         <button id="btn-zero-debt-vault" class="zero-debt-vault-btn">
           <i data-lucide="shield"></i> Bóveda de Deuda Cero
         </button>
@@ -2722,7 +2823,7 @@
         </div>
 
         <!-- Metrics de Adquisición As-Is -->
-        <div class="detail-card">
+        <div class="detail-card" id="investment-metrics-card">
           <div class="detail-card-title"><i data-lucide="shield-check"></i> Métricas de Adquisición (As-Is)</div>
           <div class="uw-grid">
             <div class="uw-item">
@@ -2765,6 +2866,33 @@
               <a id="zillow-link" href="#" target="_blank" style="color: #006aff; font-weight: bold; text-decoration: none;">Zillow <i data-lucide="external-link" class="inline-icon" style="width: 10px; height: 10px; margin-left: 2px;"></i></a>
               <span style="color: rgba(255,255,255,0.1)">|</span>
               <a id="redfin-link" href="#" target="_blank" style="color: #e60000; font-weight: bold; text-decoration: none;">Redfin <i data-lucide="external-link" class="inline-icon" style="width: 10px; height: 10px; margin-left: 2px;"></i></a>
+            </div>
+          </div>
+        </div>
+
+        <!-- Métricas de Desastres / Daños (Modo Desastre) -->
+        <div class="detail-card" id="disaster-damage-card" style="display: none;">
+          <div class="detail-card-title"><i data-lucide="tornado"></i> Detalle de Daño Meteorológico (NOAA / NWS)</div>
+          <div class="uw-grid">
+            <div class="uw-item" style="background: rgba(6, 182, 212, 0.1); border: 1px solid rgba(6, 182, 212, 0.3);">
+              <span class="uw-label" style="color: #0891b2; font-weight: bold;">Tipo de Evento</span>
+              <span class="uw-value" id="uw-disaster-type" style="color: #06b6d4;">-</span>
+            </div>
+            <div class="uw-item">
+              <span class="uw-label">Escala Fujita (EF)</span>
+              <span class="uw-value" id="uw-ef-scale" style="font-weight: bold;">N/A</span>
+            </div>
+            <div class="uw-item">
+              <span class="uw-label">Viento Estimado</span>
+              <span class="uw-value" id="uw-wind-speed">N/A</span>
+            </div>
+            <div class="uw-item">
+              <span class="uw-label">Fecha del Reporte</span>
+              <span class="uw-value" id="uw-disaster-date">-</span>
+            </div>
+            <div class="uw-item" style="grid-column: span 2; background: rgba(255, 255, 255, 0.02); border: 1px solid rgba(255, 255, 255, 0.05); height: auto; display: flex; flex-direction: column; align-items: flex-start; text-align: left;">
+              <span class="uw-label">Notas e Inspección NWS / Código</span>
+              <div id="uw-nws-details" style="font-size: 0.72rem; line-height: 1.4; color: var(--text-main); margin-top: 4px; white-space: pre-wrap;">-</div>
             </div>
           </div>
         </div>
@@ -2867,19 +2995,19 @@
   <!-- Bottom Metrics bar -->
   <footer class="metrics-bar">
     <div class="metric-card">
-      <span class="metric-label">Total Alertas Encontradas</span>
+      <span class="metric-label" id="lbl-metric-total">Total Alertas Encontradas</span>
       <span class="metric-value" id="metric-total">0</span>
     </div>
     <div class="metric-card">
-      <span class="metric-label">Alta Motivación (🔥 Stacking)</span>
+      <span class="metric-label" id="lbl-metric-high">Alta Motivación (🔥 Stacking)</span>
       <span class="metric-value red" id="metric-high">0</span>
     </div>
     <div class="metric-card">
-      <span class="metric-label">PVA Promedio de la Zona</span>
+      <span class="metric-label" id="lbl-metric-avg-arv">PVA Promedio de la Zona</span>
       <span class="metric-value" id="metric-avg-arv">$0</span>
     </div>
     <div class="metric-card">
-      <span class="metric-label">Margen de Equidad Promedio</span>
+      <span class="metric-label" id="lbl-metric-avg-roi">Margen de Equidad Promedio</span>
       <span class="metric-value green" id="metric-avg-roi">$0</span>
     </div>
   </footer>
@@ -3017,6 +3145,9 @@
     // Favorites & Comparison State
     let favoriteKeys = JSON.parse(localStorage.getItem('tzel_favorites') || '[]');
     let comparedKeys = [];
+    
+    // System Mode: 'investment' or 'disaster'
+    let activeSystemMode = 'investment';
 
     // Variables para el arrastre / swipe del carrusel de fotos
     let isDraggingPhoto = false;
@@ -3324,6 +3455,71 @@
       }
     };
 
+    function toggleSystemMode(event) {
+      if (event) event.stopPropagation();
+      const nextMode = (activeSystemMode === 'investment') ? 'disaster' : 'investment';
+      setSystemMode(nextMode);
+    }
+
+    function setSystemMode(mode) {
+      activeSystemMode = mode;
+      
+      const bg = document.getElementById('mode-switch-bg');
+      const btnInv = document.getElementById('mode-btn-investment');
+      const btnDis = document.getElementById('mode-btn-disaster');
+      
+      if (!bg || !btnInv || !btnDis) return;
+
+      if (mode === 'investment') {
+        bg.style.left = '2px';
+        bg.style.background = 'var(--color-radar-green)';
+        btnInv.classList.add('active');
+        btnDis.classList.remove('active');
+        
+        // Show investment elements
+        document.getElementById('investment-filters-group').style.display = 'block';
+        document.getElementById('disaster-filters-group').style.display = 'none';
+        
+        document.getElementById('investment-distress-section').style.display = 'block';
+        document.getElementById('investment-financial-section').style.display = 'block';
+        document.getElementById('investment-surplus-section').style.display = 'block';
+        document.getElementById('investment-zerodebt-section').style.display = 'block';
+      } else {
+        bg.style.left = '82px'; // Adjust nicely for 160px width
+        bg.style.background = '#06b6d4'; // Cyan color for storm mode
+        btnInv.classList.remove('active');
+        btnDis.classList.add('active');
+        
+        // Hide investment elements, show disaster elements
+        document.getElementById('investment-filters-group').style.display = 'none';
+        document.getElementById('disaster-filters-group').style.display = 'block';
+        
+        document.getElementById('investment-distress-section').style.display = 'none';
+        document.getElementById('investment-financial-section').style.display = 'none';
+        document.getElementById('investment-surplus-section').style.display = 'none';
+        document.getElementById('investment-zerodebt-section').style.display = 'none';
+      }
+      
+      // Close drawer if selected lead does not match the active mode
+      if (selectedLead) {
+        const matchesMode = (mode === 'disaster') ? isRoofingLeadCheck(selectedLead) : true;
+        if (!matchesMode) {
+          closeDrawer();
+        } else {
+          hydrateDrawer(selectedLead);
+        }
+      }
+      
+      renderUI();
+      lucide.createIcons();
+    }
+    
+    function isRoofingLeadCheck(lead) {
+      const isViol = lead.violations && lead.violations.some(v => (v.violation_type || '').toUpperCase().includes('ROOF') || (v.details || '').toLowerCase().includes('roof'));
+      const isDis = lead.physicalDistress && lead.physicalDistress.some(pd => ['Tornado Damage', 'Storm Damage', 'Hail Damage'].includes(pd.distress_type));
+      return isViol || isDis;
+    }
+
     function initMap() {
       // Coordinates default to Louisville, KY area (middle of KY & IN border)
       map = L.map('map', {
@@ -3420,33 +3616,59 @@
     function calculateFooterMetrics() {
       const filtered = getFilteredLeads();
       const totalCount = filtered.length;
-      const highMotivationCount = filtered.filter(l => l.isHighMotivation).length;
-      
-      let totalPva = 0;
-      let validPvaCount = 0;
-      let totalSpread = 0;
-      let validSpreadCount = 0;
 
-      filtered.forEach(lead => {
-        const totalDebt = (lead.primaryDebt || 0) + (lead.hiddenMortgages || 0) + (lead.hiddenLiensAmount || 0);
-        const marketValue = (lead.auctions && lead.auctions.length > 0 && lead.auctions[0].appraisal_value > 0) ? lead.auctions[0].appraisal_value : (lead.mlsValue || 0);
-        const spread = marketValue - totalDebt;
+      if (activeSystemMode === 'disaster') {
+        const tornadoCount = filtered.filter(l => l.physicalDistress && l.physicalDistress.some(pd => pd.distress_type === 'Tornado Damage')).length;
+        const stormHailCount = filtered.filter(l => l.physicalDistress && l.physicalDistress.some(pd => ['Storm Damage', 'Hail Damage'].includes(pd.distress_type))).length;
+        const roofViolCount = filtered.filter(l => l.violations && l.violations.some(v => (v.violation_type || '').toUpperCase().includes('ROOF') || (v.details || '').toLowerCase().includes('roof'))).length;
 
-        if (marketValue > 0) {
-          totalPva += marketValue;
-          validPvaCount++;
-        }
-        totalSpread += spread;
-        validSpreadCount++;
-      });
+        document.getElementById('lbl-metric-total').textContent = 'Total Daños y Reportes';
+        document.getElementById('metric-total').textContent = totalCount;
 
-      const avgPva = validPvaCount > 0 ? Math.round(totalPva / validPvaCount) : 0;
-      const avgSpread = validSpreadCount > 0 ? Math.round(totalSpread / validSpreadCount) : 0;
+        document.getElementById('lbl-metric-high').textContent = 'Tornados Registrados (🌀)';
+        document.getElementById('metric-high').textContent = tornadoCount;
 
-      document.getElementById('metric-total').textContent = totalCount;
-      document.getElementById('metric-high').textContent = highMotivationCount;
-      document.getElementById('metric-avg-arv').textContent = `$${avgPva.toLocaleString()}`;
-      document.getElementById('metric-avg-roi').textContent = `$${avgSpread.toLocaleString()}`;
+        document.getElementById('lbl-metric-avg-arv').textContent = 'Tormentas / Vientos (⛈️)';
+        document.getElementById('metric-avg-arv').textContent = stormHailCount;
+
+        document.getElementById('lbl-metric-avg-roi').textContent = 'Infracciones de Techo (🏠)';
+        document.getElementById('metric-avg-roi').textContent = roofViolCount;
+      } else {
+        const highMotivationCount = filtered.filter(l => l.isHighMotivation).length;
+        
+        let totalPva = 0;
+        let validPvaCount = 0;
+        let totalSpread = 0;
+        let validSpreadCount = 0;
+
+        filtered.forEach(lead => {
+          const totalDebt = (lead.primaryDebt || 0) + (lead.hiddenMortgages || 0) + (lead.hiddenLiensAmount || 0);
+          const marketValue = (lead.auctions && lead.auctions.length > 0 && lead.auctions[0].appraisal_value > 0) ? lead.auctions[0].appraisal_value : (lead.mlsValue || 0);
+          const spread = marketValue - totalDebt;
+
+          if (marketValue > 0) {
+            totalPva += marketValue;
+            validPvaCount++;
+          }
+          totalSpread += spread;
+          validSpreadCount++;
+        });
+
+        const avgPva = validPvaCount > 0 ? Math.round(totalPva / validPvaCount) : 0;
+        const avgSpread = validSpreadCount > 0 ? Math.round(totalSpread / validSpreadCount) : 0;
+
+        document.getElementById('lbl-metric-total').textContent = 'Total Alertas Encontradas';
+        document.getElementById('metric-total').textContent = totalCount;
+
+        document.getElementById('lbl-metric-high').textContent = 'Alta Motivación (🔥 Stacking)';
+        document.getElementById('metric-high').textContent = highMotivationCount;
+
+        document.getElementById('lbl-metric-avg-arv').textContent = 'PVA Promedio de la Zona';
+        document.getElementById('metric-avg-arv').textContent = `$${avgPva.toLocaleString()}`;
+
+        document.getElementById('lbl-metric-avg-roi').textContent = 'Margen de Equidad Promedio';
+        document.getElementById('metric-avg-roi').textContent = `$${avgSpread.toLocaleString()}`;
+      }
     }
 
     function getDaysRemaining(dateStr) {
@@ -3508,6 +3730,68 @@
       const searchVal = document.getElementById('address-search').value.toLowerCase().trim();
       const stateVal = document.getElementById('state-filter').value;
       
+      if (activeSystemMode === 'disaster') {
+        const showTornado = document.getElementById('chk-dis-tornado').checked;
+        const showStorm = document.getElementById('chk-dis-storm').checked;
+        const showHail = document.getElementById('chk-dis-hail').checked;
+        const showViolation = document.getElementById('chk-dis-violation').checked;
+        const minEfVal = document.getElementById('dis-ef-filter').value;
+        const dateFilterVal = document.getElementById('dis-date-filter').value;
+
+        return allLeads.filter(lead => {
+          const isRoofViol = lead.violations && lead.violations.some(v => (v.violation_type || '').toUpperCase().includes('ROOF') || (v.details || '').toLowerCase().includes('roof'));
+          const disasters = lead.physicalDistress || [];
+          
+          const hasTornado = disasters.some(pd => pd.distress_type === 'Tornado Damage');
+          const hasStorm = disasters.some(pd => pd.distress_type === 'Storm Damage');
+          const hasHail = disasters.some(pd => pd.distress_type === 'Hail Damage');
+
+          // Check event checkboxes
+          let matchesType = false;
+          if (showTornado && hasTornado) matchesType = true;
+          if (showStorm && hasStorm) matchesType = true;
+          if (showHail && hasHail) matchesType = true;
+          if (showViolation && isRoofViol) matchesType = true;
+
+          if (!matchesType) return false;
+
+          // EF Scale Filter
+          if (hasTornado && minEfVal !== 'ALL') {
+            const firstTornado = disasters.find(pd => pd.distress_type === 'Tornado Damage');
+            const scaleStr = firstTornado ? (firstTornado.ef_scale || '') : '';
+            const scaleNum = parseInt(scaleStr.replace(/[^0-9]/g, '')) || 0;
+            const filterNum = parseInt(minEfVal.replace(/[^0-9]/g, '')) || 0;
+            if (scaleNum < filterNum) return false;
+          }
+
+          // Date Filter
+          if (dateFilterVal !== 'ALL') {
+            let dates = [];
+            disasters.forEach(d => { if (d.report_date) dates.push(new Date(d.report_date)); });
+            lead.violations?.forEach(v => { if (v.report_date) dates.push(new Date(v.report_date)); });
+            if (dates.length > 0) {
+              const maxDate = new Date(Math.max(...dates.map(d => d.getTime())));
+              const today = new Date();
+              const diffTime = today.getTime() - maxDate.getTime();
+              const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+              const maxAllowedDays = parseInt(dateFilterVal) || 90;
+              if (diffDays > maxAllowedDays) return false;
+            }
+          }
+
+          // Search text filter
+          const matchesSearch = 
+            lead.displayAddress.toLowerCase().includes(searchVal) ||
+            lead.ownerName.toLowerCase().includes(searchVal);
+          if (!matchesSearch) return false;
+
+          // State filter
+          if (stateVal !== 'ALL' && lead.state !== stateVal) return false;
+
+          return true;
+        });
+      }
+
       const showExecution = document.getElementById('pill-execution').checked;
       const showPhysical = document.getElementById('pill-physical').checked;
       const showOthers = document.getElementById('pill-others').checked;
@@ -3793,8 +4077,24 @@
         if (isAbsentee) badgesHtml += `<span class="badge badge-absentee"><i data-lucide="user" class="inline-icon"></i> Absentee</span>`;
         if (hasHibernated) badgesHtml += `<span class="badge" style="background: rgba(139, 92, 246, 0.15); color: #c084fc; border: 1px solid rgba(139, 92, 246, 0.3)"><i data-lucide="bot" class="inline-icon"></i> Hibernado</span>`;
         if (hasManualReview) badgesHtml += `<span class="badge" style="background: rgba(239, 68, 68, 0.15); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.3)"><i data-lucide="alert-triangle" class="inline-icon"></i> Review</span>`;
-        if (equitySpread > 40000) {
-          badgesHtml += `<span class="badge badge-equity-high" style="background: rgba(16, 185, 129, 0.15); color: var(--color-radar-green-dark); border: 1px solid var(--color-radar-green-border);"><i data-lucide="trending-up" class="inline-icon"></i> ALTA EQUIDAD</span>`;
+        
+        if (activeSystemMode === 'investment') {
+          if (equitySpread > 40000) {
+            badgesHtml += `<span class="badge badge-equity-high" style="background: rgba(16, 185, 129, 0.15); color: var(--color-radar-green-dark); border: 1px solid var(--color-radar-green-border);"><i data-lucide="trending-up" class="inline-icon"></i> ALTA EQUIDAD</span>`;
+          }
+        } else {
+          // Disaster mode badges: Tornado or storm damage type
+          const disasters = lead.physicalDistress || [];
+          const isTornado = disasters.some(pd => pd.distress_type === 'Tornado Damage');
+          const isStorm = disasters.some(pd => pd.distress_type === 'Storm Damage');
+          const isHail = disasters.some(pd => pd.distress_type === 'Hail Damage');
+          const isViol = lead.violations && lead.violations.some(v => (v.violation_type || '').toUpperCase().includes('ROOF') || (v.details || '').toLowerCase().includes('roof'));
+          
+          if (isTornado) badgesHtml += `<span class="badge" style="background: rgba(6, 182, 212, 0.15); color: #0891b2; border: 1px solid rgba(6, 182, 212, 0.3);"><i data-lucide="tornado" class="inline-icon"></i> TORNADO</span>`;
+          else if (isStorm) badgesHtml += `<span class="badge" style="background: rgba(14, 116, 144, 0.15); color: #0e7490; border: 1px solid rgba(14, 116, 144, 0.3);"><i data-lucide="cloud-lightning" class="inline-icon"></i> TORMENTA</span>`;
+          else if (isHail) badgesHtml += `<span class="badge" style="background: rgba(3, 105, 161, 0.15); color: #0369a1; border: 1px solid rgba(3, 105, 161, 0.3);"><i data-lucide="cloud-drizzle" class="inline-icon"></i> GRANIZO</span>`;
+          
+          if (isViol) badgesHtml += `<span class="badge" style="background: rgba(180, 83, 9, 0.15); color: #b45309; border: 1px solid rgba(180, 83, 9, 0.3);"><i data-lucide="alert-circle" class="inline-icon"></i> MULTA TECHO</span>`;
         }
 
         // Photos
@@ -3836,6 +4136,80 @@
           </a>
         `;
 
+        let compsHtml = '';
+        if (activeSystemMode === 'investment') {
+          compsHtml = `
+            <div class="lead-comps">
+              <div class="comp-item">
+                <span class="comp-label">Valor PVA</span>
+                <span class="comp-val">${marketValue > 0 ? '$' + marketValue.toLocaleString() : 'N/A'}</span>
+              </div>
+              <div class="comp-item">
+                <span class="comp-label">Deuda Total</span>
+                <span class="comp-val" style="color: #ef4444">$${totalDebt.toLocaleString()}</span>
+              </div>
+              <div class="comp-item">
+                <span class="comp-label">Oferta MPO</span>
+                <span class="comp-val" style="color: var(--color-radar-green); font-weight: bold;">$${mpo.toLocaleString()}</span>
+              </div>
+              <div class="comp-item">
+                <span class="comp-label">Equidad</span>
+                <span class="comp-val" style="color: ${equitySpread > 40000 ? 'var(--color-radar-green)' : 'var(--text-main)'}">$${equitySpread.toLocaleString()}</span>
+              </div>
+            </div>
+          `;
+        } else {
+          let eventType = "Desastre / Daño";
+          let intensity = "N/A";
+          let dateStr = "N/A";
+          let detailsSnippet = "Sin descripción de daño registrada.";
+
+          const disaster = lead.physicalDistress && lead.physicalDistress.find(pd => ['Tornado Damage', 'Storm Damage', 'Hail Damage'].includes(pd.distress_type));
+          const violation = lead.violations && lead.violations.find(v => (v.violation_type || '').toUpperCase().includes('ROOF') || (v.details || '').toLowerCase().includes('roof'));
+
+          if (disaster) {
+            eventType = disaster.distress_type === 'Tornado Damage' ? 'Tornado' : (disaster.distress_type === 'Hail Damage' ? 'Granizo' : 'Tormenta / Viento');
+            intensity = disaster.distress_type === 'Tornado Damage' ? (disaster.ef_scale || 'EF-N/A') : (disaster.wind_speed_est ? `${disaster.wind_speed_est} mph` : 'Viento');
+            dateStr = disaster.report_date || 'N/A';
+            detailsSnippet = disaster.nws_survey_details || disaster.details || 'Ver detalles del reporte NWS...';
+            if (detailsSnippet.includes('\n')) {
+              const lines = detailsSnippet.split('\n');
+              const cleanLines = lines.filter(l => !l.startsWith('[NOAA DAT ID:') && !l.startsWith('Estructura:') && !l.startsWith('Daño:') && !l.startsWith('Escala:'));
+              if (cleanLines.length > 0) {
+                detailsSnippet = cleanLines.join(' ');
+              }
+            }
+          } else if (violation) {
+            eventType = "Infracción Techo";
+            intensity = violation.violation_type || "X50-ROOF";
+            dateStr = violation.report_date || 'N/A';
+            detailsSnippet = violation.details || 'Violación de código municipal por estado del tejado.';
+          }
+
+          compsHtml = `
+            <div class="lead-comps">
+              <div class="comp-item">
+                <span class="comp-label">Evento</span>
+                <span class="comp-val" style="color: #06b6d4; font-weight: bold; text-transform: uppercase;">${eventType}</span>
+              </div>
+              <div class="comp-item">
+                <span class="comp-label">Intensidad</span>
+                <span class="comp-val" style="font-weight: bold;">${intensity}</span>
+              </div>
+              <div class="comp-item">
+                <span class="comp-label">Fecha</span>
+                <span class="comp-val" style="color: var(--text-muted); font-size: 0.68rem;">${dateStr}</span>
+              </div>
+              <div class="comp-item" style="grid-column: span 2; display: flex; flex-direction: column; align-items: flex-start; text-align: left; height: auto;">
+                <span class="comp-label" style="margin-bottom: 2px;">Detalle de Daño</span>
+                <span class="comp-val" style="font-size: 0.7rem; font-weight: normal; line-height: 1.25; max-height: 38px; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; color: var(--text-main);">
+                  ${detailsSnippet}
+                </span>
+              </div>
+            </div>
+          `;
+        }
+
         card.innerHTML = `
           <div style="position: relative; width: 100%; height: 150px;">
             ${photoHtml}
@@ -3860,24 +4234,7 @@
               <span><i data-lucide="user" class="inline-icon"></i> ${lead.ownerName}</span>
               <span><i data-lucide="map-pin" class="inline-icon"></i> ${lead.county}, ${lead.state}</span>
             </div>
-            <div class="lead-comps">
-              <div class="comp-item">
-                <span class="comp-label">Valor PVA</span>
-                <span class="comp-val">${marketValue > 0 ? '$' + marketValue.toLocaleString() : 'N/A'}</span>
-              </div>
-              <div class="comp-item">
-                <span class="comp-label">Deuda Total</span>
-                <span class="comp-val" style="color: #ef4444">$${totalDebt.toLocaleString()}</span>
-              </div>
-              <div class="comp-item">
-                <span class="comp-label">Oferta MPO</span>
-                <span class="comp-val" style="color: var(--color-radar-green); font-weight: bold;">$${mpo.toLocaleString()}</span>
-              </div>
-              <div class="comp-item">
-                <span class="comp-label">Equidad</span>
-                <span class="comp-val" style="color: ${equitySpread > 40000 ? 'var(--color-radar-green)' : 'var(--text-main)'}">$${equitySpread.toLocaleString()}</span>
-              </div>
-            </div>
+            ${compsHtml}
           </div>
         `;
 
@@ -4462,6 +4819,49 @@
         alertBanner.style.display = 'none';
       }
 
+      // Toggle drawer cards based on Mode (Investment vs Disaster)
+      const investmentMetricsCard = document.getElementById('investment-metrics-card');
+      const disasterDamageCard = document.getElementById('disaster-damage-card');
+
+      if (activeSystemMode === 'disaster') {
+        if (investmentMetricsCard) investmentMetricsCard.style.display = 'none';
+        if (disasterDamageCard) {
+          disasterDamageCard.style.display = 'block';
+          
+          let eventType = "Desastre / Tormenta";
+          let efScale = "N/A";
+          let windSpeed = "N/A";
+          let dateStr = "N/A";
+          let notesStr = "No hay notas adicionales.";
+
+          const disaster = lead.physicalDistress && lead.physicalDistress.find(pd => ['Tornado Damage', 'Storm Damage', 'Hail Damage'].includes(pd.distress_type));
+          const violation = lead.violations && lead.violations.find(v => (v.violation_type || '').toUpperCase().includes('ROOF') || (v.details || '').toLowerCase().includes('roof'));
+
+          if (disaster) {
+            eventType = disaster.distress_type === 'Tornado Damage' ? 'Tornado' : (disaster.distress_type === 'Hail Damage' ? 'Granizo' : 'Tormenta / Viento');
+            efScale = disaster.ef_scale || 'N/A';
+            windSpeed = disaster.wind_speed_est ? `${disaster.wind_speed_est} mph` : 'N/A';
+            dateStr = disaster.report_date || 'N/A';
+            notesStr = disaster.nws_survey_details || disaster.details || 'Sin comentarios en el reporte del Servicio Meteorológico.';
+          } else if (violation) {
+            eventType = "Violación de Código de Techo";
+            efScale = "N/A";
+            windSpeed = "N/A";
+            dateStr = violation.report_date || 'N/A';
+            notesStr = `[VIOLACIÓN DE TECHO MUNICIPAL]\nCódigo: ${violation.violation_type || 'X50-ROOF'}\nDetalles del Código: ${violation.details || 'Falta de mantenimiento o daño visible en tejado.'}`;
+          }
+
+          document.getElementById('uw-disaster-type').textContent = eventType;
+          document.getElementById('uw-ef-scale').textContent = efScale;
+          document.getElementById('uw-wind-speed').textContent = windSpeed;
+          document.getElementById('uw-disaster-date').textContent = dateStr;
+          document.getElementById('uw-nws-details').textContent = notesStr;
+        }
+      } else {
+        if (investmentMetricsCard) investmentMetricsCard.style.display = 'block';
+        if (disasterDamageCard) disasterDamageCard.style.display = 'none';
+      }
+
       // Fetch MCA dynamic comps
       const mcaCard = document.getElementById('mca-card');
       const mcaTbody = document.getElementById('mca-comps-tbody');
@@ -4469,11 +4869,12 @@
       const mcaCompsCount = document.getElementById('mca-comps-count');
       const mcaTargetProfile = document.getElementById('mca-target-profile');
 
-      mcaCard.style.display = 'block';
-      mcaTargetProfile.innerHTML = 'Consultando perfil en el MLS...';
-      mcaTbody.innerHTML = `<tr><td colspan="4" style="text-align: center; padding: 10px; color: var(--text-muted);">Consultando MLS...</td></tr>`;
-      mcaSuggestedArv.textContent = 'Calculando...';
-      mcaCompsCount.textContent = '';
+      if (activeSystemMode === 'investment') {
+        mcaCard.style.display = 'block';
+        mcaTargetProfile.innerHTML = 'Consultando perfil en el MLS...';
+        mcaTbody.innerHTML = `<tr><td colspan="4" style="text-align: center; padding: 10px; color: var(--text-muted);">Consultando MLS...</td></tr>`;
+        mcaSuggestedArv.textContent = 'Calculando...';
+        mcaCompsCount.textContent = '';
 
       fetch(`/api/mca?address=${encodeURIComponent(lead.displayAddress)}&state=${lead.state}`)
         .then(r => r.json())
@@ -4944,8 +5345,28 @@
 
       const scripts = {};
 
-      // 1. Stacking Script (Always first if High Motivation)
-      if (lead.isHighMotivation) {
+      // In disaster mode, add roofing first if available so it's the default active tab
+      if (activeSystemMode === 'disaster' && categories.includes('roofing')) {
+        const isDisaster = lead.physicalDistress && lead.physicalDistress.some(pd => ['Tornado Damage', 'Storm Damage', 'Hail Damage'].includes(pd.distress_type));
+        if (isDisaster) {
+          const firstDis = lead.physicalDistress.find(pd => ['Tornado Damage', 'Storm Damage', 'Hail Damage'].includes(pd.distress_type));
+          const fscale = firstDis ? (firstDis.ef_scale || 'N/A') : 'N/A';
+          scripts['roofing'] = {
+            name: 'Roofing Clima',
+            icon: 'tornado',
+            text: `[GUION DE RECONSTRUCCIÓN POR TORMENTA]\nHola, buenas tardes. ¿Hablo con ${lead.ownerName}? Le llamo respecto a la propiedad en ${lead.displayAddress}.\nEstaba revisando los reportes meteorológicos y de daños del Servicio Meteorológico Nacional (NWS) para su área y noté un registro de inspección de daños por tormenta/tornado (${fscale}) asociado a su dirección.\n¿Usted y su familia se encuentran bien? Quería comentarle que trabajamos directamente con propietarios en su zona ayudándoles con la reconstrucción y reparación urgente del techo.\nNosotros nos encargamos de documentar los daños estructurales y gestionar todo el reclamo directamente con su compañía de seguros para que usted no tenga que desembolsar dinero de su bolsillo para las reparaciones de emergencia.\n¿Estaría interesado en que hagamos una inspección gratuita del tejado esta semana para evaluar los daños y coordinar con su seguro?`
+          };
+        } else {
+          scripts['roofing'] = {
+            name: 'Roofing Violación',
+            icon: 'cloud-lightning',
+            text: `[GUION DE VIOLACIÓN DE TECHO - ROOFING]\nHola, buenas tardes. ¿Hablo con ${lead.ownerName}? Le llamo en relación a su propiedad en ${lead.displayAddress}.\nRevisando los registros del departamento de obras y cumplimiento de códigos de la ciudad, noté una notificación activa de violación relacionada específicamente con el estado del techo (código X50-ROOF o similar).\nComo contratistas de tejados de servicio completo, ayudamos a propietarios a resolver estas multas de forma rápida y limpia. Ofrecemos financiamiento flexible y trabajamos directamente para subsanar la violación ante los inspectores municipales para que no siga acumulando cargos.\n¿Le interesaría recibir un presupuesto gratuito y sin compromiso para reparar el tejado y cerrar este caso municipal?`
+          };
+        }
+      }
+
+      // 1. Stacking Script (Always first if High Motivation and not in disaster mode)
+      if (lead.isHighMotivation && activeSystemMode !== 'disaster') {
         scripts['alta-motivacion'] = {
           name: 'Alta Mot.',
           icon: 'flame',
@@ -4954,7 +5375,7 @@
       }
 
       // 2. Specific Distress Scripts
-      if (categories.includes('auction')) {
+      if (categories.includes('auction') && activeSystemMode !== 'disaster') {
         const firstAuc = lead.auctions[0];
         scripts['subasta'] = {
           name: 'Subasta',
@@ -4963,7 +5384,7 @@
         };
       }
 
-      if (categories.includes('violation')) {
+      if (categories.includes('violation') && activeSystemMode !== 'disaster') {
         const firstViol = lead.violations[0];
         scripts['violacion'] = {
           name: 'Violación',
@@ -4972,7 +5393,7 @@
         };
       }
 
-      if (categories.includes('probate')) {
+      if (categories.includes('probate') && activeSystemMode !== 'disaster') {
         scripts['probate'] = {
           name: 'Probate',
           icon: 'file-text',
@@ -4980,7 +5401,7 @@
         };
       }
 
-      if (categories.includes('divorce')) {
+      if (categories.includes('divorce') && activeSystemMode !== 'disaster') {
         scripts['divorce'] = {
           name: 'Divorcio',
           icon: 'heart-off',
@@ -4988,7 +5409,7 @@
         };
       }
 
-      if (categories.includes('bankruptcy')) {
+      if (categories.includes('bankruptcy') && activeSystemMode !== 'disaster') {
         scripts['bankruptcy'] = {
           name: 'Bancarrota',
           icon: 'trending-down',
@@ -4996,31 +5417,32 @@
         };
       }
 
-      if (categories.includes('physical')) {
+      if (categories.includes('physical') && activeSystemMode !== 'disaster') {
         scripts['physical'] = {
           name: 'Físico',
           icon: 'hammer',
-          text: `[GUION DE ESTRÉS FÍSICO / DAÑO SEVERO]\nHola, buenas tardes. ¿Hablo con \${lead.ownerName}? Le contacto respecto a la propiedad en \${lead.displayAddress}.\nRevisando los registros de seguridad e inspección urbana, notamos reportes por daños o suspensión de servicios. Nos especializamos en adquirir propiedades con problemas de mantenimiento severos en efectivo.\nNosotros nos encargamos de vaciar el inmueble, resolver problemas estructurales y liquidar adeudos de servicios municipales. Usted recibe su pago en efectivo sin tener que invertir dinero ni tiempo en reparaciones.\n¿Consideraría evaluar una oferta en efectivo en las condiciones actuales de la casa?`
+          text: `[GUION DE ESTRÉS FÍSICO / DAÑO SEVERO]\nHola, buenas tardes. ¿Hablo con ${lead.ownerName}? Le contacto respecto a la propiedad en ${lead.displayAddress}.\nRevisando los registros de seguridad e inspección urbana, notamos reportes por daños o suspensión de servicios. Nos especializamos en adquirir propiedades con problemas de mantenimiento severos en efectivo.\nNosotros nos encargamos de vaciar el inmueble, resolver problemas estructurales y liquidar adeudos de servicios municipales. Usted recibe su pago en efectivo sin tener que invertir dinero ni tiempo en reparaciones.\n¿Consideraría evaluar una oferta en efectivo en las condiciones actuales de la casa?`
         };
       }
 
-      if (categories.includes('financial')) {
+      if (categories.includes('financial') && activeSystemMode !== 'disaster') {
         scripts['financial'] = {
           name: 'Finanzas',
           icon: 'scale',
-          text: `[GUION DE ESTRÉS FINANCIERO / GRAVAMENES]\nHola, buenas tardes. ¿Hablo con \${lead.ownerName}? Le llamo en relación a la propiedad en \${lead.displayAddress}.\nRevisando los registros del condado, notamos algunos gravámenes pendientes o reclamaciones comerciales. Nuestro fondo adquiere propiedades directamente haciéndose cargo de saldar estas deudas pendientes en el momento de la compra.\nEsto le permite liberar el título de la casa de inmediato, detener recargos y recuperar una parte sustancial de su dinero en efectivo.\n¿Le interesaría recibir una oferta para liquidar la propiedad y saldar estos saldos pendientes de forma directa?`
+          text: `[GUION DE ESTRÉS FINANCIERO / GRAVAMENES]\nHola, buenas tardes. ¿Hablo con ${lead.ownerName}? Le llamo en relación a la propiedad en ${lead.displayAddress}.\nRevisando los registros del condado, notamos algunos gravámenes pendientes o reclamaciones comerciales. Nuestro fondo adquiere propiedades directamente haciéndose cargo de saldar estas deudas pendientes en el momento de la compra.\nEsto le permite liberar el título de la casa de inmediato, detener recargos y recuperar una parte sustancial de su dinero en efectivo.\n¿Le interesaría recibir una oferta para liquidar la propiedad y saldar estos saldos pendientes de forma directa?`
         };
       }
 
-      if (categories.includes('life-event')) {
+      if (categories.includes('life-event') && activeSystemMode !== 'disaster') {
         scripts['life-event'] = {
           name: 'Evento Vida',
           icon: 'alert-circle',
-          text: `[GUION DE EVENTOS DE VIDA CRÍTICOS]\nHola, buenas tardes. ¿Hablo con \${lead.ownerName}? Le contacto en relación al inmueble en \${lead.displayAddress}.\nCompramos propiedades al contado de forma rápida y confidencial en su condado. Sabemos que a veces surgen situaciones imprevistas o cambios familiares que requieren liquidez de forma inmediata.\nPodemos formalizar un contrato de compra en 24 horas y cerrar la transacción en pocos días sin intermediarios, comisiones, ni visitas públicas al inmueble.\n¿Le gustaría evaluar una propuesta de compra rápida en efectivo hoy de forma totalmente privada?`
+          text: `[GUION DE EVENTOS DE VIDA CRÍTICOS]\nHola, buenas tardes. ¿Hablo con ${lead.ownerName}? Le contacto en relación al inmueble en ${lead.displayAddress}.\nCompramos propiedades al contado de forma rápida y confidencial en su condado. Sabemos que a veces surgen situaciones imprevistas o cambios familiares que requieren liquidez de forma inmediata.\nPodemos formalizar un contrato de compra en 24 horas y cerrar la transacción en pocos días sin intermediarios, comisiones, ni visitas públicas al inmueble.\n¿Le gustaría evaluar una propuesta de compra rápida en efectivo hoy de forma totalmente privada?`
         };
       }
 
-      if (categories.includes('roofing')) {
+      // Add roofing at the end if we are NOT in disaster mode (classic mode compat)
+      if (categories.includes('roofing') && activeSystemMode !== 'disaster') {
         const isDisaster = lead.physicalDistress && lead.physicalDistress.some(pd => ['Tornado Damage', 'Storm Damage', 'Hail Damage'].includes(pd.distress_type));
         if (isDisaster) {
           const firstDis = lead.physicalDistress.find(pd => ['Tornado Damage', 'Storm Damage', 'Hail Damage'].includes(pd.distress_type));
