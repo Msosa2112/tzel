@@ -12,6 +12,14 @@
     {
       "src": "logo.jpg",
       "use": "@vercel/static"
+    },
+    {
+      "src": "zillow-icon.png",
+      "use": "@vercel/static"
+    },
+    {
+      "src": "street-view-icon.png",
+      "use": "@vercel/static"
     }
   ],
   "routes": [
@@ -22,6 +30,14 @@
     {
       "src": "/logo.jpg",
       "dest": "logo.jpg"
+    },
+    {
+      "src": "/zillow-icon.png",
+      "dest": "zillow-icon.png"
+    },
+    {
+      "src": "/street-view-icon.png",
+      "dest": "street-view-icon.png"
     },
     {
       "src": "/(.*)",
