@@ -407,7 +407,9 @@ app.get("/api/prospectos", async (req, res) => {
     // 6. Fetch physical distress
     const physicalRes = await db.execute(`
       SELECT distress_id, address, county, state, distress_type, report_date, details, owner_name,
-             mls_estimated_value, mls_id, defendant_phones, defendant_emails, mailing_address, absentee_owner, sqft, beds, baths, hidden_mortgages, hidden_liens_amount, photo_urls
+             mls_estimated_value, mls_id, defendant_phones, defendant_emails, mailing_address, absentee_owner, 
+             sqft, beds, baths, hidden_mortgages, hidden_liens_amount, photo_urls,
+             ef_scale, nws_survey_details, wind_speed_est
       FROM physical_distress
     `);
     const physicalDistressList = physicalRes.rows.filter(row => {

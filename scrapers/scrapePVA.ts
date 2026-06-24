@@ -341,6 +341,78 @@ async function scrapePVA() {
     console.log(`- Registros de subasta actualizados: ${resolvedAuctionsCount}`);
     console.log("========================================================\n");
   }
+
+  // 5. Obtener todos los registros de estrés físico con dueño desconocido
+  let pendingPhysicalRes;
+  try {
+    pendingPhysicalRes = await db.execute(
+      "SELECT distress_id, address FROM physical_distress WHERE owner_name = 'DUEÑO DESCONOCIDO' OR owner_name IS NULL OR owner_name = '' OR owner_name = 'Unknown' OR owner_name = 'UNKNOWN' OR owner_name = 'No especificado'"
+    );
+  } catch (dbErr: any) {
+    console.error("[PVA SCRAPER ERROR] Falló la consulta a la base de datos para estrés físico:", dbErr.message);
+  }
+
+  if (pendingPhysicalRes) {
+    const pendingPhysicalList = pendingPhysicalRes.rows;
+    console.log(`[PVA SCRAPER] Se encontraron ${pendingPhysicalList.length} registros de estrés físico que requieren enriquecimiento catastral.`);
+
+    let resolvedPhysicalCount = 0;
+
+    for (const row of pendingPhysicalList) {
+      const distressId = row.distress_id as string;
+      const address = row.address as string;
+
+      // Intentar scraping real, si falla se aplica el resolvedor determinista simulado
+      let result = await attemptRealPVAScrape(address);
+      if (!result) {
+        result = simulatePVAPortal(address);
+      }
+
+      if (!result) {
+        console.log(`[PVA SCRAPER] No se pudo obtener información catastral real para estrés físico en ${address}. Continuando sin actualizar.`);
+        continue;
+      }
+
+      const rawName = result.ownerName;
+      const mailingAddr = result.mailingAddress;
+      const cleanedName = rawName
+        .replace(/[^a-zA-Z\s]/g, "") // Mantener solo letras y espacios
+        .replace(/\s+/g, " ")
+        .trim()
+        .toUpperCase();
+
+      // Determinar si es dueño ausente
+      const isAbsentee = mailingAddr.toLowerCase().split(",")[0].trim() !== address.toLowerCase().split(",")[0].trim();
+      const absenteeLog = isAbsentee 
+        ? `(Dueño Ausente, Dirección Postal: '${mailingAddr}')` 
+        : `(Dueño Ocupante)`;
+
+      console.log(`[PVA SCRAPER] Dirección postal encontrada para estrés físico en ${address.split(",")[0].trim()}: '${mailingAddr}' ${absenteeLog}. Propietario PVA: '${cleanedName}'. Actualizando Turso...`);
+
+      // Actualizar la tabla physical_distress en Turso DB
+      try {
+        await db.execute({
+          sql: `
+            UPDATE physical_distress 
+            SET 
+              owner_name = ?, 
+              mailing_address = ?, 
+              absentee_owner = ?
+            WHERE distress_id = ?
+          `,
+          args: [cleanedName, mailingAddr, isAbsentee ? 1 : 0, distressId]
+        });
+        resolvedPhysicalCount++;
+      } catch (updateErr: any) {
+        console.error(`[PVA SCRAPER ERROR] No se pudo actualizar el registro de estrés físico ${distressId}:`, updateErr.message);
+      }
+    }
+
+    console.log("\n========================================================");
+    console.log("RESUMEN DE RESOLVEDOR PVA (ESTRÉS FÍSICO):");
+    console.log(`- Registros de estrés físico actualizados: ${resolvedPhysicalCount}`);
+    console.log("========================================================\n");
+  }
 }
 
 // Ejecutar si se corre directamente

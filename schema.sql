@@ -172,6 +172,9 @@ CREATE TABLE IF NOT EXISTS physical_distress (
     stress_score INTEGER DEFAULT 0,
     telegram_ssi_sent INTEGER DEFAULT 0,
     photo_urls TEXT,
+    ef_scale TEXT,
+    nws_survey_details TEXT,
+    wind_speed_est REAL,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 

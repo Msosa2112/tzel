@@ -2548,6 +2548,13 @@
               <span>Favoritos</span>
             </label>
           </div>
+          <div>
+            <input type="checkbox" id="pill-roofing" class="pill-checkbox">
+            <label for="pill-roofing" class="pill-label">
+              <i data-lucide="cloud-lightning"></i>
+              <span>Roofing</span>
+            </label>
+          </div>
         </div>
       </div>
 
@@ -2993,7 +3000,9 @@
       clock: `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>`,
       flame: `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/></svg>`,
       scale: `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m16 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z"/><path d="m2 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z"/><path d="M7 21h10"/><path d="M12 3v18"/><path d="M3 7h18"/></svg>`,
-      user: `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>`
+      user: `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>`,
+      tornado: `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 4H3"/><path d="M19 8H5"/><path d="M17 12H7"/><path d="M15 16H9"/><path d="M13 20h-2"/></svg>`,
+      cloudLightning: `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 16.9A5 5 0 0 0 18 7h-1.26a8 8 0 1 0-11.62 8.58M13 11l-4 6h6l-3 5"/></svg>`
     };
 
     let map;
@@ -3032,6 +3041,7 @@
       document.getElementById('pill-others').addEventListener('change', applyFilters);
       document.getElementById('pill-stack').addEventListener('change', applyFilters);
       document.getElementById('pill-favorites').addEventListener('change', applyFilters);
+      document.getElementById('pill-roofing').addEventListener('change', applyFilters);
       document.getElementById('btn-surplus-vault').addEventListener('click', openSurplusVault);
       document.getElementById('close-surplus-btn').addEventListener('click', closeSurplusVault);
       document.getElementById('btn-zero-debt-vault').addEventListener('click', openZeroDebtVault);
@@ -3503,24 +3513,45 @@
       const showOthers = document.getElementById('pill-others').checked;
       const showStackOnly = document.getElementById('pill-stack').checked;
       const showFavorites = document.getElementById('pill-favorites').checked;
+      const showRoofing = document.getElementById('pill-roofing').checked;
 
       const minEquity = parseFloat(document.getElementById('equity-spread-filter').value) || 0;
       const minDebt = parseFloat(document.getElementById('active-debt-filter').value) || 0;
 
       return allLeads.filter(lead => {
-        // Excluir propiedades sin deuda (van a la Bóveda de Deuda Cero)
+        const isRoofingLead = (lead.violations && lead.violations.some(v => (v.violation_type || '').toUpperCase().includes('ROOF') || (v.details || '').toLowerCase().includes('roof'))) || 
+                              (lead.physicalDistress && lead.physicalDistress.some(pd => ['Tornado Damage', 'Storm Damage', 'Hail Damage'].includes(pd.distress_type)));
+
         const totalDebt = (lead.primaryDebt || 0) + (lead.hiddenMortgages || 0) + (lead.hiddenLiensAmount || 0);
-        if (totalDebt === 0) return false;
-
-        // Filtro de Deuda Activa Mínima
-        if (totalDebt < minDebt) return false;
-
-        // Margen de Equidad Spread
         const marketValue = (lead.auctions && lead.auctions.length > 0 && lead.auctions[0].appraisal_value > 0) ? lead.auctions[0].appraisal_value : (lead.mlsValue || 0);
         const equitySpread = marketValue - totalDebt;
-        
-        // Filtro de Margen de Equidad Mínimo
-        if (equitySpread < minEquity) return false;
+
+        // Skip financial/debt filters if it's a roofing lead and the roofing filter is active
+        const bypassFinancial = showRoofing && isRoofingLead;
+
+        if (!bypassFinancial) {
+          // Excluir propiedades sin deuda (van a la Bóveda de Deuda Cero)
+          if (totalDebt === 0) return false;
+
+          // Filtro de Deuda Activa Mínima
+          if (totalDebt < minDebt) return false;
+
+          // Filtro de Margen de Equidad Mínimo
+          if (equitySpread < minEquity) return false;
+
+          // Filtro Financiero (Buenos Deals vs Bajo el Agua vs Sin Valorar)
+          const isGoodDeal = marketValue > 0 && equitySpread >= Math.max(40000, marketValue * 0.30);
+          const isUnderwater = marketValue > 0 && equitySpread < 0;
+          const isUnvalued = marketValue === 0;
+          
+          if (financialFilter === 'deals') {
+            if (isUnvalued || !isGoodDeal) return false;
+          } else if (financialFilter === 'underwater') {
+            if (isUnvalued || !isUnderwater) return false;
+          } else if (financialFilter === 'unvalued') {
+            if (!isUnvalued) return false;
+          }
+        }
 
         // Favorites filter
         if (showFavorites && !favoriteKeys.includes(lead.groupingKey)) return false;
@@ -3534,19 +3565,6 @@
 
         // State filter
         if (stateVal !== 'ALL' && lead.state !== stateVal) return false;
-
-        // Filtro Financiero (Buenos Deals vs Bajo el Agua vs Sin Valorar)
-        const isGoodDeal = marketValue > 0 && equitySpread >= Math.max(40000, marketValue * 0.30);
-        const isUnderwater = marketValue > 0 && equitySpread < 0;
-        const isUnvalued = marketValue === 0;
-        
-        if (financialFilter === 'deals') {
-          if (isUnvalued || !isGoodDeal) return false;
-        } else if (financialFilter === 'underwater') {
-          if (isUnvalued || !isUnderwater) return false;
-        } else if (financialFilter === 'unvalued') {
-          if (!isUnvalued) return false;
-        }
 
         // Distress Stacking / Type Filter
         const hasAuctions = lead.auctions && lead.auctions.length > 0;
@@ -3565,6 +3583,7 @@
         if (showExecution && hasAuctions) matchesCategory = true;
         if (showPhysical && hasPhysical) matchesCategory = true;
         if (showOthers && hasOthers) matchesCategory = true;
+        if (showRoofing && isRoofingLead) matchesCategory = true;
 
         if (!matchesCategory) return false;
 
@@ -3601,12 +3620,22 @@
           const hasScheduledAuction = hasAuctions && lead.auctions.some(auc => getDaysRemaining(auc.auction_date) !== null);
           const hasPhysical = (lead.physicalDistress && lead.physicalDistress.length > 0) || (lead.violations && lead.violations.length > 0);
 
-          const isFav = favoriteKeys.includes(lead.groupingKey);
+           const isFav = favoriteKeys.includes(lead.groupingKey);
+          const isDisaster = lead.physicalDistress && lead.physicalDistress.some(pd => ['Tornado Damage', 'Storm Damage', 'Hail Damage'].includes(pd.distress_type));
+          const isRoofViolation = lead.violations && lead.violations.some(v => (v.violation_type || '').toUpperCase().includes('ROOF') || (v.details || '').toLowerCase().includes('roof'));
 
           if (isFav) {
             markerColor = '#fbbf24';
             svgIconKey = 'star';
             markerClass = 'favorite-marker';
+          } else if (isDisaster) {
+            markerColor = '#06b6d4'; // Cyan
+            svgIconKey = 'tornado';
+            markerClass = 'disaster-storm';
+          } else if (isRoofViolation) {
+            markerColor = '#0891b2'; // Blue-Cyan
+            svgIconKey = 'cloudLightning';
+            markerClass = 'roofing-violation';
           } else if (hasScheduledAuction && equitySpread > 30000) {
             markerColor = '#ef4444';
             svgIconKey = 'shieldAlert';
@@ -4658,6 +4687,10 @@
       // B. Violations
       if (lead.violations && lead.violations.length > 0) {
         activeDistressCategories.push('violation');
+        const isRoofViol = lead.violations.some(v => (v.violation_type || '').toUpperCase().includes('ROOF') || (v.details || '').toLowerCase().includes('roof'));
+        if (isRoofViol && !activeDistressCategories.includes('roofing')) {
+          activeDistressCategories.push('roofing');
+        }
         lead.violations.forEach(v => {
           const div = document.createElement('div');
           div.className = 'distress-log-item';
@@ -4735,6 +4768,10 @@
       // F. Physical Distress
       if (lead.physicalDistress && lead.physicalDistress.length > 0) {
         activeDistressCategories.push('physical');
+        const isDisaster = lead.physicalDistress.some(pd => ['Tornado Damage', 'Storm Damage', 'Hail Damage'].includes(pd.distress_type));
+        if (isDisaster && !activeDistressCategories.includes('roofing')) {
+          activeDistressCategories.push('roofing');
+        }
         lead.physicalDistress.forEach(pd => {
           const div = document.createElement('div');
           div.className = 'distress-log-item';
@@ -4981,6 +5018,25 @@
           icon: 'alert-circle',
           text: `[GUION DE EVENTOS DE VIDA CRÍTICOS]\nHola, buenas tardes. ¿Hablo con \${lead.ownerName}? Le contacto en relación al inmueble en \${lead.displayAddress}.\nCompramos propiedades al contado de forma rápida y confidencial en su condado. Sabemos que a veces surgen situaciones imprevistas o cambios familiares que requieren liquidez de forma inmediata.\nPodemos formalizar un contrato de compra en 24 horas y cerrar la transacción en pocos días sin intermediarios, comisiones, ni visitas públicas al inmueble.\n¿Le gustaría evaluar una propuesta de compra rápida en efectivo hoy de forma totalmente privada?`
         };
+      }
+
+      if (categories.includes('roofing')) {
+        const isDisaster = lead.physicalDistress && lead.physicalDistress.some(pd => ['Tornado Damage', 'Storm Damage', 'Hail Damage'].includes(pd.distress_type));
+        if (isDisaster) {
+          const firstDis = lead.physicalDistress.find(pd => ['Tornado Damage', 'Storm Damage', 'Hail Damage'].includes(pd.distress_type));
+          const fscale = firstDis ? (firstDis.ef_scale || 'N/A') : 'N/A';
+          scripts['roofing'] = {
+            name: 'Roofing Clima',
+            icon: 'tornado',
+            text: `[GUION DE RECONSTRUCCIÓN POR TORMENTA]\nHola, buenas tardes. ¿Hablo con ${lead.ownerName}? Le llamo respecto a la propiedad en ${lead.displayAddress}.\nEstaba revisando los reportes meteorológicos y de daños del Servicio Meteorológico Nacional (NWS) para su área y noté un registro de inspección de daños por tormenta/tornado (${fscale}) asociado a su dirección.\n¿Usted y su familia se encuentran bien? Quería comentarle que trabajamos directamente con propietarios en su zona ayudándoles con la reconstrucción y reparación urgente del techo.\nNosotros nos encargamos de documentar los daños estructurales y gestionar todo el reclamo directamente con su compañía de seguros para que usted no tenga que desembolsar dinero de su bolsillo para las reparaciones de emergencia.\n¿Estaría interesado en que hagamos una inspección gratuita del tejado esta semana para evaluar los daños y coordinar con su seguro?`
+          };
+        } else {
+          scripts['roofing'] = {
+            name: 'Roofing Violación',
+            icon: 'cloud-lightning',
+            text: `[GUION DE VIOLACIÓN DE TECHO - ROOFING]\nHola, buenas tardes. ¿Hablo con ${lead.ownerName}? Le llamo en relación a su propiedad en ${lead.displayAddress}.\nRevisando los registros del departamento de obras y cumplimiento de códigos de la ciudad, noté una notificación activa de violación relacionada específicamente con el estado del techo (código X50-ROOF o similar).\nComo contratistas de tejados de servicio completo, ayudamos a propietarios a resolver estas multas de forma rápida y limpia. Ofrecemos financiamiento flexible y trabajamos directamente para subsanar la violación ante los inspectores municipales para que no siga acumulando cargos.\n¿Le interesaría recibir un presupuesto gratuito y sin compromiso para reparar el tejado y cerrar este caso municipal?`
+          };
+        }
       }
 
       // Default script (Always available)

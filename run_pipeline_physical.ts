@@ -1,6 +1,7 @@
 import { scrapeCodeViolations } from "./scrapers/scrapeCodeViolations";
 import { scrapePVA } from "./scrapers/scrapePVA";
 import { scrapePhysicalDistress } from "./scrapers/scrape_physical_distress";
+import { scrapeDisasterDamage } from "./scrapers/scrape_disaster_damage";
 import { scrapeLifeEvents } from "./scrapers/scrape_life_events";
 import { runCrossReference } from "./cross_reference";
 import { runSkipTracing } from "./skip_trace";
@@ -47,6 +48,13 @@ async function runPhysicalPipeline() {
     await scrapePhysicalDistress();
   } catch (err: any) {
     console.error("[CAPA 1 ERROR] Falló el scraper de estrés físico:", err.message);
+  }
+
+  try {
+    console.log("\n[CAPA 1 - 1H] Scraping Disaster Damage (NOAA/NWS Tornadoes & Storms)...");
+    await scrapeDisasterDamage();
+  } catch (err: any) {
+    console.error("[CAPA 1 ERROR] Falló el scraper de desastres naturales:", err.message);
   }
 
   try {
