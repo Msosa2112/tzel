@@ -2516,7 +2516,7 @@
           <div>
             <input type="checkbox" id="pill-execution" class="pill-checkbox" checked>
             <label for="pill-execution" class="pill-label">
-              <i data-lucide="gavel"></i>
+              <i data-lucide="shield-alert"></i>
               <span>Ejecución</span>
             </label>
           </div>
@@ -2620,7 +2620,7 @@
           <div class="map-legend-title">Temperatura de Equidad</div>
           <div class="map-legend-item">
             <span class="legend-color-dot" style="background-color: #ef4444; box-shadow: 0 0 6px #ef4444"></span>
-            <span class="legend-label"><i data-lucide="gavel" class="inline-icon" style="color: #ef4444"></i> <strong>PIN ROJO: Alta Prioridad</strong><br>Subasta sheriff programada y Margen de Equidad &gt; $30,000</span>
+            <span class="legend-label"><i data-lucide="shield-alert" class="inline-icon" style="color: #ef4444"></i> <strong>PIN ROJO: Alta Prioridad</strong><br>Subasta sheriff programada y Margen de Equidad &gt; $30,000</span>
           </div>
           <div class="map-legend-item">
             <span class="legend-color-dot" style="background-color: #ca8a04; box-shadow: 0 0 6px #ca8a04"></span>
@@ -2989,7 +2989,7 @@
   <script>
     const SVG_ICONS = {
       star: `<svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>`,
-      gavel: `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m14 5-3-3H4v7h3l3 3 4-4z"/><path d="m14 5 4 4-4 4-4-4z"/><path d="m16 9 2-2 4 4-2 2z"/><path d="m7 21 6-6"/><path d="m5 16 3 3"/></svg>`,
+      shieldAlert: `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 9.7a1 1 0 0 1-.68 0C7.5 20.5 4 18 4 13V6a1 1 0 0 1 .76-.97l8-2a1 1 0 0 1 .48 0l8 2A1 1 0 0 1 20 6z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>`,
       clock: `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>`,
       flame: `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/></svg>`,
       scale: `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m16 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z"/><path d="m2 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z"/><path d="M7 21h10"/><path d="M12 3v18"/><path d="M3 7h18"/></svg>`,
@@ -3609,7 +3609,7 @@
             markerClass = 'favorite-marker';
           } else if (hasScheduledAuction && equitySpread > 30000) {
             markerColor = '#ef4444';
-            svgIconKey = 'gavel';
+            svgIconKey = 'shieldAlert';
             markerClass = 'execution-scheduled';
           } else if (hasPhysical && equitySpread > 0) {
             markerColor = '#ca8a04';
@@ -4103,7 +4103,7 @@
 
         if (hasScheduledAuction && equitySpread > 30000) {
           markerColor = '#ef4444';
-          svgIconKey = 'gavel';
+          svgIconKey = 'shieldAlert';
           markerClass = 'execution-scheduled';
         } else if (hasPhysical && equitySpread > 0) {
           markerColor = '#ca8a04';
@@ -4274,7 +4274,7 @@
         rSpread += `<td class="comp-col-prop" style="font-weight: bold; color: ${equitySpread > 40000 ? 'var(--color-radar-green)' : 'var(--text-main)'}">$${equitySpread.toLocaleString()}</td>`;
         
         let distressList = [];
-        if (lead.auctions && lead.auctions.length > 0) distressList.push('<span class="badge badge-high" style="margin: 2px;"><i data-lucide="gavel" class="inline-icon"></i> Ejecución</span>');
+        if (lead.auctions && lead.auctions.length > 0) distressList.push('<span class="badge badge-high" style="margin: 2px;"><i data-lucide="shield-alert" class="inline-icon"></i> Ejecución</span>');
         if ((lead.physicalDistress && lead.physicalDistress.length > 0) || (lead.violations && lead.violations.length > 0)) {
           distressList.push('<span class="badge" style="background: rgba(249,115,22,0.15); color: var(--color-physical-amber); border: 1px solid rgba(249,115,22,0.3); margin: 2px;"><i data-lucide="flame" class="inline-icon"></i> Físico</span>');
         }
@@ -4598,7 +4598,7 @@
           const daysRemaining = getDaysRemaining(auc.auction_date);
           const isScheduled = daysRemaining !== null;
           const borderClr = isScheduled ? 'var(--color-execution-red)' : 'var(--color-execution-orange)';
-          const iconName = isScheduled ? 'gavel' : 'clock';
+          const iconName = isScheduled ? 'shield-alert' : 'clock';
           const titleStr = isScheduled ? 'ZONA DE EJECUCIÓN: SUBASTA PROGRAMADA' : 'ZONA DE EJECUCIÓN: DETECCIÓN PRE-SUBASTA';
           
           div.style.borderLeftColor = borderClr;
@@ -4868,7 +4868,7 @@
         const firstAuc = lead.auctions[0];
         scripts['subasta'] = {
           name: 'Subasta',
-          icon: 'gavel',
+          icon: 'shield-alert',
           text: `[GUION DE SUBASTA HIPOTECARIA]\nHola, buenas tardes. ¿Hablo con ${lead.ownerName}? Le llamo respecto a la propiedad en ${lead.displayAddress}.\nVi en los registros de la corte del condado que tienen programada una subasta de ejecución hipotecaria para el ${firstAuc.auction_date} por la demanda presentada por ${firstAuc.plaintiff || 'el banco'}.\n¿Está enterado de esta fecha? Quería poner a su disposición nuestra ayuda. Nosotros podemos liquidar la deuda pendiente de $${(lead.primaryDebt || 0).toLocaleString()} con el juzgado de forma directa para cancelar la subasta de inmediato. Esto le evita perder todo su capital acumulado y protege su récord crediticio de una ejecución formal.\n¿Le gustaría evaluar una oferta de rescate de capital hoy?`
         };
       }
