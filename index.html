@@ -4950,6 +4950,9 @@
           mcaTbody.innerHTML = `<tr><td colspan="4" style="text-align: center; padding: 10px; color: var(--text-muted);">Error del servidor.</td></tr>`;
           mcaSuggestedArv.textContent = 'Error';
         });
+      } else {
+        if (mcaCard) mcaCard.style.display = 'none';
+      }
 
       // OSINT LLC/Owner Unmasking & OSM Auditor rendering
       const osintUnmaskCard = document.getElementById('osint-unmask-card');
