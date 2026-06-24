@@ -4820,17 +4820,66 @@
       });
 
       emails.forEach(email => {
-        const contactInfo = formatContact(email, true);
-        const div = document.createElement('div');
-        div.className = 'contact-item';
-        div.innerHTML = `
-          <div class="contact-info">
-            <span class="contact-type">${contactInfo.label}</span>
-            <span class="contact-value">${contactInfo.value}</span>
-          </div>
-          <a class="contact-action-btn" href="mailto:${contactInfo.value}">Enviar Mail</a>
-        `;
-        contactsContainer.appendChild(div);
+        const isUrl = email.includes("http://") || email.includes("https://");
+        if (isUrl) {
+          let label = "Búsqueda OSINT";
+          let url = email;
+          let buttonText = "Buscar";
+          let icon = "search";
+          
+          if (email.startsWith("TruePeopleSearch: ")) {
+            label = "TruePeopleSearch";
+            url = email.substring("TruePeopleSearch: ".length);
+            buttonText = "Abrir TPS";
+            icon = "external-link";
+          } else if (email.startsWith("Whitepages: ")) {
+            label = "Whitepages";
+            url = email.substring("Whitepages: ".length);
+            buttonText = "Abrir WP";
+            icon = "external-link";
+          } else if (email.includes("truepeoplesearch.com")) {
+            label = "TruePeopleSearch";
+            buttonText = "Abrir TPS";
+            icon = "external-link";
+          } else if (email.includes("whitepages.com")) {
+            label = "Whitepages";
+            buttonText = "Abrir WP";
+            icon = "external-link";
+          } else if (email.includes("bizapedia.com")) {
+            label = "Bizapedia";
+            buttonText = "Abrir Bizapedia";
+            icon = "external-link";
+          }
+          
+          const div = document.createElement('div');
+          div.className = 'contact-item';
+          div.innerHTML = `
+            <div class="contact-info">
+              <span class="contact-type" style="display: flex; align-items: center; gap: 4px;">
+                <i data-lucide="${icon}" class="inline-icon" style="width: 10px; height: 10px; stroke-width: 2.2;"></i> ${label}
+              </span>
+              <span class="contact-value" style="font-size: 0.75rem; text-overflow: ellipsis; overflow: hidden; white-space: nowrap; max-width: 200px;" title="${url}">
+                ${url}
+              </span>
+            </div>
+            <a class="contact-action-btn" href="${url}" target="_blank" rel="noopener noreferrer" style="background: #e0f2fe; border: 1px solid rgba(14, 165, 233, 0.2); color: #0369a1;">
+              ${buttonText}
+            </a>
+          `;
+          contactsContainer.appendChild(div);
+        } else {
+          const contactInfo = formatContact(email, true);
+          const div = document.createElement('div');
+          div.className = 'contact-item';
+          div.innerHTML = `
+            <div class="contact-info">
+              <span class="contact-type">${contactInfo.label}</span>
+              <span class="contact-value">${contactInfo.value}</span>
+            </div>
+            <a class="contact-action-btn" href="mailto:${contactInfo.value}">Enviar Mail</a>
+          `;
+          contactsContainer.appendChild(div);
+        }
       });
 
       if (phones.length === 0 && emails.length === 0) {
