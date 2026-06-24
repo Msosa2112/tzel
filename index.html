@@ -3813,6 +3813,10 @@
             <div class="card-actions-wrapper" onclick="event.stopPropagation()">
               ${zillowHtml}
               ${streetViewHtml}
+              <label class="compare-check-label" title="Seleccionar para comparar">
+                <input type="checkbox" class="compare-check-input" data-key="${lead.groupingKey}" onchange="handleCompareCheckbox(this)" ${comparedKeys.includes(lead.groupingKey) ? 'checked' : ''}>
+                <span>Comparar</span>
+              </label>
               <button class="fav-btn ${favoriteKeys.includes(lead.groupingKey) ? 'fav-active' : ''}" onclick="toggleFavoriteCard(this, '${lead.groupingKey}')" title="Favorito">
                 <i data-lucide="star"></i>
               </button>
@@ -4056,8 +4060,8 @@
         updateMapMarkerFavorite(key);
         updateDrawerFavButton();
         // Sincronizar el botón de la tarjeta en la lista
-        const cardBtn = document.querySelector(`.compare-check-input[data-key="${key}"]`)?.nextElementSibling;
-        if (cardBtn && cardBtn.classList.contains('fav-btn')) {
+        const cardBtn = document.querySelector(`.lead-card[data-key="${key}"] .fav-btn`);
+        if (cardBtn) {
           const isFav = favoriteKeys.includes(key);
           if (isFav) cardBtn.classList.add('fav-active');
           else cardBtn.classList.remove('fav-active');
