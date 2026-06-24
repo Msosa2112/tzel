@@ -3676,12 +3676,12 @@
               
               <!-- Floating Zillow Button outside the card (stacked above Street View) -->
               <a href="https://www.zillow.com/homes/${encodeURIComponent(lead.displayAddress)}" target="_blank" class="popup-zillow-floating-btn" title="Ver en Zillow" onclick="event.stopPropagation()">
-                <img src="/zillow-icon.png" style="width: 22px; height: 22px; object-fit: contain;" alt="Zillow">
+                <img src="zillow-icon.png" style="width: 22px; height: 22px; object-fit: contain;" alt="Zillow">
               </a>
 
               <!-- Floating Street View Button outside the card in the lower right corner -->
               <a href="https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${lead.lat},${lead.lon}" target="_blank" class="popup-streetview-floating-btn" title="Street View" onclick="event.stopPropagation()">
-                <img src="/street-view-icon.png" style="width: 22px; height: 22px; object-fit: contain;" alt="Street View">
+                <img src="street-view-icon.png" style="width: 22px; height: 22px; object-fit: contain;" alt="Street View">
               </a>
             </div>
           `;
@@ -3795,7 +3795,7 @@
         if (hasCoords) {
           streetViewHtml = `
             <a href="https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${lead.lat},${lead.lon}" target="_blank" class="streetview-btn" title="Street View" onclick="event.stopPropagation()">
-              <img src="/street-view-icon.png" style="width: 16px; height: 16px; object-fit: contain; margin: 0;" alt="Street View">
+              <img src="street-view-icon.png" style="width: 16px; height: 16px; object-fit: contain; margin: 0;" alt="Street View">
             </a>
           `;
         }
@@ -3803,7 +3803,7 @@
         const zillowUrl = `https://www.zillow.com/homes/${encodeURIComponent(lead.displayAddress)}`;
         const zillowHtml = `
           <a href="${zillowUrl}" target="_blank" class="zillow-btn" title="Ver en Zillow" onclick="event.stopPropagation()">
-            <img src="/zillow-icon.png" style="width: 16px; height: 16px; object-fit: contain; margin: 0;" alt="Zillow">
+            <img src="zillow-icon.png" style="width: 16px; height: 16px; object-fit: contain; margin: 0;" alt="Zillow">
           </a>
         `;
 
