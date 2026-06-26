@@ -28,6 +28,79 @@ function cleanAddressForMatch(address: string): string {
   return address.split(",")[0].trim().toLowerCase().replace(/[^a-z0-9\s]/g, "").replace(/\s+/g, " ");
 }
 
+// Helper functions copied from enrichment_pipeline.ts for address normalization parity
+const NOISE_WORDS = new Set([
+  "st", "street", "ave", "avenue", "rd", "road", "ln", "lane", "dr", "drive", 
+  "ct", "court", "blvd", "boulevard", "way", "pl", "place", "hwy", "highway", 
+  "rte", "route", "cir", "circle", "ter", "terrace", "trl", "trail", "pkwy", "parkway",
+  "apt", "apartment", "unit", "ste", "suite", "fl", "floor", 
+  "n", "north", "s", "south", "e", "east", "w", "west", 
+  "ky", "in", "jefferson", "clark", "floyd"
+]);
+
+const UNIT_INDICATORS = ["apt", "unit", "ste", "suite", "#", "apartment"];
+
+function parseAddress(address: string): { houseNumber: string | null; coreWords: string[] } {
+  let part1 = address.split(",")[0].trim().toLowerCase();
+  
+  for (const indicator of UNIT_INDICATORS) {
+    const idx = part1.indexOf(indicator);
+    if (idx !== -1) {
+      part1 = part1.substring(0, idx).trim();
+    }
+  }
+  
+  part1 = part1.replace(/[^a-z0-9\s]/g, " ");
+  
+  const words = part1.split(/\s+/).filter(w => w.length > 0);
+  if (words.length === 0) {
+    return { houseNumber: null, coreWords: [] };
+  }
+  
+  let houseNumber: string | null = null;
+  let streetStartIndex = 0;
+  
+  if (/^\d+/.test(words[0])) {
+    houseNumber = words[0];
+    streetStartIndex = 1;
+  }
+  
+  const coreWords: string[] = [];
+  for (let i = streetStartIndex; i < words.length; i++) {
+    const w = words[i];
+    if (NOISE_WORDS.has(w)) continue;
+    if (/^\d{5}$/.test(w)) continue;
+    coreWords.push(w);
+  }
+  
+  return { houseNumber, coreWords };
+}
+
+function getUnitInfo(address: string): string {
+  const cleanAddress = address.toLowerCase();
+  for (const indicator of ["apt", "unit", "ste", "suite", "#", "apartment"]) {
+    const idx = cleanAddress.indexOf(indicator);
+    if (idx !== -1) {
+      const rest = cleanAddress.substring(idx);
+      const parts = rest.split(",");
+      const unitPart = parts[0].trim().replace(/[^a-z0-9]/g, "");
+      if (unitPart) return unitPart;
+    }
+  }
+  return "";
+}
+
+export function getGroupingKey(address: string): string {
+  const parsed = parseAddress(address);
+  const unit = getUnitInfo(address);
+  if (!parsed.houseNumber) {
+    const base = address.toLowerCase().replace(/[^a-z0-9]/g, "");
+    return unit ? `${base}_${unit}` : base;
+  }
+  const baseKey = `${parsed.houseNumber}_${parsed.coreWords.join("_")}`;
+  return unit ? `${baseKey}_${unit}` : baseKey;
+}
+
 /**
  * Obtiene el ID de parcela para una dirección y condado dados.
  */
@@ -107,6 +180,7 @@ export async function downloadAppraisalPhoto(
   }
 
   let filename = "";
+  let photoDownloadedPath: string | null = null;
 
   if (countyLower.includes("jefferson")) {
     filename = `jefferson_${parcelId}.jpg`;
@@ -142,7 +216,7 @@ export async function downloadAppraisalPhoto(
         const relativePath = `scratch/pva_photos/${filename}`;
         console.log(`[MEDIA RETRIEVER EXITO] Foto oficial guardada (Intento 1): ${relativePath}`);
         await savePhotoUrlToDb(propertyId, tableName, relativePath);
-        return relativePath;
+        photoDownloadedPath = relativePath;
       }
     } catch (err: any) {
       console.warn(`[MEDIA RETRIEVER WARNING] Intento 1 falló para ${parcelId}:`, err.message);
@@ -151,7 +225,7 @@ export async function downloadAppraisalPhoto(
 
     // 2. Segundo intento predictivo: district_block_lot.jpg
     let attempt2Failed = false;
-    if (parcelId.length >= 11) {
+    if (!photoDownloadedPath && parcelId.length >= 11) {
       const d = parcelId.substring(0, 4);
       const b = parcelId.substring(4, 8);
       const l = parcelId.substring(8);
@@ -174,18 +248,18 @@ export async function downloadAppraisalPhoto(
           const relativePath = `scratch/pva_photos/${filename}`;
           console.log(`[MEDIA RETRIEVER EXITO] Foto oficial guardada (Intento 2): ${relativePath}`);
           await savePhotoUrlToDb(propertyId, tableName, relativePath);
-          return relativePath;
+          photoDownloadedPath = relativePath;
         }
       } catch (err: any) {
         console.warn(`[MEDIA RETRIEVER WARNING] Intento 2 falló para ${parcelId}:`, err.message);
         attempt2Failed = true;
       }
-    } else {
+    } else if (!photoDownloadedPath) {
       attempt2Failed = true;
     }
 
     // 3. Consulta de respaldo al MapServer de LOJIC GIS para extraer LRSN y descargar usando LRSN
-    if (attempt1Failed && attempt2Failed) {
+    if (!photoDownloadedPath && attempt1Failed && attempt2Failed) {
       console.log(`[MEDIA RETRIEVER] Ambos intentos predictivos fallaron. Consultando MapServer para extraer LRSN...`);
       try {
         const features = await gisRestClient.queryJeffersonParcelsByParcelId(parcelId);
@@ -211,36 +285,38 @@ export async function downloadAppraisalPhoto(
                 const relativePath = `scratch/pva_photos/${filename}`;
                 console.log(`[MEDIA RETRIEVER EXITO] Foto oficial guardada (Intento 3 LRSN): ${relativePath}`);
                 await savePhotoUrlToDb(propertyId, tableName, relativePath);
-                return relativePath;
+                photoDownloadedPath = relativePath;
               }
             } catch (err: any) {
               console.warn(`[MEDIA RETRIEVER WARNING] Intento 3 (LRSN) falló para ${parcelId}:`, err.message);
             }
 
             // Probar con LRSN padded a 6 dígitos
-            const lrsnUrl2 = `https://jeffersonpva.ky.gov/images/parcels/${String(lrsn).padStart(6, '0')}.jpg`;
-            console.log(`[MEDIA RETRIEVER] Intento 4 (Respaldo LRSN Padded): ${lrsnUrl2}`);
-            try {
-              const response = await gotScraping({
-                url: lrsnUrl2,
-                responseType: "buffer",
-                timeout: { request: 10000 },
-                retry: { limit: 1 },
-                headerGeneratorOptions: {
-                  browsers: ["chrome", "firefox"],
-                  devices: ["desktop"],
-                  operatingSystems: ["windows", "linux"],
+            if (!photoDownloadedPath) {
+              const lrsnUrl2 = `https://jeffersonpva.ky.gov/images/parcels/${String(lrsn).padStart(6, '0')}.jpg`;
+              console.log(`[MEDIA RETRIEVER] Intento 4 (Respaldo LRSN Padded): ${lrsnUrl2}`);
+              try {
+                const response = await gotScraping({
+                  url: lrsnUrl2,
+                  responseType: "buffer",
+                  timeout: { request: 10000 },
+                  retry: { limit: 1 },
+                  headerGeneratorOptions: {
+                    browsers: ["chrome", "firefox"],
+                    devices: ["desktop"],
+                    operatingSystems: ["windows", "linux"],
+                  }
+                });
+                if (response.statusCode === 200 && response.body && response.body.length > 0) {
+                  fs.writeFileSync(filepath, response.body);
+                  const relativePath = `scratch/pva_photos/${filename}`;
+                  console.log(`[MEDIA RETRIEVER EXITO] Foto oficial guardada (Intento 4 LRSN Padded): ${relativePath}`);
+                  await savePhotoUrlToDb(propertyId, tableName, relativePath);
+                  photoDownloadedPath = relativePath;
                 }
-              });
-              if (response.statusCode === 200 && response.body && response.body.length > 0) {
-                fs.writeFileSync(filepath, response.body);
-                const relativePath = `scratch/pva_photos/${filename}`;
-                console.log(`[MEDIA RETRIEVER EXITO] Foto oficial guardada (Intento 4 LRSN Padded): ${relativePath}`);
-                await savePhotoUrlToDb(propertyId, tableName, relativePath);
-                return relativePath;
+              } catch (err: any) {
+                console.warn(`[MEDIA RETRIEVER WARNING] Intento 4 (LRSN Padded) falló para ${parcelId}:`, err.message);
               }
-            } catch (err: any) {
-              console.warn(`[MEDIA RETRIEVER WARNING] Intento 4 (LRSN Padded) falló para ${parcelId}:`, err.message);
             }
           }
         }
@@ -250,37 +326,22 @@ export async function downloadAppraisalPhoto(
     }
 
     // Simulación final para datos de prueba si falló todo en red
-    const cleanAddr = cleanAddressForMatch(address);
-    const isTestData = cleanAddr.includes("rowan") || cleanAddr.includes("orchard grass") || cleanAddr.includes("cedar ct") || cleanAddr.includes("maple ln");
-    if (isTestData) {
-      const relativePath = `scratch/pva_photos/${filename}`;
-      console.log(`[MEDIA RETRIEVER SIMULATION] Simulando descarga de foto PVA para propiedad de prueba en: ${relativePath}`);
-      if (!fs.existsSync(filepath)) {
-        const dummyPng = Buffer.from(
-          "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=",
-          "base64"
-        );
-        fs.writeFileSync(filepath, dummyPng);
+    if (!photoDownloadedPath) {
+      const cleanAddr = cleanAddressForMatch(address);
+      const isTestData = cleanAddr.includes("rowan") || cleanAddr.includes("orchard grass") || cleanAddr.includes("cedar ct") || cleanAddr.includes("maple ln");
+      if (isTestData) {
+        const relativePath = `scratch/pva_photos/${filename}`;
+        console.log(`[MEDIA RETRIEVER SIMULATION] Simulando descarga de foto PVA para propiedad de prueba en: ${relativePath}`);
+        if (!fs.existsSync(filepath)) {
+          const dummyPng = Buffer.from(
+            "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=",
+            "base64"
+          );
+          fs.writeFileSync(filepath, dummyPng);
+        }
+        await savePhotoUrlToDb(propertyId, tableName, relativePath);
+        photoDownloadedPath = relativePath;
       }
-      await savePhotoUrlToDb(propertyId, tableName, relativePath);
-      return relativePath;
-    }
-
-    // Si todo falla, marcar para revisión manual
-    console.warn(`[MEDIA RETRIEVER WARNING] Todos los intentos de descarga fallaron para ${parcelId}. Marcando para revisión manual.`);
-    try {
-      let idColumn = "auction_id";
-      if (tableName === "code_violations") idColumn = "violation_id";
-      else if (tableName === "physical_distress") idColumn = "distress_id";
-      else if (tableName === "financial_distress") idColumn = "record_id";
-
-      await db.execute({
-        sql: `UPDATE ${tableName} SET needs_manual_review = 1 WHERE ${idColumn} = ?`,
-        args: [propertyId]
-      });
-      console.log(`[MEDIA RETRIEVER] Propiedad ${propertyId} en ${tableName} marcada con 'needs_manual_review = 1'`);
-    } catch (dbErr: any) {
-      console.error(`[MEDIA RETRIEVER DB ERROR] No se pudo marcar para revisión manual:`, dbErr.message);
     }
 
   } else if (countyLower.includes("oldham") || countyLower.includes("bullitt")) {
@@ -308,30 +369,125 @@ export async function downloadAppraisalPhoto(
         const relativePath = `scratch/pva_photos/${filename}`;
         console.log(`[MEDIA RETRIEVER EXITO] Foto oficial guardada localmente: ${relativePath}`);
         await savePhotoUrlToDb(propertyId, tableName, relativePath);
-        return relativePath;
+        photoDownloadedPath = relativePath;
       }
     } catch (err: any) {
       console.warn(`[MEDIA RETRIEVER WARNING] Falló la descarga de la foto oficial (${downloadUrl}):`, err.message);
     }
 
     // Simulación final para datos de prueba si falló todo en red
-    const cleanAddr = cleanAddressForMatch(address);
-    const isTestData = cleanAddr.includes("rowan") || cleanAddr.includes("orchard grass") || cleanAddr.includes("cedar ct") || cleanAddr.includes("maple ln");
-    if (isTestData) {
-      const relativePath = `scratch/pva_photos/${filename}`;
-      console.log(`[MEDIA RETRIEVER SIMULATION] Simulando descarga de foto PVA para propiedad de prueba en: ${relativePath}`);
-      if (!fs.existsSync(filepath)) {
-        const dummyPng = Buffer.from(
-          "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=",
-          "base64"
-        );
-        fs.writeFileSync(filepath, dummyPng);
+    if (!photoDownloadedPath) {
+      const cleanAddr = cleanAddressForMatch(address);
+      const isTestData = cleanAddr.includes("rowan") || cleanAddr.includes("orchard grass") || cleanAddr.includes("cedar ct") || cleanAddr.includes("maple ln");
+      if (isTestData) {
+        const relativePath = `scratch/pva_photos/${filename}`;
+        console.log(`[MEDIA RETRIEVER SIMULATION] Simulando descarga de foto PVA para propiedad de prueba en: ${relativePath}`);
+        if (!fs.existsSync(filepath)) {
+          const dummyPng = Buffer.from(
+            "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=",
+            "base64"
+          );
+          fs.writeFileSync(filepath, dummyPng);
+        }
+        await savePhotoUrlToDb(propertyId, tableName, relativePath);
+        photoDownloadedPath = relativePath;
       }
-      await savePhotoUrlToDb(propertyId, tableName, relativePath);
-      return relativePath;
     }
   } else {
     console.log(`[MEDIA RETRIEVER] Condado "${county}" no soportado directamente. Saltando.`);
+  }
+
+  if (photoDownloadedPath) {
+    return photoDownloadedPath;
+  }
+
+  // Si la descarga de la fotografía oficial falló tras agotar los intentos,
+  // verificar si el lead ya cuenta con deudas, propietarios y zonificación ambiental resueltos correctamente.
+  console.warn(`[MEDIA RETRIEVER WARNING] No se pudo descargar la foto oficial para: "${address}". Realizando comprobación de calidad de datos...`);
+  
+  let hasOwner = false;
+  let hasDebt = false;
+  let hasEnv = false;
+
+  try {
+    let idColumn = "auction_id";
+    let ownerColumn = "defendant";
+    let debtColumn = "debt_amount";
+
+    if (tableName === "code_violations") {
+      idColumn = "violation_id";
+      ownerColumn = "owner_name";
+      debtColumn = "null"; // no tiene deuda
+    } else if (tableName === "physical_distress") {
+      idColumn = "distress_id";
+      ownerColumn = "owner_name";
+      debtColumn = "null"; // no tiene deuda
+    } else if (tableName === "financial_distress") {
+      idColumn = "record_id";
+      ownerColumn = "owner_name";
+      debtColumn = "debt_amount";
+    }
+
+    const leadRes = await db.execute({
+      sql: `SELECT ${ownerColumn} as owner, ${debtColumn} as debt FROM ${tableName} WHERE ${idColumn} = ?`,
+      args: [propertyId]
+    });
+
+    if (leadRes.rows.length > 0) {
+      const owner = leadRes.rows[0].owner as string | null;
+      const debt = leadRes.rows[0].debt;
+
+      if (owner && owner !== "Unknown" && owner !== "DUEÑO DESCONOCIDO" && owner.trim() !== "") {
+        hasOwner = true;
+      }
+
+      if (debtColumn === "null" || (debt !== null && Number(debt) > 0)) {
+        hasDebt = true;
+      }
+    }
+
+    const addrKey = getGroupingKey(address);
+    const envRes = await db.execute({
+      sql: `SELECT env_stressors, env_attractors FROM osint_enrichment WHERE address_key = ?`,
+      args: [addrKey]
+    });
+
+    if (envRes.rows.length > 0) {
+      const stressors = envRes.rows[0].env_stressors;
+      const attractors = envRes.rows[0].env_attractors;
+      if (stressors && attractors) {
+        hasEnv = true;
+      }
+    }
+
+    let idCol = "auction_id";
+    if (tableName === "code_violations") idCol = "violation_id";
+    else if (tableName === "physical_distress") idCol = "distress_id";
+    else if (tableName === "financial_distress") idCol = "record_id";
+
+    if (hasOwner && hasDebt && hasEnv) {
+      console.log(`[MEDIA RETRIEVER QUALITY CHECK] Datos financieros, propietario y ambiental resueltos para "${address}". Omitiendo revisión manual y estableciendo photo_urls = NULL.`);
+      await db.execute({
+        sql: `UPDATE ${tableName} SET photo_urls = NULL, needs_manual_review = 0 WHERE ${idCol} = ?`,
+        args: [propertyId]
+      });
+    } else {
+      if (!hasOwner || !hasDebt) {
+        console.warn(`[MEDIA RETRIEVER QUALITY CHECK] Fallo crítico (Falta propietario o deuda) para "${address}". Marcando para revisión manual.`);
+        await db.execute({
+          sql: `UPDATE ${tableName} SET needs_manual_review = 1 WHERE ${idCol} = ?`,
+          args: [propertyId]
+        });
+      } else {
+        console.log(`[MEDIA RETRIEVER QUALITY CHECK] Falta ambiental pero propietario y deuda válidos para "${address}". Omitiendo revisión manual.`);
+        await db.execute({
+          sql: `UPDATE ${tableName} SET photo_urls = NULL, needs_manual_review = 0 WHERE ${idCol} = ?`,
+          args: [propertyId]
+        });
+      }
+    }
+  } catch (dbErr: any) {
+    console.error(`[MEDIA RETRIEVER QUALITY DB ERROR] Error comprobando calidad de datos:`, dbErr.message);
   }
 
   return null;

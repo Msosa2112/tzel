@@ -158,12 +158,10 @@ export async function runOSINTEnrichment(): Promise<number> {
       // Find coordinates in cache
       const coords = geocodeMap.get(lead.address);
       if (coords) {
-        await auditEnvironment(coords.lat, coords.lon, key);
+        await auditEnvironment(coords.lat, coords.lon, key, lead.address);
       } else {
-        // Fallback: use default coordinates for city center or simulation based on county
-        // For OSM test, we can use a fallback of Louisville coordinates
-        console.log(`[OSM AUDITOR] Coordenadas no encontradas en caché para "${lead.address}". Usando fallback de Louisville.`);
-        await auditEnvironment(38.2527, -85.7585, key);
+        console.log(`[OSM AUDITOR] Coordenadas no encontradas en caché para "${lead.address}". Pasando nulos.`);
+        await auditEnvironment(null, null, key, lead.address);
       }
 
       enrichedCount++;

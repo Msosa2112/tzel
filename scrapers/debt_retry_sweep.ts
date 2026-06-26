@@ -142,6 +142,7 @@ async function performOSINTDebtSearch(
 
   let response = null;
   const maxRetries = 3;
+  let delay = 5000;
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     try {
       // Delay preventivo para no ahogar el API rate limit si son consultas seguidas
@@ -153,14 +154,19 @@ async function performOSINTDebtSearch(
       }, { timeout: 15000 });
       break; // Éxito
     } catch (err: any) {
-      if (err.response?.status === 429 && attempt < maxRetries - 1) {
-        const delay = 8000 * Math.pow(2, attempt);
-        console.warn(`    [GEMINI 429] Rate limit superado. Reintentando en ${delay / 1000}s...`);
+      const isRetryable = err.response?.status === 429 || err.response?.status === 503 ||
+                          err.message.includes("429") || err.message.includes("503") ||
+                          err.message.includes("timeout") || err.message.includes("Network") ||
+                          err.code === "ECONNABORTED";
+      if (isRetryable && attempt < maxRetries - 1) {
+        console.warn(`    [GEMINI RETRY] Intento ${attempt + 1} falló con: ${err.message}. Reintentando en ${delay / 1000}s (backoff exponencial)...`);
         await new Promise(resolve => setTimeout(resolve, delay));
-        continue;
+        delay *= 2;
+      } else {
+        console.error(`  [OSINT SWEEP GEMINI ERROR] Falló análisis con Gemini (Intento ${attempt + 1}/${maxRetries}): ${err.message}`);
+        if (attempt === maxRetries - 1) return null;
+        break;
       }
-      console.error(`  [OSINT SWEEP GEMINI ERROR] Falló análisis con Gemini (Intento ${attempt + 1}/${maxRetries}): ${err.message}`);
-      if (attempt === maxRetries - 1) return null;
     }
   }
 

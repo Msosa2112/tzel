@@ -151,32 +151,51 @@ export async function scrapeIndianaCaseWithCrawlee(caseNumber: string): Promise<
       log.info("Esperando resultados de la búsqueda...");
       try {
         await Promise.race([
-          page.waitForSelector(`span.result-subtitle:has-text("${caseNumber}")`, { timeout: 15000 }),
+          page.waitForSelector(".search-results, .case-row, tr.result-row", { timeout: 15000 }),
           page.waitForFunction(() => {
             const body = document.body.innerText;
-            return body.includes("No cases found") || body.includes("0 Cases Found") || body.includes("0 cases found");
+            return body.includes("No cases found") || body.includes("0 Cases Found") || body.includes("0 cases found") || body.includes("No matches found");
           }, { timeout: 15000 })
         ]);
       } catch (e: any) {
-        log.error("Error al esperar resultados de búsqueda. Guardando diagnóstico...");
-        const screenshotPath = "./storage/mycase_crawlee_fail_results.png";
-        if (!fs.existsSync("./storage")) {
-          fs.mkdirSync("./storage", { recursive: true });
-        }
-        await page.screenshot({ path: screenshotPath, fullPage: true }).catch(err2 => log.error(`Fallo al capturar: ${err2.message}`));
-        throw e;
+        log.warning(`Timeout o error esperando resultados: ${e.message}`);
       }
       
-      const bodyText = await page.innerText("body");
-      if (bodyText.includes("No cases found") || bodyText.includes("0 Cases Found") || bodyText.includes("0 cases found")) {
-        log.warning(`Caso ${caseNumber} no encontrado en el portal.`);
+      // Esperar hasta 5 segundos para verificar si el número de expediente existe dentro del contenedor
+      let foundText = false;
+      const startTime = Date.now();
+      while (Date.now() - startTime < 5000) {
+        const bodyText = await page.innerText("body");
+        if (bodyText.includes(caseNumber)) {
+          foundText = true;
+          break;
+        }
+        await page.waitForTimeout(500);
+      }
+
+      if (!foundText) {
+        log.warning(`Caso ${caseNumber} no encontrado en el portal tras 5 segundos de espera.`);
+        result = {
+          caseNumber,
+          plaintiff: null,
+          defendant: "Caso no encontrado",
+          debtAmount: null,
+          isDismissed: false
+        };
         return;
       }
       
       // Hacer clic en el enlace del caso encontrado (el título/estilo del caso en la misma fila)
       log.info("Haciendo clic en el enlace del caso...");
-      const caseRow = page.locator('tr.result-row', { has: page.locator('span.result-subtitle', { hasText: caseNumber }) });
-      await caseRow.locator('a.result-title').click();
+      const rowLocator = page.locator('tr.result-row, .case-row', { hasText: caseNumber });
+      const linkLocator = rowLocator.locator('a.result-title, a');
+      if (await linkLocator.count() > 0) {
+        await linkLocator.first().click();
+      } else {
+        await page.click(`a:has-text("${caseNumber}")`).catch(async () => {
+          await page.click('a.result-title').catch(() => {});
+        });
+      }
       
       // Esperar a que cargue el expediente completo
       log.info("Cargando detalles del expediente...");

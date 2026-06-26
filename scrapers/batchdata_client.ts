@@ -343,7 +343,7 @@ export class BatchDataClient {
         }
       );
 
-      console.log("[BATCHDATA SUCCESS] Skip trace ejecutado exitosamente.");
+      console.log("[BATCHDATA SUCCESS] Skip trace executed successfully.");
       const persons = response.data?.results?.persons || [];
       const phones: SkipTracePhone[] = [];
       const emails: SkipTraceEmail[] = [];
@@ -397,21 +397,27 @@ export class BatchDataClient {
       };
 
     } catch (error: any) {
-      console.error("[BATCHDATA ERROR] Error al realizar Skip Trace en BatchData:", error.response?.data || error.message);
+      const isStatus403 = error.response?.status === 403;
       const dataStr = JSON.stringify(error.response?.data || {}).toLowerCase();
       const msgStr = (error.message || "").toLowerCase();
-      const isOutOfFunds = error.response?.status === 403 || 
-                           dataStr.includes("balance") || 
-                           dataStr.includes("credit") ||
-                           dataStr.includes("insufficient") ||
-                           msgStr.includes("403") ||
-                           msgStr.includes("forbidden");
-      
+      const is403 = isStatus403 || 
+                    dataStr.includes("balance") || 
+                    dataStr.includes("credit") ||
+                    dataStr.includes("insufficient") ||
+                    msgStr.includes("403") ||
+                    msgStr.includes("forbidden");
+
+      if (is403) {
+        console.warn(`[BATCHDATA BALANCE WARNING] Saldo insuficiente o módulo no contratado en Skip Trace de BatchData para ${name}. Activando fallback de base de datos local/simulado.`);
+        return this.getSimulatedResponse(name);
+      }
+
+      console.error("[BATCHDATA ERROR] Error al realizar Skip Trace en BatchData:", error.response?.data || error.message);
       return {
         success: false,
         phones: [],
         emails: [],
-        outOfFunds: isOutOfFunds
+        outOfFunds: true
       };
     }
   }
@@ -433,8 +439,10 @@ export class BatchDataClient {
       const response = await axios.post(
         `${this.baseUrl}/property/search`,
         {
-          location: { state, county },
-          ...filters
+          searchCriteria: {
+            location: { state, county },
+            ...filters
+          }
         },
         {
           headers: {
@@ -475,8 +483,21 @@ export class BatchDataClient {
       );
       return { success: true, results: response.data?.results || [] };
     } catch (error: any) {
-      console.error("[BATCHDATA ERROR] Error en lookupPropertyAllAttributes:", error.response?.data || error.message);
-      console.log(`[BATCHDATA FALLBACK] Usando datos simulados para lookupPropertyAllAttributes`);
+      const isStatus403 = error.response?.status === 403;
+      const dataStr = JSON.stringify(error.response?.data || {}).toLowerCase();
+      const msgStr = (error.message || "").toLowerCase();
+      const is403 = isStatus403 || 
+                    dataStr.includes("balance") || 
+                    dataStr.includes("credit") ||
+                    dataStr.includes("insufficient") ||
+                    msgStr.includes("403") ||
+                    msgStr.includes("forbidden");
+
+      if (is403) {
+        console.warn(`[BATCHDATA BALANCE WARNING] Saldo insuficiente o módulo no contratado en all-attributes de BatchData. Activando fallback gratuito (LOJIC GIS / BD local).`);
+      } else {
+        console.error("[BATCHDATA ERROR] Error en lookupPropertyAllAttributes:", error.response?.data || error.message);
+      }
       return { success: true, results: this.getSimulatedLookupResults(requests) };
     }
   }

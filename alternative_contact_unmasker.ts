@@ -61,19 +61,7 @@ export function generateUsernames(fullName: string): string[] {
  * Checks if a username exists on GitHub (representing a real unauthenticated Sherlock test).
  */
 async function checkGitHubUsername(username: string): Promise<string | null> {
-  try {
-    const url = `https://api.github.com/users/${username}`;
-    const response = await makeGotScrapingRequest(url, {
-      headers: {
-        "User-Agent": "Tzel-OSINT-Scanner/1.0"
-      }
-    });
-    if (response.statusCode === 200) {
-      return `https://github.com/${username}`;
-    }
-  } catch (err) {
-    // Ignore error
-  }
+  // Desactivado por completo: No tiene sentido técnico buscar perfiles de código para propietarios de bienes raíces.
   return null;
 }
 
@@ -85,6 +73,14 @@ export async function unmaskAlternativeContacts(
   email: string | null | undefined,
   addressKey: string
 ): Promise<ContactUnmaskResult> {
+  const upperName = (ownerName || "").toUpperCase();
+  const containsExcluded = /UNKNOWN|DUEÑO DESCONOCIDO|DUEO DESCONOCIDO|SPOUSE|ESTATE OF/.test(upperName) ||
+                           /\b(LLC|INC|CORP|CO|LTD|PROPERTIES|HOLDINGS|INVESTMENTS|GROUP|PARTNERS)\b/.test(upperName);
+  if (containsExcluded) {
+    console.log(`\x1b[33m[SKIPTRACE SANITIZED] Omitiendo identidad no elegible: ${ownerName}\x1b[0m`);
+    return { socialProfiles: [], usernamesFound: [] };
+  }
+
   console.log(`[OSINT ALT CONTACTS] Iniciando rastreo para: "${ownerName}" (Email: ${email || "No provisto"})`);
 
   const usernames = generateUsernames(ownerName);

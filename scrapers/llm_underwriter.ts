@@ -51,79 +51,97 @@ Por favor, analiza el texto del expediente provisto abajo y responde con este fo
 Texto del expediente a analizar:
 ${rawText}`;
 
-  try {
-    console.log("[LLM UNDERWRITER] Consultando API de Gemini (gemini-1.5-flash)...");
-    const response = await fetch(url, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        contents: [
-          {
-            parts: [
-              {
-                text: prompt
-              }
-            ]
+  let lastError: any = null;
+  let delay = 5000;
+  const attempts = 3;
+
+  for (let attempt = 1; attempt <= attempts; attempt++) {
+    try {
+      console.log(`[LLM UNDERWRITER] Consultando API de Gemini (gemini-2.5-flash) - Intento ${attempt}/${attempts}...`);
+      const response = await fetch(url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          contents: [
+            {
+              parts: [
+                {
+                  text: prompt
+                }
+              ]
+            }
+          ],
+          generationConfig: {
+            response_mime_type: "application/json"
           }
-        ],
-        generationConfig: {
-          response_mime_type: "application/json"
-        }
-      }),
-      // Añadir un timeout razonable para evitar colgar el pipeline si Gemini no responde
-      signal: AbortSignal.timeout(15000)
-    });
+        }),
+        // Añadir un timeout razonable para evitar colgar el pipeline si Gemini no responde
+        signal: AbortSignal.timeout(15000)
+      });
 
-    if (!response.ok) {
-      throw new Error(`HTTP Error ${response.status}: ${response.statusText}`);
-    }
+      if (!response.ok) {
+        throw new Error(`HTTP Error ${response.status}: ${response.statusText}`);
+      }
 
-    const data = await response.json() as any;
-    
-    // Mapear respuesta del API de Gemini
-    let responseText = "";
-    if (data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts && data.candidates[0].content.parts[0]) {
-      responseText = data.candidates[0].content.parts[0].text;
-    } else if (data.candidates && (data.candidates as any).content && (data.candidates as any).content.parts && (data.candidates as any).content.parts.text) {
-      responseText = (data.candidates as any).content.parts.text;
-    } else {
-      throw new Error("Estructura de respuesta de Gemini inválida.");
-    }
-    
-    if (!responseText) {
-      throw new Error("Respuesta vacía recibida desde Gemini.");
-    }
-
-    const parsedResult = JSON.parse(responseText);
-    
-    let isDismissed = false;
-    let reason = "Sin detalles adicionales del LLM.";
-    
-    if (parsedResult) {
-      const keys = Object.keys(parsedResult);
-      const isDismissedKey = keys.find(k => k.toLowerCase() === "isdismissed");
-      if (isDismissedKey) {
-        const val = (parsedResult as any)[isDismissedKey];
-        isDismissed = val === true || val === "true" || val === 1 || String(val).toLowerCase() === "true";
+      const data = await response.json() as any;
+      
+      // Mapear respuesta del API de Gemini
+      let responseText = "";
+      if (data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts && data.candidates[0].content.parts[0]) {
+        responseText = data.candidates[0].content.parts[0].text;
+      } else if (data.candidates && (data.candidates as any).content && (data.candidates as any).content.parts && (data.candidates as any).content.parts.text) {
+        responseText = (data.candidates as any).content.parts.text;
+      } else {
+        throw new Error("Estructura de respuesta de Gemini inválida.");
       }
       
-      const reasonKey = keys.find(k => k.toLowerCase() === "reason");
-      if (reasonKey) {
-        reason = (parsedResult as any)[reasonKey] || reason;
+      if (!responseText) {
+        throw new Error("Respuesta vacía recibida desde Gemini.");
+      }
+
+      const parsedResult = JSON.parse(responseText);
+      
+      let isDismissed = false;
+      let reason = "Sin detalles adicionales del LLM.";
+      
+      if (parsedResult) {
+        const keys = Object.keys(parsedResult);
+        const isDismissedKey = keys.find(k => k.toLowerCase() === "isdismissed");
+        if (isDismissedKey) {
+          const val = (parsedResult as any)[isDismissedKey];
+          isDismissed = val === true || val === "true" || val === 1 || String(val).toLowerCase() === "true";
+        }
+        
+        const reasonKey = keys.find(k => k.toLowerCase() === "reason");
+        if (reasonKey) {
+          reason = (parsedResult as any)[reasonKey] || reason;
+        }
+      }
+      
+      console.log(`[LLM UNDERWRITER SUCCESS] Decisión: ${isDismissed} | Razón: ${reason}`);
+      
+      return {
+        isDismissed,
+        reason
+      };
+
+    } catch (err: any) {
+      lastError = err;
+      const statusStr = err.message || "";
+      const isRetryable = statusStr.includes("429") || statusStr.includes("503") || statusStr.includes("timeout") || statusStr.includes("fetch") || err.name === "TimeoutError";
+      
+      if (isRetryable && attempt < attempts) {
+        console.warn(`[LLM UNDERWRITER WARNING] Intento ${attempt} falló con: ${err.message}. Reintentando en ${delay / 1000}s (backoff exponencial)...`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+        delay *= 2;
+      } else {
+        break;
       }
     }
-    
-    console.log(`[LLM UNDERWRITER SUCCESS] Decisión: ${isDismissed} | Razón: ${reason}`);
-    
-    return {
-      isDismissed,
-      reason
-    };
-
-  } catch (err: any) {
-    console.warn(`[LLM UNDERWRITER WARNING] No se pudo conectar con Gemini o falló la respuesta: ${err.message}. Usando fallback de reglas rígidas.`);
-    return runRuleBasedFallback(rawText);
   }
+
+  console.warn(`[LLM UNDERWRITER WARNING] No se pudo conectar con Gemini o falló la respuesta tras ${attempts} intentos: ${lastError?.message || "Error desconocido"}. Usando fallback de reglas rígidas.`);
+  return runRuleBasedFallback(rawText);
 }

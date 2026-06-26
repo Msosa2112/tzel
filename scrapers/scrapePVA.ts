@@ -2,6 +2,13 @@ import axios from "axios";
 import * as cheerio from "cheerio";
 import { createClient } from "@libsql/client";
 import * as dotenv from "dotenv";
+import { validateAndCleanAddress } from "./address_validation";
+import { gisRestClient } from "./gis_rest_client";
+import { applyFlareSolverrBypass } from "./proxy_helper";
+import { chromium } from "playwright-extra";
+import stealthPlugin from "puppeteer-extra-plugin-stealth";
+
+chromium.use(stealthPlugin());
 
 // Cargar variables de entorno
 dotenv.config();
@@ -63,75 +70,48 @@ function getSimpleHash(str: string): number {
 }
 
 /**
- * Simula de forma determinista la consulta PVA para una dirección.
- */
-function simulatePVAPortal(address: string): { ownerName: string; mailingAddress: string } | null {
-  const cleanAddrKey = address.split(",")[0].trim().toLowerCase().replace(/[^a-z0-9\s]/g, "").replace(/\s+/g, " ");
-  
-  // 1. Intentar coincidir con base predefinida
-  for (const presetKey in PRESET_OWNERS) {
-    if (cleanAddrKey.includes(presetKey) || presetKey.includes(cleanAddrKey)) {
-      const p = PRESET_OWNERS[presetKey];
-      return {
-        ownerName: p.name,
-        mailingAddress: p.mailingAddress || `${address.split(",")[0].trim()}, Louisville, KY`
-      };
-    }
-  }
-
-  // ¡IMPORTANTE! Para direcciones reales en producción, NO inventamos nombres ni direcciones ficticias.
-  // Devolvemos null para que no se contaminen los leads reales.
-  console.log(`[PVA SCRAPER] Dirección real sin datos de prueba y sin respuesta del portal: "${address}". Retornando null.`);
-  return null;
-}
-
-/**
- * Template estructural para realizar web scraping real en un portal PVA público.
- * En portales reales (ej. Patriot Properties de otros condados), realizaríamos
- * peticiones HTTP POST con el número de casa y nombre de la calle, cargando cheerio para extraer
- * la tabla de resultados.
+ * Intenta consultar el portal web del PVA Jefferson County usando HTTP POST (Axios + FlareSolverr)
  */
 let consecutiveSolverErrors = 0;
 let disableRealScrapeMode = false;
 
-async function attemptRealPVAScrape(address: string): Promise<{ ownerName: string; mailingAddress: string } | null> {
+interface ScrapeResult {
+  success: boolean;
+  ownerName?: string;
+  mailingAddress?: string;
+  noResults?: boolean;
+}
+
+async function attemptRealPVAScrape(address: string): Promise<ScrapeResult> {
   if (disableRealScrapeMode) {
-    return null;
+    return { success: false, noResults: false };
   }
 
   const cleanAddr = address.split(",")[0].trim();
   const addressParts = cleanAddr.split(/\s+/);
   
-  if (addressParts.length < 2) return null;
-  
-  const houseNumber = addressParts[0];
-  const streetName = addressParts.slice(1).join(" ");
+  if (addressParts.length < 2) {
+    return { success: false, noResults: false };
+  }
 
   try {
-    const url = "https://jeffersonky.patriotproperties.com/Search.asp";
-    const payload = new URLSearchParams({
-      "StreetNumber": houseNumber,
-      "StreetName": streetName,
-      "btnSearch": "Search"
-    });
-
+    const searchUrl = `https://jeffersonpva.ky.gov/property-search/property-listings/?psfldAddress=${encodeURIComponent(cleanAddr)}&propertySearchFormButton=Search&searchType=StreetSearch`;
     let htmlContent = "";
     
-    // Intentar llamada directa con timeout de 2s
+    // Intentar llamada directa con timeout de 3s
     try {
-      console.log(`[PVA SCRAPER] Intentando POST directo para ${cleanAddr}...`);
-      const response = await axios.post(url, payload.toString(), {
+      console.log(`[PVA SCRAPER] Intentando GET directo a PVA para ${cleanAddr}...`);
+      const response = await axios.get(searchUrl, {
         headers: {
-          "Content-Type": "application/x-www-form-urlencoded",
           "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
         },
-        timeout: 2000
+        timeout: 3000
       });
       if (response.status === 200 && response.data) {
         htmlContent = response.data;
       }
     } catch (err: any) {
-      console.log(`[PVA SCRAPER] POST directo falló: ${err.message}. Intentando FlareSolverr...`);
+      console.log(`[PVA SCRAPER] GET directo falló: ${err.message}. Intentando FlareSolverr...`);
     }
 
     // Si la llamada directa falló o nos topamos con un bloqueo de Cloudflare, usar FlareSolverr
@@ -142,18 +122,16 @@ async function attemptRealPVAScrape(address: string): Promise<{ ownerName: strin
       if (consecutiveSolverErrors >= 3) {
         console.log(`[PVA SCRAPER] Demasiados errores consecutivos de FlareSolverr (${consecutiveSolverErrors}). Saltando scrapeo real para evitar lentitud.`);
         disableRealScrapeMode = true;
-        return null;
+        return { success: false, noResults: false };
       }
       
       console.log(`[PVA SCRAPER] Cloudflare detectado o respuesta vacía. Canalizando a través de FlareSolverr local...`);
       const solverUrl = process.env.FLARESOLVERR_URL || "http://localhost:8191/v1";
-      const postData = `StreetNumber=${encodeURIComponent(houseNumber)}&StreetName=${encodeURIComponent(streetName)}&btnSearch=Search`;
       
       try {
         const solverRes = await axios.post(solverUrl, {
-          cmd: "request.post",
-          url: url,
-          postData: postData,
+          cmd: "request.get",
+          url: searchUrl,
           maxTimeout: 10000
         }, { timeout: 12000 });
 
@@ -172,18 +150,35 @@ async function attemptRealPVAScrape(address: string): Promise<{ ownerName: strin
     }
 
     if (htmlContent) {
+      // Si el portal explícitamente dice 0 registros, no continuar ni reintentar
+      if (htmlContent.toLowerCase().includes("0 records found")) {
+        console.log(`[PVA SCRAPER] 0 registros encontrados en PVA para ${cleanAddr}. Evitando búsquedas redundantes.`);
+        return { success: false, noResults: true };
+      }
+
       const $ = cheerio.load(htmlContent);
-      // Extraer datos catastrales si están disponibles usando selectores genéricos para Patriot Properties
-      const ownerName = $('td:contains("Owner Name"), th:contains("Owner Name")').next().text().trim() ||
-                        $('td:has(b:contains("Owner"))').next().text().trim() ||
-                        $('.DetailVal').first().text().trim();
-      const mailingAddress = $('td:contains("Mailing Address"), th:contains("Mailing Address")').next().text().trim() ||
-                             $('td:has(b:contains("Mailing"))').next().text().trim();
+      const title = $('title').text() || "";
+      const isDetails = title.includes("Property Details") || $('dt:contains("Owner")').length > 0;
+      
+      let ownerName = "";
+      
+      if (isDetails) {
+        ownerName = $('dt:contains("Owner")').next('.result').text().trim();
+      } else {
+        const firstRow = $('.searchResultsTable tr').not('.rowTitle').first();
+        if (firstRow.length > 0) {
+          const tds = firstRow.find('td');
+          if (tds.length >= 5) {
+            ownerName = $(tds[2]).text().trim();
+          }
+        }
+      }
       
       if (ownerName && ownerName.length > 2) {
         return { 
+          success: true,
           ownerName, 
-          mailingAddress: mailingAddress || `${cleanAddr}, Louisville, KY`
+          mailingAddress: `${cleanAddr}, Louisville, KY`
         };
       }
     }
@@ -191,20 +186,320 @@ async function attemptRealPVAScrape(address: string): Promise<{ ownerName: strin
     console.warn(`[PVA SCRAPER] Falló el scraper real para ${cleanAddr}: ${err.message}`);
   }
 
+  return { success: false, noResults: false };
+}
+
+/**
+ * Extrae propietario e información catastral usando Playwright y el bypass de FlareSolverr
+ */
+async function attemptPlaywrightPVAScrape(address: string): Promise<{ ownerName: string; mailingAddress: string } | null> {
+  const cleanAddr = address.split(",")[0].trim();
+  const addressParts = cleanAddr.split(/\s+/);
+  if (addressParts.length < 2) return null;
+  
+  console.log(`[PVA SCRAPER PLAYWRIGHT] Iniciando consulta PVA con Playwright para: ${cleanAddr}...`);
+  const browser = await chromium.launch({
+    headless: process.env.HEADLESS ? process.env.HEADLESS === "true" : true,
+  });
+  const context = await browser.newContext({
+    userAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+    viewport: { width: 1280, height: 800 },
+  });
+  const page = await context.newPage();
+  
+  try {
+    const url = `https://jeffersonpva.ky.gov/property-search/property-listings/?psfldAddress=${encodeURIComponent(cleanAddr)}&propertySearchFormButton=Search&searchType=StreetSearch`;
+    await page.goto(url, { waitUntil: "networkidle", timeout: 25000 });
+    await page.waitForTimeout(2000);
+    
+    const title = await page.title();
+    const cfKeywords = ["Just a moment", "Cloudflare", "Attention Required", "Checking your browser"];
+    const isBlocked = cfKeywords.some(kw => title.includes(kw));
+    
+    if (isBlocked) {
+      console.log(`[PVA SCRAPER PLAYWRIGHT] Cloudflare detectado en Playwright. Invocando applyFlareSolverrBypass...`);
+      const bypassed = await applyFlareSolverrBypass(context, url);
+      if (bypassed) {
+        console.log(`[PVA SCRAPER PLAYWRIGHT] Bypass exitoso. Recargando...`);
+        await page.goto(url, { waitUntil: "networkidle", timeout: 25000 });
+      }
+    }
+    
+    const htmlContent = await page.content();
+    if (htmlContent.toLowerCase().includes("0 records found")) {
+      console.log(`[PVA SCRAPER PLAYWRIGHT] 0 registros encontrados en PVA para ${cleanAddr}.`);
+      await browser.close();
+      return null;
+    }
+
+    const $ = cheerio.load(htmlContent);
+    const isDetails = title.includes("Property Details") || $('dt:contains("Owner")').length > 0;
+    
+    let ownerName = "";
+    
+    if (isDetails) {
+      ownerName = $('dt:contains("Owner")').next('.result').text().trim();
+    } else {
+      const firstRow = $('.searchResultsTable tr').not('.rowTitle').first();
+      if (firstRow.length > 0) {
+        const tds = firstRow.find('td');
+        if (tds.length >= 5) {
+          ownerName = $(tds[2]).text().trim();
+        }
+      }
+    }
+    
+    if (ownerName && ownerName.length > 2) {
+      console.log(`[PVA SCRAPER PLAYWRIGHT SUCCESS] Propietario encontrado: ${ownerName}`);
+      await browser.close();
+      return {
+        ownerName,
+        mailingAddress: `${cleanAddr}, Louisville, KY`
+      };
+    }
+  } catch (err: any) {
+    console.error(`[PVA SCRAPER PLAYWRIGHT ERROR] Falló extracción con Playwright: ${err.message}`);
+  } finally {
+    await browser.close();
+  }
   return null;
 }
 
 /**
- * Ejecuta el resolvedor de registros de propiedad (PVA) en Louisville.
+ * Consulta de atributos completos de propietario en BatchData API (Paso 4 Fallback)
+ */
+async function getOwnerNameFromBatchData(address: string, state: string, county: string): Promise<{ ownerName: string; mailingAddress: string } | null> {
+  const apiKey = process.env.SKIP_TRACE_API_KEY || process.env.BATCHDATA_API_KEY || "";
+  if (!apiKey) {
+    console.log("[BATCHDATA] No API Key configurada para consulta de propiedad.");
+    return null;
+  }
+  
+  // Limpieza básica de dirección para parseo
+  let street = address.trim();
+  let city = "";
+  let zip = "";
+  
+  const zipMatches = street.match(/\b\d{5}\b/g);
+  if (zipMatches) {
+    zip = zipMatches[zipMatches.length - 1];
+    const lastIdx = street.lastIndexOf(zip);
+    if (lastIdx !== -1) {
+      street = (street.substring(0, lastIdx) + street.substring(lastIdx + zip.length)).trim();
+    }
+  }
+  
+  street = street.replace(/,\s*$/, "").trim();
+  const parts = street.split(",");
+  if (parts.length >= 2) {
+    city = parts[parts.length - 1].trim();
+    street = parts.slice(0, parts.length - 1).join(",").trim();
+  }
+  
+  if (!city) {
+    if (state === "KY" && county.toLowerCase().includes("jeff")) {
+      city = "Louisville";
+    } else if (state === "IN" && county.toLowerCase().includes("floyd")) {
+      city = "New Albany";
+    } else if (state === "IN" && county.toLowerCase().includes("clark")) {
+      city = "Jeffersonville";
+    } else {
+      city = county;
+    }
+  }
+  
+  try {
+    console.log(`[BATCHDATA] Buscando propietario en BatchData para: "${address}"...`);
+    const response = await axios.post(
+      "https://api.batchdata.com/api/v1/property/lookup/all-attributes",
+      {
+        requests: [
+          {
+            address: {
+              street: street.replace(/,\s*$/, "").trim(),
+              city: city,
+              state: state,
+              zip: zip || ""
+            }
+          }
+        ]
+      },
+      {
+        headers: {
+          "Authorization": `Bearer ${apiKey}`,
+          "Content-Type": "application/json"
+        },
+        timeout: 10000
+      }
+    );
+    
+    const properties = response.data?.results?.properties || [];
+    if (properties.length > 0) {
+      const owner = properties[0].owner;
+      if (owner && owner.names && owner.names.length > 0) {
+        const primaryOwnerName = owner.names.map((n: any) => `${n.first || ""} ${n.last || ""}`.trim()).join(" & ");
+        const mailingAddrObj = owner.mailingAddress;
+        let mailingAddressStr = "";
+        if (mailingAddrObj) {
+          mailingAddressStr = `${mailingAddrObj.street || ""}, ${mailingAddrObj.city || ""}, ${mailingAddrObj.state || ""} ${mailingAddrObj.zip || ""}`.replace(/,\s*$/, "").trim();
+        }
+        
+        console.log(`[BATCHDATA SUCCESS] Propietario encontrado vía BatchData: ${primaryOwnerName}`);
+        return {
+          ownerName: primaryOwnerName,
+          mailingAddress: mailingAddressStr || address
+        };
+      }
+    }
+  } catch (err: any) {
+    console.error(`[BATCHDATA ERROR] Error en consulta de all-attributes: ${err.message}`);
+  }
+  return null;
+}
+
+interface WaterfallResult {
+  ownerName: string;
+  mailingAddress: string;
+  needsManualReview: number;
+}
+
+/**
+ * Resuelve la dirección y el propietario a través del pipeline de resolución en cascada (waterfall)
+ */
+async function resolveOwnerWaterfall(address: string, state: string, county: string): Promise<WaterfallResult> {
+  // PASO 1: Normalización previa de la dirección
+  const normalizedAddress = await validateAndCleanAddress(address, state);
+  
+  // Preset check
+  const cleanAddrKey = normalizedAddress.split(",")[0].trim().toLowerCase().replace(/[^a-z0-9\s]/g, "").replace(/\s+/g, " ");
+  for (const presetKey in PRESET_OWNERS) {
+    if (cleanAddrKey.includes(presetKey) || presetKey.includes(cleanAddrKey)) {
+      const p = PRESET_OWNERS[presetKey];
+      console.log(`[PVA SCRAPER] Dirección coincide con preset de prueba: "${normalizedAddress}" -> '${p.name}'`);
+      return {
+        ownerName: p.name,
+        mailingAddress: p.mailingAddress || `${normalizedAddress.split(",")[0].trim()}, Louisville, KY`,
+        needsManualReview: 0
+      };
+    }
+  }
+  
+  // PASO 2: Consulta gratuita al ArcGIS REST de LOJIC GIS
+  if (state === "KY" && county.toLowerCase().includes("jeff")) {
+    try {
+      console.log(`[PVA SCRAPER] Consultando LOJIC GIS para obtener Parcel ID de: "${normalizedAddress}"`);
+      const featuresAddr = await gisRestClient.queryJeffersonParcelByAddress(normalizedAddress);
+      if (featuresAddr && featuresAddr.length > 0 && featuresAddr[0].attributes) {
+        const parcelId = featuresAddr[0].attributes.PARCELID || featuresAddr[0].attributes.PARCEL_ID || featuresAddr[0].attributes.PARCEL;
+        if (parcelId) {
+          const featuresPVA = await gisRestClient.queryJeffersonParcelsByParcelId(parcelId);
+          if (featuresPVA && featuresPVA.length > 0 && featuresPVA[0].attributes) {
+            const attrs = featuresPVA[0].attributes;
+            // Intentar extraer de campos que puedan contenerlo (si existen o en el futuro)
+            const ownerName = attrs.owner_name || attrs.owner || attrs.OWNER || attrs.OWNER1 || attrs.PROP_OWNER;
+            const mailingAddress = attrs.mailing_address || attrs.mail_addr || attrs.MAILING_ADDRESS || attrs.OWNER_ADDR;
+            
+            if (ownerName && ownerName.length > 2) {
+              console.log(`\x1b[36m[PVA LOJIC SUCCESS] Datos catastrales resueltos vía LOJIC GIS para "${normalizedAddress}": ${ownerName}\x1b[0m`);
+              return {
+                ownerName,
+                mailingAddress: mailingAddress || normalizedAddress,
+                needsManualReview: 0
+              };
+            }
+          }
+        }
+      }
+    } catch (e: any) {
+      console.warn(`[PVA SCRAPER WARNING] Falló consulta LOJIC GIS para ${normalizedAddress}:`, e.message);
+    }
+  }
+  
+  // PASO 3: Portal Web de PVA (Bypass de Cloudflare en intento real)
+  if (state === "KY" && county.toLowerCase().includes("jeff")) {
+    try {
+      const result = await attemptRealPVAScrape(normalizedAddress);
+      if (result && result.success && result.ownerName) {
+        return {
+          ownerName: result.ownerName,
+          mailingAddress: result.mailingAddress || normalizedAddress,
+          needsManualReview: 0
+        };
+      } else if (result && result.noResults) {
+        // El portal respondió exitosamente pero con 0 registros.
+        // Evitamos llamar a Playwright ya que el resultado será el mismo,
+        // y pasamos directamente al siguiente paso (BatchData).
+        console.log(`[PVA SCRAPER] Saltando Playwright para ${normalizedAddress} porque direct GET confirmó 0 registros.`);
+      } else {
+        // El direct GET falló por bloqueo o red. Intentamos Playwright.
+        const pwResult = await attemptPlaywrightPVAScrape(normalizedAddress);
+        if (pwResult) {
+          return {
+            ownerName: pwResult.ownerName,
+            mailingAddress: pwResult.mailingAddress,
+            needsManualReview: 0
+          };
+        }
+      }
+    } catch (err: any) {
+      console.error(`[PVA SCRAPER ERROR] Falló la extracción web del portal PVA para ${normalizedAddress}:`, err.message);
+    }
+  }
+  
+  // PASO 4: Fallback modular a BatchData (Última instancia)
+  try {
+    const batchRes = await getOwnerNameFromBatchData(normalizedAddress, state, county);
+    if (batchRes) {
+      return {
+        ownerName: batchRes.ownerName,
+        mailingAddress: batchRes.mailingAddress,
+        needsManualReview: 0
+      };
+    }
+  } catch (err: any) {
+    console.error(`[PVA SCRAPER ERROR] Falló fallback a BatchData para ${normalizedAddress}:`, err.message);
+  }
+  
+  // PASO 5: Protección de Privacidad y Revisión Manual
+  console.warn(`[PVA SCRAPER WARNING] Todas las capas del resolvedor fallaron para "${normalizedAddress}". Marcando como DESCONOCIDO.`);
+  return {
+    ownerName: "DUEÑO DESCONOCIDO",
+    mailingAddress: normalizedAddress,
+    needsManualReview: 1
+  };
+}
+
+/**
+ * Limpia y normaliza el nombre del propietario catastral, permitiendo caracteres válidos
+ * como espacios, ampersands (&), la letra Ñ y acentos.
+ */
+function cleanOwnerName(rawName: string): string {
+  const upperRaw = rawName.trim().toUpperCase();
+  if (
+    upperRaw === "DUEÑO DESCONOCIDO" ||
+    upperRaw === "DUEO DESCONOCIDO" ||
+    upperRaw === "UNKNOWN" ||
+    upperRaw === ""
+  ) {
+    return "DUEÑO DESCONOCIDO";
+  }
+  return upperRaw
+    .replace(/[^A-ZÁÉÍÓÚÜÑ\s&/]/g, "") // Permitir letras, acentos, Ñ, espacios, & y /
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/**
+ * Ejecuta el resolvedor de registros de propiedad (PVA)
  */
 async function scrapePVA() {
   console.log("[PVA SCRAPER] Iniciando resolvedor de registros de propiedad (PVA)...");
 
-  // 1. Obtener todos los registros con dueño desconocido
+  // 1. Obtener todos los registros con dueño desconocido en violaciones de código
   let pendingRes;
   try {
     pendingRes = await db.execute(
-      "SELECT violation_id, address FROM code_violations WHERE owner_name = 'DUEÑO DESCONOCIDO' OR owner_name IS NULL OR owner_name = '' OR owner_name = 'Unknown' OR owner_name = 'UNKNOWN' OR owner_name = 'No especificado'"
+      "SELECT violation_id, address FROM code_violations WHERE owner_name = 'DUEÑO DESCONOCIDO' OR owner_name = 'DUEO DESCONOCIDO' OR owner_name IS NULL OR owner_name = '' OR owner_name = 'Unknown' OR owner_name = 'UNKNOWN' OR owner_name = 'No especificado'"
     );
   } catch (dbErr: any) {
     console.error("[PVA SCRAPER ERROR] Falló la consulta a la base de datos:", dbErr.message);
@@ -212,7 +507,7 @@ async function scrapePVA() {
   }
 
   const pendingList = pendingRes.rows;
-  console.log(`[PVA SCRAPER] Se encontraron ${pendingList.length} violaciones de código con 'DUEÑO DESCONOCIDO'.`);
+  console.log(`[PVA SCRAPER] Se encontraron ${pendingList.length} violaciones de código con dueño desconocido.`);
 
   let resolvedCount = 0;
 
@@ -220,40 +515,23 @@ async function scrapePVA() {
     const violationId = row.violation_id as string;
     const address = row.address as string;
 
-    // 2. Intentar scraping real, si falla se aplica el resolvedor determinista simulado
-    let result = await attemptRealPVAScrape(address);
-    if (!result) {
-      result = simulatePVAPortal(address);
-    }
-
-    if (!result) {
-      console.log(`[PVA SCRAPER] No se pudo obtener información catastral real para ${address}. Dejando como Desconocido para evitar falsear datos.`);
-      continue;
-    }
+    const result = await resolveOwnerWaterfall(address, "KY", "Jefferson");
 
     const rawName = result.ownerName;
     const mailingAddr = result.mailingAddress;
+    const cleanedName = cleanOwnerName(rawName);
 
-    // Limpiar nombre extraído de caracteres extraños
-    const cleanedName = rawName
-      .replace(/[^a-zA-Z\s]/g, "") // Mantener solo letras y espacios
-      .replace(/\s+/g, " ")
-      .trim()
-      .toUpperCase();
-
-    // Determinar si es dueño ausente (mailing address diferente a la física de la propiedad)
     const isAbsentee = mailingAddr.toLowerCase().split(",")[0].trim() !== address.toLowerCase().split(",")[0].trim();
     const absenteeLog = isAbsentee 
       ? `(Dueño Ausente, Dirección Postal: '${mailingAddr}')` 
       : `(Dueño Ocupante)`;
 
-    console.log(`[PVA SCRAPER] Nombre encontrado para ${address.split(",")[0].trim()}: '${cleanedName}' ${absenteeLog}. Actualizando Turso...`);
+    console.log(`[PVA SCRAPER] Propietario resuelto para ${address.split(",")[0].trim()}: '${cleanedName}' ${absenteeLog}. Actualizando Turso...`);
 
-    // 3. Actualizar la tabla code_violations en Turso DB
     try {
       await db.execute({
-        sql: "UPDATE code_violations SET owner_name = ?, mailing_address = ?, absentee_owner = ? WHERE violation_id = ?",
-        args: [cleanedName, mailingAddr, isAbsentee ? 1 : 0, violationId]
+        sql: "UPDATE code_violations SET owner_name = ?, mailing_address = ?, absentee_owner = ?, needs_manual_review = ? WHERE violation_id = ?",
+        args: [cleanedName, mailingAddr, isAbsentee ? 1 : 0, result.needsManualReview, violationId]
       });
       resolvedCount++;
     } catch (updateErr: any) {
@@ -266,11 +544,11 @@ async function scrapePVA() {
   console.log(`- Registros de dueño de violación actualizados: ${resolvedCount}`);
   console.log("========================================================\n");
 
-  // 4. Obtener todas las subastas judiciales sin dirección postal o con nombre de demandado inválido o 'Unknown'
+  // 2. Obtener todas las subastas judiciales sin dirección postal o con nombre de deudor inválido
   let pendingAuctionsRes;
   try {
     pendingAuctionsRes = await db.execute(
-      "SELECT auction_id, address, defendant FROM foreclosure_auctions WHERE mailing_address IS NULL OR defendant IS NULL OR defendant = '' OR defendant = 'No especificado' OR defendant = 'null' OR UPPER(defendant) = 'UNKNOWN' OR UPPER(defendant) = 'DUEÑO DESCONOCIDO'"
+      "SELECT auction_id, address, defendant, county, state FROM foreclosure_auctions WHERE mailing_address IS NULL OR defendant IS NULL OR defendant = '' OR defendant = 'No especificado' OR defendant = 'null' OR UPPER(defendant) = 'UNKNOWN' OR UPPER(defendant) = 'DUEÑO DESCONOCIDO' OR UPPER(defendant) = 'DUEO DESCONOCIDO'"
     );
   } catch (dbErr: any) {
     console.error("[PVA SCRAPER ERROR] Falló la consulta a la base de datos para subastas:", dbErr.message);
@@ -285,35 +563,22 @@ async function scrapePVA() {
     for (const row of pendingAuctionsList) {
       const auctionId = row.auction_id as string;
       const address = row.address as string;
+      const county = row.county as string || "Jefferson";
+      const state = row.state as string || "KY";
 
-      // Intentar scraping real, si falla se aplica el resolvedor determinista simulado
-      let result = await attemptRealPVAScrape(address);
-      if (!result) {
-        result = simulatePVAPortal(address);
-      }
-
-      if (!result) {
-        console.log(`[PVA SCRAPER] No se pudo obtener dirección postal real para subasta en ${address}. Continuando sin actualizar para evitar inventar datos.`);
-        continue;
-      }
+      const result = await resolveOwnerWaterfall(address, state, county);
 
       const rawName = result.ownerName;
       const mailingAddr = result.mailingAddress;
-      const cleanedName = rawName
-        .replace(/[^a-zA-Z\s]/g, "") // Mantener solo letras y espacios
-        .replace(/\s+/g, " ")
-        .trim()
-        .toUpperCase();
+      const cleanedName = cleanOwnerName(rawName);
 
-      // Determinar si es dueño ausente
       const isAbsentee = mailingAddr.toLowerCase().split(",")[0].trim() !== address.toLowerCase().split(",")[0].trim();
       const absenteeLog = isAbsentee 
         ? `(Dueño Ausente, Dirección Postal: '${mailingAddr}')` 
         : `(Dueño Ocupante)`;
 
-      console.log(`[PVA SCRAPER] Dirección postal encontrada para subasta en ${address.split(",")[0].trim()}: '${mailingAddr}' ${absenteeLog}. Propietario PVA: '${cleanedName}'. Actualizando Turso...`);
+      console.log(`[PVA SCRAPER] Dirección postal encontrada para subasta en ${address.split(",")[0].trim()}: '${mailingAddr}' ${absenteeLog}. Propietario: '${cleanedName}'. Actualizando Turso...`);
 
-      // Actualizar la tabla foreclosure_auctions en Turso DB
       try {
         await db.execute({
           sql: `
@@ -321,14 +586,15 @@ async function scrapePVA() {
             SET 
               mailing_address = ?, 
               absentee_owner = ?,
+              needs_manual_review = ?,
               defendant = CASE 
-                WHEN defendant IS NULL OR defendant = '' OR defendant = 'No especificado' OR defendant = 'null' OR UPPER(defendant) = 'UNKNOWN' OR UPPER(defendant) = 'DUEÑO DESCONOCIDO'
+                WHEN defendant IS NULL OR defendant = '' OR defendant = 'No especificado' OR defendant = 'null' OR UPPER(defendant) = 'UNKNOWN' OR UPPER(defendant) = 'DUEÑO DESCONOCIDO' OR UPPER(defendant) = 'DUEO DESCONOCIDO'
                 THEN ? 
                 ELSE defendant 
               END
             WHERE auction_id = ?
           `,
-          args: [mailingAddr, isAbsentee ? 1 : 0, cleanedName, auctionId]
+          args: [mailingAddr, isAbsentee ? 1 : 0, result.needsManualReview, cleanedName, auctionId]
         });
         resolvedAuctionsCount++;
       } catch (updateErr: any) {
@@ -342,11 +608,11 @@ async function scrapePVA() {
     console.log("========================================================\n");
   }
 
-  // 5. Obtener todos los registros de estrés físico con dueño desconocido
+  // 3. Obtener todos los registros de estrés físico con dueño desconocido
   let pendingPhysicalRes;
   try {
     pendingPhysicalRes = await db.execute(
-      "SELECT distress_id, address FROM physical_distress WHERE owner_name = 'DUEÑO DESCONOCIDO' OR owner_name IS NULL OR owner_name = '' OR owner_name = 'Unknown' OR owner_name = 'UNKNOWN' OR owner_name = 'No especificado'"
+      "SELECT distress_id, address, county, state FROM physical_distress WHERE owner_name = 'DUEÑO DESCONOCIDO' OR owner_name = 'DUEO DESCONOCIDO' OR owner_name IS NULL OR owner_name = '' OR owner_name = 'Unknown' OR owner_name = 'UNKNOWN' OR owner_name = 'No especificado'"
     );
   } catch (dbErr: any) {
     console.error("[PVA SCRAPER ERROR] Falló la consulta a la base de datos para estrés físico:", dbErr.message);
@@ -361,35 +627,22 @@ async function scrapePVA() {
     for (const row of pendingPhysicalList) {
       const distressId = row.distress_id as string;
       const address = row.address as string;
+      const county = row.county as string || "Jefferson";
+      const state = row.state as string || "KY";
 
-      // Intentar scraping real, si falla se aplica el resolvedor determinista simulado
-      let result = await attemptRealPVAScrape(address);
-      if (!result) {
-        result = simulatePVAPortal(address);
-      }
-
-      if (!result) {
-        console.log(`[PVA SCRAPER] No se pudo obtener información catastral real para estrés físico en ${address}. Continuando sin actualizar.`);
-        continue;
-      }
+      const result = await resolveOwnerWaterfall(address, state, county);
 
       const rawName = result.ownerName;
       const mailingAddr = result.mailingAddress;
-      const cleanedName = rawName
-        .replace(/[^a-zA-Z\s]/g, "") // Mantener solo letras y espacios
-        .replace(/\s+/g, " ")
-        .trim()
-        .toUpperCase();
+      const cleanedName = cleanOwnerName(rawName);
 
-      // Determinar si es dueño ausente
       const isAbsentee = mailingAddr.toLowerCase().split(",")[0].trim() !== address.toLowerCase().split(",")[0].trim();
       const absenteeLog = isAbsentee 
         ? `(Dueño Ausente, Dirección Postal: '${mailingAddr}')` 
         : `(Dueño Ocupante)`;
 
-      console.log(`[PVA SCRAPER] Dirección postal encontrada para estrés físico en ${address.split(",")[0].trim()}: '${mailingAddr}' ${absenteeLog}. Propietario PVA: '${cleanedName}'. Actualizando Turso...`);
+      console.log(`[PVA SCRAPER] Dirección postal encontrada para estrés físico en ${address.split(",")[0].trim()}: '${mailingAddr}' ${absenteeLog}. Propietario: '${cleanedName}'. Actualizando Turso...`);
 
-      // Actualizar la tabla physical_distress en Turso DB
       try {
         await db.execute({
           sql: `
@@ -397,10 +650,11 @@ async function scrapePVA() {
             SET 
               owner_name = ?, 
               mailing_address = ?, 
-              absentee_owner = ?
+              absentee_owner = ?,
+              needs_manual_review = ?
             WHERE distress_id = ?
           `,
-          args: [cleanedName, mailingAddr, isAbsentee ? 1 : 0, distressId]
+          args: [cleanedName, mailingAddr, isAbsentee ? 1 : 0, result.needsManualReview, distressId]
         });
         resolvedPhysicalCount++;
       } catch (updateErr: any) {
