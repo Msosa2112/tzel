@@ -352,7 +352,13 @@ async function getOwnerNameFromBatchData(address: string, state: string, county:
       }
     }
   } catch (err: any) {
-    console.error(`[BATCHDATA ERROR] Error en consulta de all-attributes: ${err.message}`);
+    const isStatus403 = err.response?.status === 403;
+    const msgStr = (err.message || "").toLowerCase();
+    if (isStatus403 || msgStr.includes("403")) {
+      console.warn(`[BATCHDATA BALANCE WARNING] Saldo insuficiente o sin módulo contratado al consultar BatchData para ${address}. Activando fallback gratuito (LOJIC GIS / BD local).`);
+    } else {
+      console.error(`[BATCHDATA ERROR] Error en consulta de all-attributes: ${err.message}`);
+    }
   }
   return null;
 }
