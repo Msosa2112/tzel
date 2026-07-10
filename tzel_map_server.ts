@@ -7,8 +7,13 @@ import { calculateRehab, calculateMAO, calculateROI, isJuniorLien, calculateNetE
 
 dotenv.config();
 
+let dbUrl = process.env.TURSO_DATABASE_URL || "";
+if (dbUrl.startsWith("libsql://")) {
+  dbUrl = dbUrl.replace("libsql://", "https://");
+}
+
 const db = createClient({
-  url: process.env.TURSO_DATABASE_URL || "",
+  url: dbUrl,
   authToken: process.env.TURSO_AUTH_TOKEN || "",
 });
 
@@ -336,13 +341,24 @@ async function getCoordinates(address: string): Promise<{ lat: number; lon: numb
 }
 
 
+let cachedProspectos: any[] | null = null;
+let lastCacheTime = 0;
+const CACHE_TTL = 10 * 60 * 1000; // 10 minutes cache TTL
+
 app.get("/api/prospectos", async (req, res) => {
   console.log("[API] /api/prospectos requested");
 
+  const forceRefresh = req.query.refresh === "true";
+  if (cachedProspectos && (Date.now() - lastCacheTime < CACHE_TTL) && !forceRefresh) {
+    console.log("[API] Returning cached prospectos list instantly");
+    return res.json({ status: "success", count: cachedProspectos.length, data: cachedProspectos });
+  }
+
   try {
-    // 1. Fetch auctions
-    const auctionsRes = await db.execute(`
-      SELECT 
+    console.log("[API] Fetching prospectos from Turso DB in batch...");
+    const batchRes = await db.batch([
+      // 0. foreclosure_auctions
+      `SELECT 
         auction_id, case_number, address, county, state, auction_date, 
         plaintiff, defendant, debt_amount, appraisal_value, 
         mls_estimated_value, mls_id, pdf_url,
@@ -350,9 +366,54 @@ app.get("/api/prospectos", async (req, res) => {
         mailing_address, absentee_owner, sqft, beds, baths, hidden_mortgages, hidden_liens_amount, photo_urls,
         title_check_status, next_retry_date
       FROM foreclosure_auctions
-      WHERE (status IS NULL OR status = 'active' OR status = '') AND (mls_status IS NULL OR mls_status != 'resolved')
-    `);
-    
+      WHERE (status IS NULL OR status = 'active' OR status = '') AND (mls_status IS NULL OR mls_status != 'resolved')`,
+      // 1. code_violations
+      `SELECT 
+        violation_id, case_number, address, violation_type, report_date, status, 
+        owner_name, mls_estimated_value, mls_id, defendant_phones, defendant_emails,
+        mailing_address, absentee_owner, sqft, beds, baths, hidden_mortgages, hidden_liens_amount, photo_urls,
+        title_check_status
+      FROM code_violations`,
+      // 2. probates
+      `SELECT probate_id, case_number, address, county, state, deceased_name, heir_name, heir_phones, heir_emails
+      FROM probates`,
+      // 3. divorces
+      `SELECT divorce_id, case_number, address, county, state, spouse_a, spouse_b, spouse_a_phones, spouse_a_emails, spouse_b_phones, spouse_b_emails
+      FROM divorces`,
+      // 4. bankruptcies
+      `SELECT bankruptcy_id, case_number, address, county, state, debtor_name, bankruptcy_type, debtor_phones, debtor_emails
+      FROM bankruptcies`,
+      // 5. physical_distress
+      `SELECT distress_id, address, county, state, distress_type, report_date, details, owner_name,
+             mls_estimated_value, mls_id, defendant_phones, defendant_emails, mailing_address, absentee_owner, 
+             sqft, beds, baths, hidden_mortgages, hidden_liens_amount, photo_urls,
+             ef_scale, nws_survey_details, wind_speed_est
+      FROM physical_distress`,
+      // 6. financial_distress
+      `SELECT record_id, case_number, address, county, state, record_type, debt_amount, owner_name, plaintiff, report_date,
+             mls_estimated_value, mls_id, defendant_phones, defendant_emails, mailing_address, absentee_owner, sqft, beds, baths, hidden_mortgages, hidden_liens_amount, photo_urls
+      FROM financial_distress`,
+      // 7. life_events
+      `SELECT event_id, event_type, subject_name, address, county, state, details, report_date,
+             mls_estimated_value, mls_id, defendant_phones, defendant_emails, mailing_address, absentee_owner, sqft, beds, baths, hidden_mortgages, hidden_liens_amount, photo_urls
+      FROM life_events`,
+      // 8. geocode_cache
+      `SELECT address, lat, lon FROM geocode_cache`,
+      // 9. osint_enrichment
+      `SELECT address_key, llc_directors, corporate_address, social_profiles, usernames_found, env_stressors, env_attractors FROM osint_enrichment`
+    ], "read");
+
+    const auctionsRes = batchRes[0];
+    const violationsRes = batchRes[1];
+    const probatesRes = batchRes[2];
+    const divorcesRes = batchRes[3];
+    const bankruptciesRes = batchRes[4];
+    const physicalRes = batchRes[5];
+    const financialRes = batchRes[6];
+    const lifeEventsRes = batchRes[7];
+    const cacheRes = batchRes[8];
+    const osintRes = batchRes[9];
+
     // Filter auctions to next 60 days or Indiana manual reviews
     const opportunities = auctionsRes.rows.filter(row => {
       const state = (row.state as string || "").toUpperCase();
@@ -363,77 +424,33 @@ app.get("/api/prospectos", async (req, res) => {
       return daysRemaining >= 0 && daysRemaining <= 60;
     });
 
-    // 2. Fetch code violations
-    const violationsRes = await db.execute(`
-      SELECT 
-        violation_id, case_number, address, violation_type, report_date, status, 
-        owner_name, mls_estimated_value, mls_id, defendant_phones, defendant_emails,
-        mailing_address, absentee_owner, sqft, beds, baths, hidden_mortgages, hidden_liens_amount, photo_urls,
-        title_check_status
-      FROM code_violations
-    `);
     const violations = violationsRes.rows;
 
-    // 3. Fetch probates
-    const probatesRes = await db.execute(`
-      SELECT probate_id, case_number, address, county, state, deceased_name, heir_name, heir_phones, heir_emails
-      FROM probates
-    `);
     const probates = probatesRes.rows.filter(row => {
       const state = (row.state as string || "").toUpperCase();
       return state === "KY" || state === "IN";
     });
 
-    // 4. Fetch divorces
-    const divorcesRes = await db.execute(`
-      SELECT divorce_id, case_number, address, county, state, spouse_a, spouse_b, spouse_a_phones, spouse_a_emails, spouse_b_phones, spouse_b_emails
-      FROM divorces
-    `);
     const divorces = divorcesRes.rows.filter(row => {
       const state = (row.state as string || "").toUpperCase();
       return state === "KY" || state === "IN";
     });
 
-    // 5. Fetch bankruptcies
-    const bankruptciesRes = await db.execute(`
-      SELECT bankruptcy_id, case_number, address, county, state, debtor_name, bankruptcy_type, debtor_phones, debtor_emails
-      FROM bankruptcies
-    `);
     const bankruptcies = bankruptciesRes.rows.filter(row => {
       const state = (row.state as string || "").toUpperCase();
       return state === "KY" || state === "IN";
     });
 
-    // 6. Fetch physical distress
-    const physicalRes = await db.execute(`
-      SELECT distress_id, address, county, state, distress_type, report_date, details, owner_name,
-             mls_estimated_value, mls_id, defendant_phones, defendant_emails, mailing_address, absentee_owner, 
-             sqft, beds, baths, hidden_mortgages, hidden_liens_amount, photo_urls,
-             ef_scale, nws_survey_details, wind_speed_est
-      FROM physical_distress
-    `);
     const physicalDistressList = physicalRes.rows.filter(row => {
       const state = (row.state as string || "").toUpperCase();
       return state === "KY" || state === "IN";
     });
 
-    // 7. Fetch financial distress
-    const financialRes = await db.execute(`
-      SELECT record_id, case_number, address, county, state, record_type, debt_amount, owner_name, plaintiff, report_date,
-             mls_estimated_value, mls_id, defendant_phones, defendant_emails, mailing_address, absentee_owner, sqft, beds, baths, hidden_mortgages, hidden_liens_amount, photo_urls
-      FROM financial_distress
-    `);
     const financialDistressList = financialRes.rows.filter(row => {
       const state = (row.state as string || "").toUpperCase();
       return state === "KY" || state === "IN";
     });
 
-    // 8. Fetch life events
-    const lifeEventsRes = await db.execute(`
-      SELECT event_id, event_type, subject_name, address, county, state, details, report_date,
-             mls_estimated_value, mls_id, defendant_phones, defendant_emails, mailing_address, absentee_owner, sqft, beds, baths, hidden_mortgages, hidden_liens_amount, photo_urls
-      FROM life_events
-    `);
     const lifeEventsList = lifeEventsRes.rows.filter(row => {
       const state = (row.state as string || "").toUpperCase();
       return state === "KY" || state === "IN";
@@ -981,35 +998,25 @@ app.get("/api/prospectos", async (req, res) => {
 
     // Pre-cargar la caché de geocodificación en memoria para evitar el problema de consultas N+1
     const geocodeMap = new Map<string, { lat: number; lon: number }>();
-    try {
-      const cacheRes = await db.execute("SELECT address, lat, lon FROM geocode_cache");
-      for (const row of cacheRes.rows) {
-        if (row.address && row.lat !== null && row.lon !== null) {
-          geocodeMap.set(row.address as string, { lat: row.lat as number, lon: row.lon as number });
-        }
+    for (const row of cacheRes.rows) {
+      if (row.address && row.lat !== null && row.lon !== null) {
+        geocodeMap.set(row.address as string, { lat: row.lat as number, lon: row.lon as number });
       }
-    } catch (err) {
-      console.error("[GEOCODE CACHE LOAD ERROR] Failed to pre-load geocode cache:", err);
     }
 
     // Pre-cargar la base de datos de enriquecimiento OSINT en lote
     const osintMap = new Map<string, any>();
-    try {
-      const osintRes = await db.execute("SELECT address_key, llc_directors, corporate_address, social_profiles, usernames_found, env_stressors, env_attractors FROM osint_enrichment");
-      for (const row of osintRes.rows) {
-        if (row.address_key) {
-          osintMap.set(row.address_key as string, {
-            llcDirectors: row.llc_directors ? JSON.parse(row.llc_directors as string) : [],
-            corporateAddress: row.corporate_address as string || "",
-            socialProfiles: row.social_profiles ? JSON.parse(row.social_profiles as string) : [],
-            usernamesFound: row.usernames_found ? JSON.parse(row.usernames_found as string) : [],
-            envStressors: row.env_stressors ? JSON.parse(row.env_stressors as string) : [],
-            envAttractors: row.env_attractors ? JSON.parse(row.env_attractors as string) : [],
-          });
-        }
+    for (const row of osintRes.rows) {
+      if (row.address_key) {
+        osintMap.set(row.address_key as string, {
+          llcDirectors: row.llc_directors ? JSON.parse(row.llc_directors as string) : [],
+          corporateAddress: row.corporate_address as string || "",
+          socialProfiles: row.social_profiles ? JSON.parse(row.social_profiles as string) : [],
+          usernamesFound: row.usernames_found ? JSON.parse(row.usernames_found as string) : [],
+          envStressors: row.env_stressors ? JSON.parse(row.env_stressors as string) : [],
+          envAttractors: row.env_attractors ? JSON.parse(row.env_attractors as string) : [],
+        });
       }
-    } catch (err: any) {
-      console.error("[OSINT LOAD ERROR] Failed to load osint enrichment:", err.message);
     }
 
     // Geocodificar y calcular variables en lote
@@ -1102,11 +1109,13 @@ app.get("/api/prospectos", async (req, res) => {
       });
     }
 
-
     // Trigger background geocoding check without blocking the response
     startBackgroundGeocoding().catch(err => {
       console.error("[BG GEOCODER TRIGGER ERROR]", err.message);
     });
+
+    cachedProspectos = responseData;
+    lastCacheTime = Date.now();
 
     res.json({ status: "success", count: responseData.length, data: responseData });
   } catch (err: any) {
@@ -1129,6 +1138,24 @@ app.get("/api/surplus", async (req, res) => {
     res.json({ status: "success", count: surplusRes.rows.length, data: surplusRes.rows });
   } catch (err: any) {
     console.error("[API ERROR] Failed to fetch surplus funds:", err.message);
+    res.status(500).json({ status: "error", message: err.message });
+  }
+});
+
+app.get("/api/guiones", async (req, res) => {
+  console.log("[API] /api/guiones requested");
+  try {
+    const fs = require("fs");
+    const path = require("path");
+    const scriptsPath = path.resolve("./telephony_scripts.json");
+    if (fs.existsSync(scriptsPath)) {
+      const data = JSON.parse(fs.readFileSync(scriptsPath, "utf-8"));
+      res.json(data);
+    } else {
+      res.status(404).json({ status: "error", message: "Telephony scripts file not found" });
+    }
+  } catch (err: any) {
+    console.error("[API ERROR] Failed to load telephony scripts:", err.message);
     res.status(500).json({ status: "error", message: err.message });
   }
 });
@@ -1358,6 +1385,123 @@ app.get("/api/mca", async (req, res) => {
   }
 });
 
+app.get("/api/guiones", async (req, res) => {
+  console.log("[API] /api/guiones requested");
+  try {
+    const fs = require("fs");
+    const path = require("path");
+    const scriptsPath = path.resolve("./telephony_scripts.json");
+    if (fs.existsSync(scriptsPath)) {
+      const data = JSON.parse(fs.readFileSync(scriptsPath, "utf-8"));
+      res.json(data);
+    } else {
+      res.status(404).json({ status: "error", message: "Telephony scripts file not found" });
+    }
+  } catch (err: any) {
+    console.error("[API ERROR] Failed to load telephony scripts:", err.message);
+    res.status(500).json({ status: "error", message: err.message });
+  }
+});
+
+function parseAddressForCensus(fullAddress: string): { street: string; city: string; state: string; zip: string } | null {
+  try {
+    const parts = fullAddress.split(",").map(p => p.trim());
+    if (parts.length < 3) return null;
+    
+    const lastPart = parts[parts.length - 1];
+    const match = lastPart.match(/^([A-Z]{2})\s+(\d{5}(-\d{4})?)$/i);
+    if (!match) return null;
+    
+    const state = match[1];
+    const zip = match[2];
+    const city = parts[parts.length - 2];
+    const street = parts.slice(0, parts.length - 2).join(", ");
+    
+    return { street, city, state, zip };
+  } catch (e) {
+    return null;
+  }
+}
+
+async function geocodeAddressBatch(uncachedAddresses: string[]): Promise<Set<string>> {
+  const geocodedInBatch = new Set<string>();
+  
+  // Generar contenido CSV
+  let csvContent = "";
+  const addressMap = new Map<number, string>();
+  let batchCount = 0;
+  
+  uncachedAddresses.forEach((addr, idx) => {
+    const parsed = parseAddressForCensus(addr);
+    if (parsed) {
+      const cleanStreet = parsed.street.replace(/,/g, "");
+      const cleanCity = parsed.city.replace(/,/g, "");
+      csvContent += `${idx},${cleanStreet},${cleanCity},${parsed.state},${parsed.zip}\n`;
+      addressMap.set(idx, addr);
+      batchCount++;
+    }
+  });
+  
+  if (batchCount === 0) {
+    return geocodedInBatch;
+  }
+  
+  console.log(`[BACKGROUND GEOCODER BATCH] Enviando lote de ${batchCount} direcciones a US Census Geocoder...`);
+  
+  try {
+    const formData = new FormData();
+    const fileBlob = new Blob([csvContent], { type: "text/csv" });
+    formData.append("addressFile", fileBlob, "addresses.csv");
+    formData.append("benchmark", "Public_AR_Current");
+    
+    const response = await fetch("https://geocoding.geo.census.gov/geocoder/locations/addressbatch", {
+      method: "POST",
+      body: formData,
+      signal: AbortSignal.timeout(30000)
+    });
+    
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+    
+    const responseText = await response.text();
+    const lines = responseText.split("\n");
+    
+    for (const line of lines) {
+      if (!line.trim()) continue;
+      
+      const parts = line.split(`","`).map(p => p.replace(/"/g, "").trim());
+      if (parts.length < 6) continue;
+      
+      const id = parseInt(parts[0]);
+      const matchStatus = parts[2];
+      const coords = parts[5];
+      
+      const originalAddress = addressMap.get(id);
+      
+      if (matchStatus === "Match" && coords && originalAddress) {
+        const coordParts = coords.split(",");
+        if (coordParts.length === 2) {
+          const lon = parseFloat(coordParts[0]);
+          const lat = parseFloat(coordParts[1]);
+          if (!isNaN(lat) && !isNaN(lon)) {
+            await db.execute({
+              sql: "INSERT OR REPLACE INTO geocode_cache (address, lat, lon) VALUES (?, ?, ?)",
+              args: [originalAddress, lat, lon]
+            });
+            geocodedInBatch.add(originalAddress);
+          }
+        }
+      }
+    }
+    console.log(`[BACKGROUND GEOCODER BATCH] Lote procesado con éxito. Se geocodificaron ${geocodedInBatch.size} direcciones.`);
+  } catch (err: any) {
+    console.warn("[BACKGROUND GEOCODER BATCH WARNING] Falló la geocodificación en lote con US Census:", err.message);
+  }
+  
+  return geocodedInBatch;
+}
+
 let isGeocodingActive = false;
 
 /**
@@ -1389,14 +1533,13 @@ async function startBackgroundGeocoding() {
     const bankruptcies = await db.execute("SELECT DISTINCT address FROM bankruptcies");
     bankruptcies.rows.forEach(r => { if (r.address) addresses.add(r.address as string); });
 
-    // Filtrar las direcciones que ya están en caché
+    // Filtrar las direcciones que ya están en caché (consulta en lote para evitar consultas N+1 y sobrecargar Turso)
+    const cacheRes = await db.execute("SELECT address FROM geocode_cache");
+    const cachedSet = new Set(cacheRes.rows.map(r => r.address as string).filter(Boolean));
+
     const uncachedAddresses: string[] = [];
     for (const address of addresses) {
-      const cacheRes = await db.execute({
-        sql: "SELECT 1 FROM geocode_cache WHERE address = ?",
-        args: [address]
-      });
-      if (cacheRes.rows.length === 0) {
+      if (!cachedSet.has(address)) {
         uncachedAddresses.push(address);
       }
     }
@@ -1404,17 +1547,24 @@ async function startBackgroundGeocoding() {
     if (uncachedAddresses.length > 0) {
       console.log(`[BACKGROUND GEOCODER] Se encontraron ${uncachedAddresses.length} direcciones pendientes de geocodificación.`);
       
-      for (let i = 0; i < uncachedAddresses.length; i++) {
-        const addr = uncachedAddresses[i];
-        console.log(`[BACKGROUND GEOCODER] Procesando ${i + 1}/${uncachedAddresses.length}: "${addr}"`);
-        
-        await getCoordinates(addr);
-        
-        // Espera corta si usamos Google, o 1.5s para no saturar la API gratuita de Nominatim
-        const sleepTime = process.env.GOOGLE_MAPS_API_KEY ? 200 : 1500;
-        await sleep(sleepTime);
+      // Intentar primero geocodificar en lote usando el US Census Geocoder
+      const geocodedBatch = await geocodeAddressBatch(uncachedAddresses);
+      const remainingAddresses = uncachedAddresses.filter(addr => !geocodedBatch.has(addr));
+      
+      if (remainingAddresses.length > 0) {
+        console.log(`[BACKGROUND GEOCODER] Procesando ${remainingAddresses.length} direcciones restantes de forma individual...`);
+        for (let i = 0; i < remainingAddresses.length; i++) {
+          const addr = remainingAddresses[i];
+          console.log(`[BACKGROUND GEOCODER] Procesando individual ${i + 1}/${remainingAddresses.length}: "${addr}"`);
+          
+          await getCoordinates(addr);
+          
+          // Espera corta si usamos Google, o 1.5s para no saturar la API gratuita de Nominatim
+          const sleepTime = process.env.GOOGLE_MAPS_API_KEY ? 200 : 1500;
+          await sleep(sleepTime);
+        }
       }
-      console.log("[BACKGROUND GEOCODER] Geocodificación en lote completada.");
+      console.log("[BACKGROUND GEOCODER] Geocodificación en lote y residual completada.");
     } else {
       console.log("[BACKGROUND GEOCODER] Todas las direcciones están al día en la caché.");
     }

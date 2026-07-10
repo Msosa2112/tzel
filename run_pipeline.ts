@@ -24,6 +24,7 @@ import { runFuzzyOwnerUnification } from "./scrapers/fuzzy_identity_matcher";
 import { runOSINTEnrichment } from "./enrichment_pipeline";
 import { runCountyMediaRetriever } from "./scrapers/county_media_retriever";
 import { runStreetViewStitcher } from "./scrapers/streetview_stitcher";
+import { runPdfAppraisalWorker } from "./scrapers/pdf_appraisal_worker";
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -216,6 +217,13 @@ async function runPipeline() {
     await runCrossReference();
   } catch (err: any) {
     console.error("[CAPA 3 ERROR] Falló el motor de cruce MLS:", err.message);
+  }
+
+  try {
+    console.log("\n[CAPA 3 - FASE 2.3] Descargando y analizando PDFs de Tasaciones con Gemini...");
+    await runPdfAppraisalWorker();
+  } catch (err: any) {
+    console.error("[CAPA 3 ERROR] Falló la extracción de tasaciones desde PDFs:", err.message);
   }
 
   try {

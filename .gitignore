@@ -26,3 +26,7 @@ storage/
 
 # Cache files
 .indexed_files.json
+
+# Local venv and temporary files
+.venv_scrapegraph/
+*.pdf

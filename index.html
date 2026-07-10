@@ -3570,8 +3570,18 @@
       }
     }
 
+    let telephonyScripts = {};
+
     async function fetchLeads() {
       try {
+        if (Object.keys(telephonyScripts).length === 0) {
+          try {
+            const scriptsRes = await fetch('/api/guiones');
+            telephonyScripts = await scriptsRes.json();
+          } catch (e) {
+            console.error("Failed to load telephony scripts:", e);
+          }
+        }
         const res = await fetch('/api/prospectos');
         const json = await res.json();
         
@@ -5342,134 +5352,190 @@
       lucide.createIcons();
     }
 
+    function formatTemplate(template, data) {
+      if (!template) return '';
+      return template
+        .replace(/{ownerName}/g, data.ownerName || '')
+        .replace(/{displayAddress}/g, data.displayAddress || '')
+        .replace(/{fscale}/g, data.fscale || 'N/A')
+        .replace(/{primaryDebt}/g, (data.primaryDebt || 0).toLocaleString())
+        .replace(/{auctionDate}/g, data.auctionDate || 'N/A')
+        .replace(/{plaintiff}/g, data.plaintiff || 'el banco')
+        .replace(/{violationType}/g, data.violationType || 'N/A');
+    }
+
     function buildCallScripts(lead, categories) {
       const tabContainer = document.getElementById('script-tabs-container');
       tabContainer.innerHTML = '';
 
       const scripts = {};
+      const t = telephonyScripts || {};
 
-      // In disaster mode, add roofing first if available so it's the default active tab
-      if (activeSystemMode === 'disaster' && categories.includes('roofing')) {
-        const isDisaster = lead.physicalDistress && lead.physicalDistress.some(pd => ['Tornado Damage', 'Storm Damage', 'Hail Damage'].includes(pd.distress_type));
-        if (isDisaster) {
+      function addScript(key, defaultName, defaultIcon, defaultTemplate, condition) {
+        if (!condition) return;
+        const item = t[key] || {};
+        const template = item.template || defaultTemplate;
+        
+        let fscale = 'N/A';
+        if (lead.physicalDistress) {
           const firstDis = lead.physicalDistress.find(pd => ['Tornado Damage', 'Storm Damage', 'Hail Damage'].includes(pd.distress_type));
-          const fscale = firstDis ? (firstDis.ef_scale || 'N/A') : 'N/A';
-          scripts['roofing'] = {
-            name: 'Roofing Clima',
-            icon: 'tornado',
-            text: `[GUION DE RECONSTRUCCIÓN POR TORMENTA]\nHola, buenas tardes. ¿Hablo con ${lead.ownerName}? Le llamo respecto a la propiedad en ${lead.displayAddress}.\nEstaba revisando los reportes meteorológicos y de daños del Servicio Meteorológico Nacional (NWS) para su área y noté un registro de inspección de daños por tormenta/tornado (${fscale}) asociado a su dirección.\n¿Usted y su familia se encuentran bien? Quería comentarle que trabajamos directamente con propietarios en su zona ayudándoles con la reconstrucción y reparación urgente del techo.\nNosotros nos encargamos de documentar los daños estructurales y gestionar todo el reclamo directamente con su compañía de seguros para que usted no tenga que desembolsar dinero de su bolsillo para las reparaciones de emergencia.\n¿Estaría interesado en que hagamos una inspección gratuita del tejado esta semana para evaluar los daños y coordinar con su seguro?`
-          };
-        } else {
-          scripts['roofing'] = {
-            name: 'Roofing Violación',
-            icon: 'cloud-lightning',
-            text: `[GUION DE VIOLACIÓN DE TECHO - ROOFING]\nHola, buenas tardes. ¿Hablo con ${lead.ownerName}? Le llamo en relación a su propiedad en ${lead.displayAddress}.\nRevisando los registros del departamento de obras y cumplimiento de códigos de la ciudad, noté una notificación activa de violación relacionada específicamente con el estado del techo (código X50-ROOF o similar).\nComo contratistas de tejados de servicio completo, ayudamos a propietarios a resolver estas multas de forma rápida y limpia. Ofrecemos financiamiento flexible y trabajamos directamente para subsanar la violación ante los inspectores municipales para que no siga acumulando cargos.\n¿Le interesaría recibir un presupuesto gratuito y sin compromiso para reparar el tejado y cerrar este caso municipal?`
-          };
+          if (firstDis) fscale = firstDis.ef_scale || 'N/A';
         }
-      }
-
-      // 1. Stacking Script (Always first if High Motivation and not in disaster mode)
-      if (lead.isHighMotivation && activeSystemMode !== 'disaster') {
-        scripts['alta-motivacion'] = {
-          name: 'Alta Mot.',
-          icon: 'flame',
-          text: `[GUION ALTA MOTIVACIÓN - URGENTE]\nHola, buenas tardes. ¿Hablo con ${lead.ownerName}? Le llamo en relación con la propiedad en ${lead.displayAddress}.\nVi que tiene programada una subasta hipotecaria muy pronto y además cuenta con algunos reportes pendientes con la municipalidad.\nEntiendo perfectamente que esta situación es estresante. Represento a un fondo de inversión local. Nos especializamos en detener subastas de ejecución hipotecaria antes de la fecha límite cubriendo la deuda judicial de $${(lead.primaryDebt || 0).toLocaleString()} directamente y absorbiendo las multas y reparaciones de inmediato, dejándole a usted con liquidez en mano y salvando su historial de crédito.\n¿Le interesaría revisar una propuesta de compra directa en efectivo hoy mismo antes de que la propiedad vaya a subasta pública?`
-        };
-      }
-
-      // 2. Specific Distress Scripts
-      if (categories.includes('auction') && activeSystemMode !== 'disaster') {
-        const firstAuc = lead.auctions[0];
-        scripts['subasta'] = {
-          name: 'Subasta',
-          icon: 'shield-alert',
-          text: `[GUION DE SUBASTA HIPOTECARIA]\nHola, buenas tardes. ¿Hablo con ${lead.ownerName}? Le llamo respecto a la propiedad en ${lead.displayAddress}.\nVi en los registros de la corte del condado que tienen programada una subasta de ejecución hipotecaria para el ${firstAuc.auction_date} por la demanda presentada por ${firstAuc.plaintiff || 'el banco'}.\n¿Está enterado de esta fecha? Quería poner a su disposición nuestra ayuda. Nosotros podemos liquidar la deuda pendiente de $${(lead.primaryDebt || 0).toLocaleString()} con el juzgado de forma directa para cancelar la subasta de inmediato. Esto le evita perder todo su capital acumulado y protege su récord crediticio de una ejecución formal.\n¿Le gustaría evaluar una oferta de rescate de capital hoy?`
-        };
-      }
-
-      if (categories.includes('violation') && activeSystemMode !== 'disaster') {
-        const firstViol = lead.violations[0];
-        scripts['violacion'] = {
-          name: 'Violación',
-          icon: 'alert-triangle',
-          text: `[GUION DE VIOLACIÓN DE CÓDIGO]\nHola, buenas tardes. ¿Hablo con ${lead.ownerName}? Le llamo en relación a su propiedad ubicada en ${lead.displayAddress}.\nEstaba revisando los registros del departamento de cumplimiento de códigos y noté que tiene un caso activo abierto (${firstViol.violation_type}) y entiendo que las multas de la ciudad pueden acumularse con mucha rapidez.\nCompramos propiedades en su zona exactamente en el estado en que se encuentran (as-is), haciéndonos cargo de todas las reparaciones mayores necesarias y liquidando todas las multas acumuladas con la municipalidad en el momento del cierre. Así usted se desentiende de este problema sin gastar un solo dólar de su bolsillo.\n¿Estaría dispuesto a recibir una oferta de compra en efectivo por la propiedad?`
-        };
-      }
-
-      if (categories.includes('probate') && activeSystemMode !== 'disaster') {
-        scripts['probate'] = {
-          name: 'Probate',
-          icon: 'file-text',
-          text: `[GUION DE SUCESIONES - SENSIBLE]\nHola, buenas tardes. ¿Hablo con ${lead.ownerName}? Ante todo, mi más sincero pésame por la pérdida familiar.\nLe contacto con mucho respeto en relación con la sucesión del inmueble en ${lead.displayAddress}.\nSabemos que administrar una sucesión y una propiedad heredada a menudo implica trámites legales complejos, mantenimiento costoso o deudas atrasadas. Nosotros compramos propiedades heredadas directamente al contado, absorbiendo los costos del proceso de legalización que falten y nos encargamos de vaciar o limpiar la casa tal como esté.\n¿Tiene planes de conservar la propiedad o consideraría una oferta en efectivo sin compromiso de su parte?`
-        };
-      }
-
-      if (categories.includes('divorce') && activeSystemMode !== 'disaster') {
-        scripts['divorce'] = {
-          name: 'Divorcio',
-          icon: 'heart-off',
-          text: `[GUION DE LIQUIDACIÓN RÁPIDA - NEUTRAL]\nHola, buenas tardes. ¿Hablo con ${lead.ownerName}? Le llamo de forma directa respecto a la propiedad en ${lead.displayAddress}.\nSomos un grupo de inversión local y compramos casas al contado en esta zona. Vi que esta propiedad podría estar disponible para una venta de liquidación rápida.\nNosotros estructuramos compras simplificadas: cerramos en menos de 10 días, no requerimos inspecciones bancarias ni comisiones de agentes, y distribuimos los fondos del cheque de manera limpia entre las partes según lo disponga su acuerdo. Esto permite un cierre rápido y sin fricciones.\n¿Estarían interesados en recibir una cotización de compra en efectivo para esta propiedad?`
-        };
-      }
-
-      if (categories.includes('bankruptcy') && activeSystemMode !== 'disaster') {
-        scripts['bankruptcy'] = {
-          name: 'Bancarrota',
-          icon: 'trending-down',
-          text: `[GUION DE BANCARROTA / REESTRUCTURACIÓN]\nHola, buenas tardes. ¿Hablo con ${lead.ownerName}? Le contacto respecto a la propiedad en ${lead.displayAddress}.\nTrabajamos frecuentemente con propietarios en procesos de reestructuración financiera. Podemos formular una oferta de compra formal en efectivo lista para ser sometida a la aprobación del juez de quiebras.\nEsto le permite liquidar a sus acreedores garantizados de forma rápida, deteniendo acumulaciones de intereses y liberando su capital restante de forma limpia antes de que finalice el proceso judicial.\n¿Podríamos coordinar esta propuesta con usted o con su abogado de bancarrotas?`
-        };
-      }
-
-      if (categories.includes('physical') && activeSystemMode !== 'disaster') {
-        scripts['physical'] = {
-          name: 'Físico',
-          icon: 'hammer',
-          text: `[GUION DE ESTRÉS FÍSICO / DAÑO SEVERO]\nHola, buenas tardes. ¿Hablo con ${lead.ownerName}? Le contacto respecto a la propiedad en ${lead.displayAddress}.\nRevisando los registros de seguridad e inspección urbana, notamos reportes por daños o suspensión de servicios. Nos especializamos en adquirir propiedades con problemas de mantenimiento severos en efectivo.\nNosotros nos encargamos de vaciar el inmueble, resolver problemas estructurales y liquidar adeudos de servicios municipales. Usted recibe su pago en efectivo sin tener que invertir dinero ni tiempo en reparaciones.\n¿Consideraría evaluar una oferta en efectivo en las condiciones actuales de la casa?`
-        };
-      }
-
-      if (categories.includes('financial') && activeSystemMode !== 'disaster') {
-        scripts['financial'] = {
-          name: 'Finanzas',
-          icon: 'scale',
-          text: `[GUION DE ESTRÉS FINANCIERO / GRAVAMENES]\nHola, buenas tardes. ¿Hablo con ${lead.ownerName}? Le llamo en relación a la propiedad en ${lead.displayAddress}.\nRevisando los registros del condado, notamos algunos gravámenes pendientes o reclamaciones comerciales. Nuestro fondo adquiere propiedades directamente haciéndose cargo de saldar estas deudas pendientes en el momento de la compra.\nEsto le permite liberar el título de la casa de inmediato, detener recargos y recuperar una parte sustancial de su dinero en efectivo.\n¿Le interesaría recibir una oferta para liquidar la propiedad y saldar estos saldos pendientes de forma directa?`
-        };
-      }
-
-      if (categories.includes('life-event') && activeSystemMode !== 'disaster') {
-        scripts['life-event'] = {
-          name: 'Evento Vida',
-          icon: 'alert-circle',
-          text: `[GUION DE EVENTOS DE VIDA CRÍTICOS]\nHola, buenas tardes. ¿Hablo con ${lead.ownerName}? Le contacto en relación al inmueble en ${lead.displayAddress}.\nCompramos propiedades al contado de forma rápida y confidencial en su condado. Sabemos que a veces surgen situaciones imprevistas o cambios familiares que requieren liquidez de forma inmediata.\nPodemos formalizar un contrato de compra en 24 horas y cerrar la transacción en pocos días sin intermediarios, comisiones, ni visitas públicas al inmueble.\n¿Le gustaría evaluar una propuesta de compra rápida en efectivo hoy de forma totalmente privada?`
-        };
-      }
-
-      // Add roofing at the end if we are NOT in disaster mode (classic mode compat)
-      if (categories.includes('roofing') && activeSystemMode !== 'disaster') {
-        const isDisaster = lead.physicalDistress && lead.physicalDistress.some(pd => ['Tornado Damage', 'Storm Damage', 'Hail Damage'].includes(pd.distress_type));
-        if (isDisaster) {
-          const firstDis = lead.physicalDistress.find(pd => ['Tornado Damage', 'Storm Damage', 'Hail Damage'].includes(pd.distress_type));
-          const fscale = firstDis ? (firstDis.ef_scale || 'N/A') : 'N/A';
-          scripts['roofing'] = {
-            name: 'Roofing Clima',
-            icon: 'tornado',
-            text: `[GUION DE RECONSTRUCCIÓN POR TORMENTA]\nHola, buenas tardes. ¿Hablo con ${lead.ownerName}? Le llamo respecto a la propiedad en ${lead.displayAddress}.\nEstaba revisando los reportes meteorológicos y de daños del Servicio Meteorológico Nacional (NWS) para su área y noté un registro de inspección de daños por tormenta/tornado (${fscale}) asociado a su dirección.\n¿Usted y su familia se encuentran bien? Quería comentarle que trabajamos directamente con propietarios en su zona ayudándoles con la reconstrucción y reparación urgente del techo.\nNosotros nos encargamos de documentar los daños estructurales y gestionar todo el reclamo directamente con su compañía de seguros para que usted no tenga que desembolsar dinero de su bolsillo para las reparaciones de emergencia.\n¿Estaría interesado en que hagamos una inspección gratuita del tejado esta semana para evaluar los daños y coordinar con su seguro?`
-          };
-        } else {
-          scripts['roofing'] = {
-            name: 'Roofing Violación',
-            icon: 'cloud-lightning',
-            text: `[GUION DE VIOLACIÓN DE TECHO - ROOFING]\nHola, buenas tardes. ¿Hablo con ${lead.ownerName}? Le llamo en relación a su propiedad en ${lead.displayAddress}.\nRevisando los registros del departamento de obras y cumplimiento de códigos de la ciudad, noté una notificación activa de violación relacionada específicamente con el estado del techo (código X50-ROOF o similar).\nComo contratistas de tejados de servicio completo, ayudamos a propietarios a resolver estas multas de forma rápida y limpia. Ofrecemos financiamiento flexible y trabajamos directamente para subsanar la violación ante los inspectores municipales para que no siga acumulando cargos.\n¿Le interesaría recibir un presupuesto gratuito y sin compromiso para reparar el tejado y cerrar este caso municipal?`
-          };
+        
+        let auctionDate = 'N/A';
+        let plaintiff = 'el banco';
+        if (lead.auctions && lead.auctions.length > 0) {
+          auctionDate = lead.auctions[0].auction_date || 'N/A';
+          plaintiff = lead.auctions[0].plaintiff || 'el banco';
         }
+        
+        let violationType = 'N/A';
+        if (lead.violations && lead.violations.length > 0) {
+          violationType = lead.violations[0].violation_type || 'N/A';
+        }
+
+        const formattedText = formatTemplate(template, {
+          ownerName: lead.ownerName,
+          displayAddress: lead.displayAddress,
+          fscale: fscale,
+          primaryDebt: lead.primaryDebt || 0,
+          auctionDate: auctionDate,
+          plaintiff: plaintiff,
+          violationType: violationType
+        });
+
+        scripts[key] = {
+          name: item.name || defaultName,
+          icon: item.icon || defaultIcon,
+          text: formattedText
+        };
       }
 
-      // Default script (Always available)
-      scripts['general'] = {
-        name: 'General',
-        icon: 'phone',
-        text: `[GUION GENERAL DE COMPRA DIRECTA]\nHola, buenas tardes. ¿Hablo con ${lead.ownerName}? Le llamo respecto a la propiedad en ${lead.displayAddress}.\nSomos inversionistas locales y compramos casas al contado en esta zona. No cobramos comisiones de intermediarios y compramos la casa en cualquier condición física.\n¿Ha considerado vender la propiedad o recibir una propuesta de compra en efectivo sin ningún compromiso de su parte?\nEstaremos listos para enviar una cotización formal en menos de 24 horas.`
-      };
+      // 1. Disaster Mode Roofing
+      const isDisaster = lead.physicalDistress && lead.physicalDistress.some(pd => ['Tornado Damage', 'Storm Damage', 'Hail Damage'].includes(pd.distress_type));
+      
+      addScript(
+        'roofing_clima', 
+        'Roofing Clima', 
+        'tornado', 
+        "[GUION DE RECONSTRUCCIÓN POR TORMENTA]\nHola, buenas tardes. ¿Hablo con {ownerName}? Le llamo respecto a la propiedad en {displayAddress}.\nEstaba revisando los reportes meteorológicos y de daños del Servicio Meteorológico Nacional (NWS) para su área y noté un registro de inspección de daños por tormenta/tornado ({fscale}) asociado a su dirección.\n¿Usted y su familia se encuentran bien? Quería comentarle que trabajamos directamente con propietarios en su zona ayudándoles con la reconstrucción y reparación urgente del techo.\nNosotros nos encargamos de documentar los daños estructurales y gestionar todo el reclamo directamente con su compañía de seguros para que usted no tenga que desembolsar dinero de su bolsillo para las reparaciones de emergencia.\n¿Estaría interesado en que hagamos una inspección gratuita del tejado esta semana para evaluar los daños y coordinar con su seguro?",
+        activeSystemMode === 'disaster' && categories.includes('roofing') && isDisaster
+      );
+
+      addScript(
+        'roofing_violacion', 
+        'Roofing Violación', 
+        'cloud-lightning', 
+        "[GUION DE VIOLACIÓN DE TECHO - ROOFING]\nHola, buenas tardes. ¿Hablo con {ownerName}? Le llamo en relación a su propiedad en {displayAddress}.\nRevisando los registros del departamento de obras y cumplimiento de códigos de la ciudad, noté una notificación activa de violación relacionada específicamente con el estado del techo (código X50-ROOF o similar).\nComo contratistas de tejados de servicio completo, ayudamos a propietarios a resolver estas multas de forma rápida y limpia. Ofrecemos financiamiento flexible y trabajamos directamente para subsanar la violación ante los inspectores municipales para que no siga acumulando cargos.\n¿Le interesaría recibir un presupuesto gratuito y sin compromiso para reparar el tejado y cerrar este caso municipal?",
+        activeSystemMode === 'disaster' && categories.includes('roofing') && !isDisaster
+      );
+
+      // 2. High Motivation (Investment mode)
+      addScript(
+        'alta_motivacion',
+        'Alta Mot.',
+        'flame',
+        "[GUION ALTA MOTIVACIÓN - URGENTE]\nHola, buenas tardes. ¿Hablo con {ownerName}? Le llamo en relación con la propiedad en {displayAddress}.\nVi que tiene programada una subasta hipotecaria muy pronto y además cuenta con algunos reportes pendientes con la municipalidad.\nEntiendo perfectamente que esta situación es estresante. Represento a un fondo de inversión local. Nos especializamos en detener subastas de ejecución hipotecaria antes de la fecha límite cubriendo la deuda judicial de ${primaryDebt} directamente y absorbiendo las multas y reparaciones de inmediato, dejándole a usted con liquidez en mano y salvando su historial de crédito.\n¿Le interesaría revisar una propuesta de compra directa en efectivo hoy mismo antes de que la propiedad vaya a subasta pública?",
+        lead.isHighMotivation && activeSystemMode !== 'disaster'
+      );
+
+      // 3. Subasta
+      addScript(
+        'subasta',
+        'Subasta',
+        'shield-alert',
+        "[GUION DE SUBASTA HIPOTECARIA]\nHola, buenas tardes. ¿Hablo con {ownerName}? Le llamo respecto a la propiedad en {displayAddress}.\nVi en los registros de la corte del condado que tienen programada una subasta de ejecución hipotecaria para el {auctionDate} por la demanda presentada por {plaintiff}.\n¿Está enterado de esta fecha? Quería poner a su disposición nuestra ayuda. Nosotros podemos liquidar la deuda pendiente de ${primaryDebt} con el juzgado de forma directa para cancelar la subasta de inmediato. Esto le evita perder todo su capital acumulado y protege su récord crediticio de una ejecución formal.\n¿Le gustaría evaluar una oferta de rescate de capital hoy?",
+        categories.includes('auction') && activeSystemMode !== 'disaster'
+      );
+
+      // 4. Violación
+      addScript(
+        'violacion',
+        'Violación',
+        'alert-triangle',
+        "[GUION DE VIOLACIÓN DE CÓDIGO]\nHola, buenas tardes. ¿Hablo con {ownerName}? Le llamo en relación a su propiedad ubicada en {displayAddress}.\nEstaba revisando los registros del departamento de cumplimiento de códigos y noté que tiene un caso activo abierto ({violationType}) y entiendo que las multas de la ciudad pueden acumularse con mucha rapidez.\nCompramos propiedades en su zona exactamente en el estado en que se encuentran (as-is), haciéndonos cargo de todas las reparaciones mayores necesarias y liquidando todas las multas acumuladas con la municipalidad en el momento del cierre. Así usted se desentiende de este problema sin gastar un solo dólar de su bolsillo.\n¿Estaría dispuesto a recibir una oferta de compra en efectivo por la propiedad?",
+        categories.includes('violation') && activeSystemMode !== 'disaster'
+      );
+
+      // 5. Probate
+      addScript(
+        'probate',
+        'Probate',
+        'file-text',
+        "[GUION DE SUCESIONES - SENSIBLE]\nHola, buenas tardes. ¿Hablo con {ownerName}? Ante todo, mi más sincero pésame por la pérdida familiar.\nLe contacto con mucho respeto en relación con la sucesión del inmueble en {displayAddress}.\nSabemos que administrar una sucesión y una propiedad heredada a menudo implica trámites legales complejos, mantenimiento costoso o deudas atrasadas. Nosotros compramos propiedades heredadas directamente al contado, absorbiendo los costos del proceso de legalización que falten y nos encargamos de vaciar o limpiar la casa tal como esté.\n¿Tiene planes de conservar la propiedad o consideraría una oferta en efectivo sin compromiso de su parte?",
+        categories.includes('probate') && activeSystemMode !== 'disaster'
+      );
+
+      // 6. Divorce
+      addScript(
+        'divorce',
+        'Divorcio',
+        'heart-off',
+        "[GUION DE LIQUIDACIÓN RÁPIDA - NEUTRAL]\nHola, buenas tardes. ¿Hablo con {ownerName}? Le llamo de forma directa respecto a la propiedad en {displayAddress}.\nSomos un grupo de inversión local y compramos casas al contado en esta zona. Vi que esta propiedad podría estar disponible para una venta de liquidación rápida.\nNosotros nos encargamos de vaciar el inmueble, resolver problemas estructurales y liquidar adeudos de servicios municipales. Usted recibe su pago en efectivo sin tener que invertir dinero ni tiempo en reparaciones.\n¿Consideraría evaluar una oferta en efectivo en las condiciones actuales de la casa?",
+        categories.includes('divorce') && activeSystemMode !== 'disaster'
+      );
+
+      // 7. Bankruptcy
+      addScript(
+        'bankruptcy',
+        'Bancarrota',
+        'trending-down',
+        "[GUION DE BANCARROTA / REESTRUCTURACIÓN]\nHola, buenas tardes. ¿Hablo con {ownerName}? Le contacto respecto a la propiedad en {displayAddress}.\nTrabajamos frecuentemente con propietarios en procesos de reestructuración financiera. Podemos formular una oferta de compra formal en efectivo lista para ser sometida a la aprobación del juez de quiebras.\nEsto le permite liquidar a sus acreedores garantizados de forma rápida, deteniendo acumulaciones de intereses y liberando su capital restante de forma limpia antes de que finalice el proceso judicial.\n¿Podríamos coordinar esta propuesta con usted o con su abogado de bancarrotas?",
+        categories.includes('bankruptcy') && activeSystemMode !== 'disaster'
+      );
+
+      // 8. Physical
+      addScript(
+        'physical',
+        'Físico',
+        'hammer',
+        "[GUION DE ESTRÉS FÍSICO / DAÑO SEVERO]\nHola, buenas tardes. ¿Hablo con {ownerName}? Le contacto respecto a la propiedad en {displayAddress}.\nRevisando los registros de seguridad e inspección urbana, notamos reportes por daños o suspensión de servicios. Nos especializamos en adquirir propiedades con problemas de mantenimiento severos en efectivo.\nNosotros nos encargamos de vaciar el inmueble, resolver problemas estructurales y liquidar adeudos de servicios municipales. Usted recibe su pago en efectivo sin tener que invertir dinero ni tiempo en reparaciones.\n¿Consideraría evaluar una oferta en efectivo en las condiciones actuales de la casa?",
+        categories.includes('physical') && activeSystemMode !== 'disaster'
+      );
+
+      // 9. Financial
+      addScript(
+        'financial',
+        'Finanzas',
+        'scale',
+        "[GUION DE ESTRÉS FINANCIERO / GRAVAMENES]\nHola, buenas tardes. ¿Hablo con {ownerName}? Le llamo en relación a la propiedad en {displayAddress}.\nRevisando los registros del condado, notamos algunos gravámenes pendientes o reclamaciones comerciales. Nuestro fondo adquiere propiedades directamente haciéndose cargo de saldar estas deudas pendientes en el momento de la compra.\nEsto le permite liberar el título de la casa de inmediato, detener recargos y recuperar una parte sustancial de su dinero en efectivo.\n¿Le interesaría recibir una oferta para liquidar la propiedad y saldar estos saldos pendientes de forma directa?",
+        categories.includes('financial') && activeSystemMode !== 'disaster'
+      );
+
+      // 10. Life Event
+      addScript(
+        'life_event',
+        'Evento Vida',
+        'alert-circle',
+        "[GUION DE EVENTOS DE VIDA CRÍTICOS]\nHola, buenas tardes. ¿Hablo con {ownerName}? Le contacto en relación al inmueble en {displayAddress}.\nCompramos propiedades al contado de forma rápida y confidencial en su condado. Sabemos que a veces surgen situaciones imprevistas o cambios familiares que requieren liquidez de forma inmediata.\nPodemos formalizar un contrato de compra en 24 horas y cerrar la transacción en pocos días sin intermediarios, comisiones, ni visitas públicas al inmueble.\n¿Le gustaría evaluar una propuesta de compra rápida en efectivo hoy de forma totalmente privada?",
+        categories.includes('life-event') && activeSystemMode !== 'disaster'
+      );
+
+      // 11. Roofing (non-disaster mode)
+      addScript(
+        'roofing_clima',
+        'Roofing Clima',
+        'tornado',
+        "[GUION DE RECONSTRUCCIÓN POR TORMENTA]\nHola, buenas tardes. ¿Hablo con {ownerName}? Le llamo respecto a la propiedad en {displayAddress}.\nEstaba revisando los reportes meteorológicos y de daños del Servicio Meteorológico Nacional (NWS) para su área y noté un registro de inspección de daños por tormenta/tornado ({fscale}) asociado a su dirección.\n¿Usted y su familia se encuentran bien? Quería comentarle que trabajamos directamente con propietarios en su zona ayudándoles con la reconstrucción y reparación urgente del techo.\nNosotros nos encargamos de documentar los daños estructurales y gestionar todo el reclamo directamente con su compañía de seguros para que usted no tenga que desembolsar dinero de su bolsillo para las reparaciones de emergencia.\n¿Estaría interesado en que hagamos una inspección gratuita del tejado esta semana para evaluar los daños y coordinar con su seguro?",
+        categories.includes('roofing') && activeSystemMode !== 'disaster' && isDisaster
+      );
+
+      addScript(
+        'roofing_violacion',
+        'Roofing Violación',
+        'cloud-lightning',
+        "[GUION DE VIOLACIÓN DE TECHO - ROOFING]\nHola, buenas tardes. ¿Hablo con {ownerName}? Le llamo en relación a su propiedad en {displayAddress}.\nRevisando los registros del departamento de obras y cumplimiento de códigos de la ciudad, noté una notificación activa de violación relacionada específicamente con el estado del techo (código X50-ROOF o similar).\nComo contratistas de tejados de servicio completo, ayudamos a propietarios a resolver estas multas de forma rápida y limpia. Ofrecemos financiamiento flexible y trabajamos directamente para subsanar la violación ante los inspectores municipales para que no siga acumulando cargos.\n¿Le interesaría recibir un presupuesto gratuito y sin compromiso para reparar el tejado y cerrar este caso municipal?",
+        categories.includes('roofing') && activeSystemMode !== 'disaster' && !isDisaster
+      );
+
+      // 12. General (Always available)
+      addScript(
+        'general',
+        'General',
+        'phone',
+        "[GUION GENERAL DE COMPRA DIRECTA]\nHola, buenas tardes. ¿Hablo con {ownerName}? Le llamo respecto a la propiedad en {displayAddress}.\nSomos inversionistas locales y compramos casas al contado en esta zona. No cobramos comisiones de intermediarios y compramos la casa en cualquier condición física.\n¿Ha considerado vender la propiedad o recibir una propuesta de compra en efectivo sin ningún compromiso de su parte?\nEstaremos listos para enviar una cotización formal en menos de 24 horas.",
+        true
+      );
 
       // Populate Tabs
       let firstTabKey = null;
@@ -5480,7 +5546,6 @@
         tab.className = `script-tab ${idx === 0 ? 'active' : ''}`;
         tab.innerHTML = `<i data-lucide="${scripts[key].icon}" class="inline-icon"></i> <span>${scripts[key].name}</span>`;
         tab.onclick = () => {
-          // Switch active tab
           const tabs = tabContainer.querySelectorAll('.script-tab');
           tabs.forEach(t => t.classList.remove('active'));
           tab.classList.add('active');
@@ -5490,12 +5555,10 @@
         tabContainer.appendChild(tab);
       });
 
-      // Initialize Script box with first script
       if (firstTabKey) {
         document.getElementById('call-script-content').innerHTML = scripts[firstTabKey].text.replace(/\n/g, '<br>');
       }
     }
-
     window.copyCallScript = function() {
       const htmlText = document.getElementById('call-script-content').innerHTML;
       const textToCopy = htmlText.replace(/<br>/g, '\n');

@@ -25,47 +25,46 @@ interface SkipTraceResult {
 /**
  * Normaliza y divide una dirección simple en componentes de calle, ciudad, estado y código postal.
  */
-function parseAddress(rawAddress: string, state: string, county: string) {
-  let street = rawAddress.trim();
+export function parseAddress(rawAddress: string, state: string, county: string) {
+  const parts = rawAddress.split(",");
+  let street = parts[0].trim();
   let city = "";
   let zip = "";
 
-  // 1. Extraer ZIP code (5 dígitos al final, usando el último match para evitar colisiones con el número de casa)
-  const zipMatches = street.match(/\b\d{5}\b/g);
+  // 1. Extraer ciudad si hay suficientes partes
+  if (parts.length >= 2) {
+    city = parts[1].trim();
+  }
+
+  // 2. Extraer ZIP code (5 dígitos de todo el rawAddress, usando el último match)
+  const zipMatches = rawAddress.match(/\b\d{5}\b/g);
   if (zipMatches) {
     zip = zipMatches[zipMatches.length - 1];
-    const lastIdx = street.lastIndexOf(zip);
-    if (lastIdx !== -1) {
-      street = (street.substring(0, lastIdx) + street.substring(lastIdx + zip.length)).trim();
+  }
+
+  // 3. Fallbacks de ciudades conocidas por condado/estado si no se detectó
+  if (!city || city.toLowerCase() === "ky" || city.toLowerCase() === "in") {
+    if (state === "KY" && county.toLowerCase().includes("jeff")) {
+      city = "Louisville";
+    } else if (state === "IN" && county.toLowerCase().includes("floyd")) {
+      city = "New Albany";
+    } else if (state === "IN" && county.toLowerCase().includes("clark")) {
+      city = "Jeffersonville";
+    } else {
+      city = county;
     }
   }
 
-  // Quitar comas y espacios sobrantes al final
+  // 4. Limpiar códigos postales mal colocados como unidad (ej. #40211) del street
+  street = street.replace(/#\d{5}\b/g, "").replace(/\b\d{5}\b/g, "").replace(/\s+/g, " ").trim();
+  // Quitar comas sobrantes al final
   street = street.replace(/,\s*$/, "").trim();
 
-  // 2. Determinar la ciudad
-  if (state === "KY" && county.toLowerCase().includes("jeff")) {
-    city = "Louisville";
-  } else if (state === "IN" && county.toLowerCase().includes("floyd")) {
-    city = "New Albany";
-  } else if (state === "IN" && county.toLowerCase().includes("clark")) {
-    city = "Jeffersonville";
-  } else {
-    // Si contiene una coma, lo posterior suele ser la ciudad
-    const parts = street.split(",");
-    if (parts.length >= 2) {
-      city = parts[parts.length - 1].trim();
-      street = parts.slice(0, parts.length - 1).join(",").trim();
-    } else {
-      city = county; // Fallback
-    }
-  }
-
   return {
-    street: street.replace(/,\s*$/, "").trim(),
-    city: city,
-    state: state,
-    zip: zip || ""
+    street,
+    city,
+    state,
+    zip
   };
 }
 
@@ -182,6 +181,57 @@ async function performFreeOSINTrace(
 }
 
 /**
+ * Limpia sufijos ruidosos y prefijos de testamentarias y herencias en nombres de deudores.
+ */
+export function cleanNameForSkipTrace(name: string): string {
+  if (!name) return "";
+  let clean = name.trim();
+
+  // 1. Quitar sufijos comunes de copropietarios y litigios
+  clean = clean.replace(/,\s*et\s*al\.?/gi, "");
+  clean = clean.replace(/\bET\s+AL\b/gi, "");
+  clean = clean.replace(/,\s*et\s*ux\.?/gi, "");
+  clean = clean.replace(/\bET\s+UX\b/gi, "");
+  clean = clean.replace(/,\s*et\s*vir\.?/gi, "");
+  clean = clean.replace(/\bET\s+VIR\b/gi, "");
+  clean = clean.replace(/,\s*individually\b.*/gi, "");
+  clean = clean.replace(/,\s*as\s+executor\b.*/gi, "");
+  clean = clean.replace(/,\s*as\s+executrix\b.*/gi, "");
+  clean = clean.replace(/,\s*as\s+personal\s+rep\b.*/gi, "");
+
+  // 2. Manejar "Estate of..." o "Unknown Heirs of..."
+  const estateMatch = clean.match(/estate\s+of\s+(.+)/i);
+  if (estateMatch) {
+    clean = estateMatch[1];
+  }
+
+  const heirsMatch = clean.match(/(?:unknown\s+)?(?:heirs|devisees|legatees|spouse|successors|representatives).+?\bof\s+(.+)/i);
+  if (heirsMatch) {
+    clean = heirsMatch[1];
+  }
+
+  // 3. Manejar alias "A/K/A", "AKA", "F/K/A", "FKA"
+  if (clean.includes("A/K/A")) {
+    clean = clean.split("A/K/A")[0];
+  } else if (clean.includes("AKA")) {
+    clean = clean.split("AKA")[0];
+  } else if (clean.includes("F/K/A")) {
+    clean = clean.split("F/K/A")[0];
+  } else if (clean.includes("FKA")) {
+    clean = clean.split("FKA")[0];
+  }
+
+  // 4. Limpieza final de espacios, comas y LLC/INC
+  clean = clean.replace(/\bLLC\b/gi, "");
+  clean = clean.replace(/\bINC\b/gi, "");
+  clean = clean.replace(/\bCORP\b/gi, "");
+  clean = clean.replace(/,\s*$/, "");
+  clean = clean.replace(/\s+/g, " ");
+
+  return clean.trim();
+}
+
+/**
  * Realiza la búsqueda de contactos (Skip Tracing) para un deudor y dirección específicos.
  * Preparado para consumir la API de BatchData o similar.
  */
@@ -191,30 +241,37 @@ export async function performSkipTrace(
   state: string,
   county: string
 ): Promise<SkipTraceResult> {
+  const cleanDefendant = cleanNameForSkipTrace(defendant);
+  if (!cleanDefendant || cleanDefendant.toLowerCase() === "unknown" || cleanDefendant.toLowerCase() === "dueño desconocido") {
+    console.log(`[WATERFALL SKIP TRACE] Nombre inválido o desconocido ("${defendant}"). Retornando vacíos.`);
+    return { phones: [], emails: [] };
+  }
+
+  console.log(`[WATERFALL SKIP TRACE] Iniciando skip-tracing para "${defendant}" (Nombre limpio para búsqueda: "${cleanDefendant}")...`);
   let batchDataOutOfFunds = false;
 
   // 1. Paso 1: Ejecutar la nueva búsqueda gratuita en OSINT
   try {
-    console.log(`[WATERFALL SKIP TRACE] Paso 1: Buscando contactos vía OSINT para "${defendant}"...`);
-    const osintResult = await searchOSINTContacts(defendant, rawAddress, state, county);
+    console.log(`[WATERFALL SKIP TRACE] Paso 1: Buscando contactos vía OSINT para "${cleanDefendant}"...`);
+    const osintResult = await searchOSINTContacts(cleanDefendant, rawAddress, state, county);
     
     // Paso 2: Si el motor OSINT devuelve contactos válidos, terminar el proceso (Costo: $0)
     if (osintResult && (osintResult.phones.length > 0 || osintResult.emails.length > 0)) {
-      console.log(`[WATERFALL SKIP TRACE] Paso 2: OSINT gratuito exitoso para "${defendant}". Evitando BatchData.`);
+      console.log(`[WATERFALL SKIP TRACE] Paso 2: OSINT gratuito exitoso para "${cleanDefendant}". Evitando BatchData.`);
       const phones = osintResult.phones.map(p => `OSINT: ${p}`);
       const emails = osintResult.emails.map(e => `OSINT: ${e}`);
       return { phones, emails };
     }
   } catch (err: any) {
-    console.error(`[WATERFALL SKIP TRACE ERR] OSINT failed for ${defendant}:`, err.message);
+    console.error(`[WATERFALL SKIP TRACE ERR] OSINT failed for ${cleanDefendant}:`, err.message);
   }
 
   // 2. Paso 3 (Fallback): Solo si el motor OSINT falló o devolvió null/vacío, usar la llamada a la API de BatchData
   if (process.env.SKIP_TRACE_PROVIDER === "batchdata") {
     try {
-      console.log(`[WATERFALL SKIP TRACE] Paso 3: Fallback a BatchData API para "${defendant}"...`);
+      console.log(`[WATERFALL SKIP TRACE] Paso 3: Fallback a BatchData API para "${cleanDefendant}"...`);
       const parsed = parseAddress(rawAddress, state, county);
-      const batchRes = await batchDataClient.skipTrace(defendant, {
+      const batchRes = await batchDataClient.skipTrace(cleanDefendant, {
         street: parsed.street,
         city: parsed.city,
         state: parsed.state,
@@ -240,26 +297,26 @@ export async function performSkipTrace(
         batchDataOutOfFunds = true;
       }
     } catch (err: any) {
-      console.error(`[WATERFALL SKIP TRACE ERR] BatchData failed for ${defendant}:`, err.message);
+      console.error(`[WATERFALL SKIP TRACE ERR] BatchData failed for ${cleanDefendant}:`, err.message);
     }
   }
 
   // 3. Generar enlaces de búsqueda para TruePeopleSearch, Whitepages, etc.
   const searchLinks: string[] = [];
-  if (defendant && defendant.toLowerCase() !== "unknown" && defendant.toLowerCase() !== "unknown defendant") {
+  if (cleanDefendant) {
     const parsed = parseAddress(rawAddress, state, county);
     const location = parsed.zip || parsed.city || state;
-    const nameEncoded = encodeURIComponent(defendant);
+    const nameEncoded = encodeURIComponent(cleanDefendant);
     const locEncoded = encodeURIComponent(location);
     searchLinks.push(`TruePeopleSearch: https://www.truepeoplesearch.com/results?name=${nameEncoded}&citystatezip=${locEncoded}`);
     searchLinks.push(`Whitepages: https://www.whitepages.com/name/${nameEncoded}/${locEncoded}`);
   }
 
-  console.log(`[WATERFALL SKIP TRACE] No se encontraron resultados reales para "${defendant}". Retornando enlaces de búsqueda y 'Unknown' para teléfonos.`);
+  console.log(`[WATERFALL SKIP TRACE] No se encontraron resultados reales para "${cleanDefendant}". Retornando vacíos.`);
   
   return {
-    phones: ["Unknown"],
-    emails: searchLinks.length > 0 ? searchLinks : ["Unknown"]
+    phones: [],
+    emails: []
   };
 }
 
@@ -303,8 +360,8 @@ async function runSkipTracing() {
     
     // Obtener los contactos de la API
     const contacts = await performSkipTrace(defendant, address, state, county);
-    const phonesStr = contacts.phones.join(", ");
-    const emailsStr = contacts.emails.join(", ");
+    const phonesStr = contacts.phones.length > 0 ? contacts.phones.join(", ") : null;
+    const emailsStr = contacts.emails.length > 0 ? contacts.emails.join(", ") : null;
 
     // Actualizar base de datos
     try {
@@ -361,8 +418,8 @@ async function runSkipTracing() {
     
     // Obtener los contactos de la API
     const contacts = await performSkipTrace(ownerName, address, state, county);
-    const phonesStr = contacts.phones.join(", ");
-    const emailsStr = contacts.emails.join(", ");
+    const phonesStr = contacts.phones.length > 0 ? contacts.phones.join(", ") : null;
+    const emailsStr = contacts.emails.length > 0 ? contacts.emails.join(", ") : null;
 
     // Actualizar base de datos
     try {
@@ -419,8 +476,8 @@ async function runSkipTracing() {
     
     // Obtener los contactos de la API
     const contacts = await performSkipTrace(heirName, address, state, county);
-    const phonesStr = contacts.phones.join(", ");
-    const emailsStr = contacts.emails.join(", ");
+    const phonesStr = contacts.phones.length > 0 ? contacts.phones.join(", ") : null;
+    const emailsStr = contacts.emails.length > 0 ? contacts.emails.join(", ") : null;
 
     // Actualizar base de datos
     try {
@@ -472,25 +529,25 @@ async function runSkipTracing() {
 
     console.log(`[PROCESANDO DIVORCIO] Caso: ${divorceId} | Dirección: ${address}`);
     
-    let phonesAStr = "";
-    let emailsAStr = "";
-    let phonesBStr = "";
-    let emailsBStr = "";
+    let phonesAStr: string | null = null;
+    let emailsAStr: string | null = null;
+    let phonesBStr: string | null = null;
+    let emailsBStr: string | null = null;
 
     // Skip trace para Cónyuge A si no tiene teléfonos
     if (spouseA && spouseA !== "Cónyuge A" && spouseA.trim() !== "") {
       console.log(`  - Skip tracing para Cónyuge A: ${spouseA}`);
       const contactsA = await performSkipTrace(spouseA, address, state, county);
-      phonesAStr = contactsA.phones.join(", ");
-      emailsAStr = contactsA.emails.join(", ");
+      phonesAStr = contactsA.phones.length > 0 ? contactsA.phones.join(", ") : null;
+      emailsAStr = contactsA.emails.length > 0 ? contactsA.emails.join(", ") : null;
     }
 
     // Skip trace para Cónyuge B si no tiene teléfonos
     if (spouseB && spouseB !== "Cónyuge B" && spouseB.trim() !== "") {
       console.log(`  - Skip tracing para Cónyuge B: ${spouseB}`);
       const contactsB = await performSkipTrace(spouseB, address, state, county);
-      phonesBStr = contactsB.phones.join(", ");
-      emailsBStr = contactsB.emails.join(", ");
+      phonesBStr = contactsB.phones.length > 0 ? contactsB.phones.join(", ") : null;
+      emailsBStr = contactsB.emails.length > 0 ? contactsB.emails.join(", ") : null;
     }
 
     // Actualizar base de datos
@@ -567,8 +624,8 @@ async function skipTraceGenericTable(
 
     console.log(`[PROCESANDO ${tableName.toUpperCase()}] Lead: ${name} | Dirección: ${address}`);
     const contacts = await performSkipTrace(name, address, state, county);
-    const phonesStr = contacts.phones.join(", ");
-    const emailsStr = contacts.emails.join(", ");
+    const phonesStr = contacts.phones.length > 0 ? contacts.phones.join(", ") : null;
+    const emailsStr = contacts.emails.length > 0 ? contacts.emails.join(", ") : null;
 
     try {
       await db.execute({

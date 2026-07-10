@@ -3,6 +3,7 @@ import * as cheerio from "cheerio";
 import { createClient } from "@libsql/client";
 import * as dotenv from "dotenv";
 import { validateAndCleanAddress } from "./address_validation";
+import { PRESET_OWNERS } from "./mocks";
 import { gisRestClient } from "./gis_rest_client";
 import { applyFlareSolverrBypass } from "./proxy_helper";
 import { chromium } from "playwright-extra";
@@ -38,24 +39,7 @@ const CITIES = [
   "Indianapolis, IN", "Miami, FL", "Austin, TX", "Chicago, IL", "Atlanta, GA", "Cincinnati, OH", "Nashville, TN"
 ];
 
-// Base de datos de dueños predefinidos para pruebas consistentes
-const PRESET_OWNERS: { [key: string]: { name: string; mailingAddress?: string } } = {
-  "4030 beech": { name: "Sarah Jenkins", mailingAddress: "1254 Ocean Dr, Miami, FL 33139" },
-  "705 hazel": { name: "Robert Miller", mailingAddress: "705 Hazel St 1, Louisville, KY 40211" },
-  "6618 daytona": { name: "Michael Moore", mailingAddress: "1098 Lakeshore Dr, Orlando, FL 32801" },
-  "1347 cypress": { name: "David Taylor", mailingAddress: "1347 Cypress, Louisville, KY 40211" },
-  "1223 tile factory": { name: "William Anderson", mailingAddress: "1223 Tile Factory, Louisville, KY 40213" },
-  "2605 w madison": { name: "Mary Smith", mailingAddress: "2605 W Madison, Louisville, KY 40211" },
-  "4913 southside": { name: "James Johnson", mailingAddress: "4913 Southside, Louisville, KY 40214" },
-  "2123 dumesnil": { name: "Patricia Williams", mailingAddress: "2123 Dumesnil, Louisville, KY 40210" },
-  "2730 w chestnut": { name: "Thomas Davis", mailingAddress: "2730 W Chestnut, Louisville, KY 40211" },
-  "203 n 37th": { name: "Linda Brown", mailingAddress: "884 Peachtree St, Atlanta, GA 30309" },
-  "2332 magazine": { name: "Charles Jones", mailingAddress: "2332 Magazine, Louisville, KY 40211" },
-  "3011 river park": { name: "Richard Garcia", mailingAddress: "3011 River Park, Louisville, KY 40211" },
-  "2528 wyckford": { name: "Donald Lopez", mailingAddress: "994 Austin St, San Antonio, TX 78201" },
-  "2330 magazine": { name: "Steven Wilson", mailingAddress: "2330 Magazine, Louisville, KY 40211" },
-  "2314 w market": { name: "Joseph Martinez", mailingAddress: "2314 W Market, Louisville, KY 40212" }
-};
+// Preset owners movidos a scrapers/mocks.ts
 
 /**
  * Genera un hash numérico simple a partir de una cadena de texto para simulación determinista.
@@ -87,7 +71,9 @@ async function attemptRealPVAScrape(address: string): Promise<ScrapeResult> {
     return { success: false, noResults: false };
   }
 
-  const cleanAddr = address.split(",")[0].trim();
+  let cleanAddr = address.split(",")[0].trim();
+  // Limpiar códigos postales mal asignados como números de unidad (ej. #40211)
+  cleanAddr = cleanAddr.replace(/#\d{5}\b/g, "").trim();
   const addressParts = cleanAddr.split(/\s+/);
   
   if (addressParts.length < 2) {
@@ -193,7 +179,9 @@ async function attemptRealPVAScrape(address: string): Promise<ScrapeResult> {
  * Extrae propietario e información catastral usando Playwright y el bypass de FlareSolverr
  */
 async function attemptPlaywrightPVAScrape(address: string): Promise<{ ownerName: string; mailingAddress: string } | null> {
-  const cleanAddr = address.split(",")[0].trim();
+  let cleanAddr = address.split(",")[0].trim();
+  // Limpiar códigos postales mal asignados como números de unidad (ej. #40211)
+  cleanAddr = cleanAddr.replace(/#\d{5}\b/g, "").trim();
   const addressParts = cleanAddr.split(/\s+/);
   if (addressParts.length < 2) return null;
   
@@ -277,6 +265,8 @@ async function getOwnerNameFromBatchData(address: string, state: string, county:
   
   // Limpieza básica de dirección para parseo
   let street = address.trim();
+  // Limpiar códigos postales mal asignados como números de unidad (ej. #40211)
+  street = street.replace(/#\d{5}\b/g, "").trim();
   let city = "";
   let zip = "";
   
@@ -376,17 +366,19 @@ async function resolveOwnerWaterfall(address: string, state: string, county: str
   // PASO 1: Normalización previa de la dirección
   const normalizedAddress = await validateAndCleanAddress(address, state);
   
-  // Preset check
-  const cleanAddrKey = normalizedAddress.split(",")[0].trim().toLowerCase().replace(/[^a-z0-9\s]/g, "").replace(/\s+/g, " ");
-  for (const presetKey in PRESET_OWNERS) {
-    if (cleanAddrKey.includes(presetKey) || presetKey.includes(cleanAddrKey)) {
-      const p = PRESET_OWNERS[presetKey];
-      console.log(`[PVA SCRAPER] Dirección coincide con preset de prueba: "${normalizedAddress}" -> '${p.name}'`);
-      return {
-        ownerName: p.name,
-        mailingAddress: p.mailingAddress || `${normalizedAddress.split(",")[0].trim()}, Louisville, KY`,
-        needsManualReview: 0
-      };
+  // Preset check (solo si USE_MOCKS es true)
+  if (process.env.USE_MOCKS === "true") {
+    const cleanAddrKey = normalizedAddress.split(",")[0].trim().toLowerCase().replace(/[^a-z0-9\s]/g, "").replace(/\s+/g, " ");
+    for (const presetKey in PRESET_OWNERS) {
+      if (cleanAddrKey.includes(presetKey) || presetKey.includes(cleanAddrKey)) {
+        const p = PRESET_OWNERS[presetKey];
+        console.log(`[PVA SCRAPER] Dirección coincide con preset de prueba (MOCK): "${normalizedAddress}" -> '${p.name}'`);
+        return {
+          ownerName: p.name,
+          mailingAddress: p.mailingAddress || `${normalizedAddress.split(",")[0].trim()}, Louisville, KY`,
+          needsManualReview: 0
+        };
+      }
     }
   }
   

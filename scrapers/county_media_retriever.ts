@@ -3,6 +3,7 @@ import * as dotenv from "dotenv";
 import * as fs from "fs";
 import * as path from "path";
 import { gisRestClient } from "./gis_rest_client";
+import { fetchPublicPropertyPhoto } from "./public_photo_scraper";
 
 dotenv.config();
 
@@ -217,6 +218,8 @@ export async function downloadAppraisalPhoto(
         console.log(`[MEDIA RETRIEVER EXITO] Foto oficial guardada (Intento 1): ${relativePath}`);
         await savePhotoUrlToDb(propertyId, tableName, relativePath);
         photoDownloadedPath = relativePath;
+      } else {
+        attempt1Failed = true;
       }
     } catch (err: any) {
       console.warn(`[MEDIA RETRIEVER WARNING] Intento 1 falló para ${parcelId}:`, err.message);
@@ -249,6 +252,8 @@ export async function downloadAppraisalPhoto(
           console.log(`[MEDIA RETRIEVER EXITO] Foto oficial guardada (Intento 2): ${relativePath}`);
           await savePhotoUrlToDb(propertyId, tableName, relativePath);
           photoDownloadedPath = relativePath;
+        } else {
+          attempt2Failed = true;
         }
       } catch (err: any) {
         console.warn(`[MEDIA RETRIEVER WARNING] Intento 2 falló para ${parcelId}:`, err.message);
@@ -322,6 +327,25 @@ export async function downloadAppraisalPhoto(
         }
       } catch (err: any) {
         console.warn(`[MEDIA RETRIEVER WARNING] Consulta de respaldo falló para ${parcelId}:`, err.message);
+      }
+    }
+
+    // Fallback a scraper público (Zillow/Redfin) si falló el catastro oficial
+    if (!photoDownloadedPath) {
+      console.log(`[MEDIA RETRIEVER] Intentando extraer foto de Zillow/Redfin como fallback para: "${address}"`);
+      try {
+        const fallbackPhotos = await fetchPublicPropertyPhoto(address);
+        if (fallbackPhotos && fallbackPhotos.length > 0) {
+          console.log(`[MEDIA RETRIEVER EXITO] Foto de fallback encontrada: ${fallbackPhotos[0]}`);
+          for (const url of fallbackPhotos) {
+            await savePhotoUrlToDb(propertyId, tableName, url);
+          }
+          photoDownloadedPath = fallbackPhotos[0];
+        } else {
+          console.log(`[MEDIA RETRIEVER] Fallback público no encontró fotos para: "${address}"`);
+        }
+      } catch (fallbackErr: any) {
+        console.error(`[MEDIA RETRIEVER ERROR] Falló el fallback de fotos:`, fallbackErr.message);
       }
     }
 
@@ -466,9 +490,9 @@ export async function downloadAppraisalPhoto(
     else if (tableName === "financial_distress") idCol = "record_id";
 
     if (hasOwner && hasDebt && hasEnv) {
-      console.log(`[MEDIA RETRIEVER QUALITY CHECK] Datos financieros, propietario y ambiental resueltos para "${address}". Omitiendo revisión manual y estableciendo photo_urls = NULL.`);
+      console.log(`[MEDIA RETRIEVER QUALITY CHECK] Datos financieros, propietario y ambiental resueltos para "${address}". Omitiendo revisión manual.`);
       await db.execute({
-        sql: `UPDATE ${tableName} SET photo_urls = NULL, needs_manual_review = 0 WHERE ${idCol} = ?`,
+        sql: `UPDATE ${tableName} SET needs_manual_review = 0 WHERE ${idCol} = ?`,
         args: [propertyId]
       });
     } else {
@@ -481,7 +505,7 @@ export async function downloadAppraisalPhoto(
       } else {
         console.log(`[MEDIA RETRIEVER QUALITY CHECK] Falta ambiental pero propietario y deuda válidos para "${address}". Omitiendo revisión manual.`);
         await db.execute({
-          sql: `UPDATE ${tableName} SET photo_urls = NULL, needs_manual_review = 0 WHERE ${idCol} = ?`,
+          sql: `UPDATE ${tableName} SET needs_manual_review = 0 WHERE ${idCol} = ?`,
           args: [propertyId]
         });
       }
@@ -523,9 +547,15 @@ async function savePhotoUrlToDb(propertyId: string, tableName: string, relativeP
     }
 
     // Añadir si no existe ya
-    const absolutePath = path.resolve(relativePath).replace(/\\/g, "/");
-    if (!currentPhotos.includes(absolutePath) && !currentPhotos.includes(relativePath)) {
-      currentPhotos.push(relativePath);
+    if (relativePath.startsWith("http")) {
+      if (!currentPhotos.includes(relativePath)) {
+        currentPhotos.push(relativePath);
+      }
+    } else {
+      const absolutePath = path.resolve(relativePath).replace(/\\/g, "/");
+      if (!currentPhotos.includes(absolutePath) && !currentPhotos.includes(relativePath)) {
+        currentPhotos.push(relativePath);
+      }
     }
 
     await db.execute({
@@ -549,7 +579,7 @@ export async function runCountyMediaRetriever(): Promise<number> {
   try {
     // 1. Obtener subastas sin fotos completas
     const auctionsRes = await db.execute(
-      "SELECT auction_id, address, county, state FROM foreclosure_auctions WHERE county IS NOT NULL AND state IS NOT NULL"
+      "SELECT auction_id, address, county, state FROM foreclosure_auctions WHERE county IS NOT NULL AND state IS NOT NULL AND (photo_urls IS NULL OR photo_urls = '' OR photo_urls = '[]')"
     );
 
     for (const row of auctionsRes.rows) {
@@ -565,7 +595,7 @@ export async function runCountyMediaRetriever(): Promise<number> {
 
     // 2. Obtener violaciones de código sin fotos completas
     const violationsRes = await db.execute(
-      "SELECT violation_id, address, owner_name FROM code_violations WHERE address IS NOT NULL"
+      "SELECT violation_id, address, owner_name FROM code_violations WHERE address IS NOT NULL AND (photo_urls IS NULL OR photo_urls = '' OR photo_urls = '[]')"
     );
 
     for (const row of violationsRes.rows) {

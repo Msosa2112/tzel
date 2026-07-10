@@ -94,6 +94,9 @@ export async function scrapeIndianaCaseWithCrawlee(caseNumber: string): Promise<
     },
     // Handler que procesa la página web
     requestHandler: async ({ page, log }) => {
+      // Establecer un timeout de acción predeterminado de 15 segundos para evitar hangs de Playwright
+      page.setDefaultTimeout(15000);
+
       log.info(`Navegando al portal judicial de Indiana...`);
       await page.goto("https://public.courts.in.gov/mycase/", { waitUntil: "networkidle", timeout: 25000 });
       
@@ -189,12 +192,22 @@ export async function scrapeIndianaCaseWithCrawlee(caseNumber: string): Promise<
       log.info("Haciendo clic en el enlace del caso...");
       const rowLocator = page.locator('tr.result-row, .case-row', { hasText: caseNumber });
       const linkLocator = rowLocator.locator('a.result-title, a');
+      
       if (await linkLocator.count() > 0) {
         await linkLocator.first().click();
       } else {
-        await page.click(`a:has-text("${caseNumber}")`).catch(async () => {
-          await page.click('a.result-title').catch(() => {});
-        });
+        const caseLink = page.locator(`a:has-text("${caseNumber}")`);
+        if (await caseLink.count() > 0) {
+          await caseLink.first().click();
+        } else {
+          const fallbackLink = page.locator('a.result-title');
+          if (await fallbackLink.count() > 0) {
+            await fallbackLink.first().click();
+          } else {
+            log.warning(`No se encontró ningún enlace para el caso ${caseNumber}`);
+            throw new Error(`Enlace del caso no encontrado en los resultados.`);
+          }
+        }
       }
       
       // Esperar a que cargue el expediente completo

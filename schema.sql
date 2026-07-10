@@ -256,6 +256,7 @@ CREATE TABLE IF NOT EXISTS surplus_funds (
     defendant_phones TEXT,
     defendant_emails TEXT,
     hidden_liens_amount REAL DEFAULT 0,
+    telegram_sent INTEGER DEFAULT 0,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 

@@ -121,7 +121,7 @@ async function performOSINTDebtSearch(
   }
 
   // Enviar a Gemini para análisis financiero
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${apiKey}`;
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
   const prompt = `Eres un perito auditor inmobiliario. Analiza la siguiente recopilación de resultados de búsqueda pública para una propiedad o deudor y extrae:
   1. El monto total de la deuda hipotecaria en ejecución de subasta ("debtAmount").
   2. El monto de hipotecas secundarias (segundas hipotecas) no liberadas ("hiddenMortgages").
@@ -229,12 +229,24 @@ export async function runDebtRetrySweep() {
     const state = row.state as string;
     const ownerName = row.defendant as string || "";
 
-    console.log(`\n🔍 Procesando Barrida Alternativa para: "${address}" (Caso: ${caseNumber}) | Demandado: "${ownerName}"`);
+    const cleanOwnerUpper = ownerName.trim().toUpperCase();
+
+    // Optimización: Saltar si no hay datos válidos para buscar
+    if (
+      cleanOwnerUpper === "" || 
+      cleanOwnerUpper === "UNKNOWN" || 
+      cleanOwnerUpper === "DUEÑO DESCONOCIDO" || 
+      cleanOwnerUpper.includes("UNKNOWN OWNER")
+    ) {
+      if (!caseNumber || caseNumber === "PENDING" || caseNumber === "DUEÑO DESCONOCIDO" || caseNumber.toUpperCase().includes("UNKNOWN")) {
+        console.log(`  [DEBT SWEEP SKIP] Omitiendo barrida: Propietario y número de caso desconocidos/inválidos.`);
+        continue;
+      }
+    }
 
     // A. Comprobar si es un lead de prueba controlado para simulación de alta fidelidad
     let isMock = false;
-    let mockData = null;
-    const cleanOwnerUpper = ownerName.trim().toUpperCase();
+    let mockData: any = null;
     if (cleanOwnerUpper !== "") {
       for (const [name, val] of Object.entries(MOCK_LEADS)) {
         if (cleanOwnerUpper.includes(name) || name.includes(cleanOwnerUpper)) {
@@ -295,8 +307,8 @@ export async function runDebtRetrySweep() {
       console.log(`  [DEBT SWEEP] Falló la barrida alternativa para este lead. Permanecerá marcado para revisión manual.`);
     }
 
-    // Retraso para evitar bloqueos/rate limits
-    await new Promise(resolve => setTimeout(resolve, 2000));
+    // Retraso para evitar bloqueos/rate limits y respetar cuota de Gemini
+    await new Promise(resolve => setTimeout(resolve, 15000));
   }
 
   console.log(`\n=================================================================`);

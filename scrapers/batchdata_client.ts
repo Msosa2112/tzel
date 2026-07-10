@@ -284,22 +284,7 @@ export class BatchDataClient {
     propertyAddress: BatchDataAddress
   ): Promise<BatchDataSkipTraceResponse> {
     if (!this.apiKey) {
-      const mockNames = [
-        "CHARLES MILLER", "SARAH CONNOR", "JOHN SMITH", "LISA SMITH", "ROBERT DAVIS", 
-        "LINDA JOHNSON", "MARK TAYLOR", "PATRICIA WHITE", "DAVID BROWN", "SUSAN WILSON", 
-        "JAMES JONES", "KAREN THOMAS", "MICHAEL MOORE", "ELIZABETH TAYLOR", "JOSEPH ANDERSON", 
-        "THOMAS JACKSON", "NANCY WHITE", "DANIEL MARTIN", "PAUL GARCIA", "GEORGE HARRIS", 
-        "DONALD YOUNG", "MARIA RODRIGUEZ", "SARAH JENKINS", "ROBERT MILLER", "DAVID TAYLOR", 
-        "WILLIAM ANDERSON", "MARY SMITH", "JAMES JOHNSON", "PATRICIA WILLIAMS", "THOMAS DAVIS", 
-        "LINDA BROWN", "CHARLES JONES", "RICHARD GARCIA", "DONALD LOPEZ", "STEVEN WILSON", 
-        "JOSEPH MARTINEZ", "MARIA CONCEPCION", "JOHNATHAN GALE", "ESTATE OF SARAH JENKINS", "THOMAS BECHT"
-      ];
-      const isMock = mockNames.some(mn => name.toUpperCase().includes(mn) || mn.includes(name.toUpperCase()));
-      if (isMock) {
-        console.log(`[BATCHDATA SIMULATED] Skip tracing simulado para lead de demostración: ${name}`);
-        return this.getSimulatedResponse(name);
-      }
-      console.log(`[BATCHDATA SKIP] Sin API Key y no es un lead de simulación para: "${name}". Retornando vacío.`);
+      console.log(`[BATCHDATA SKIP] Sin API Key para: "${name}". Retornando vacío.`);
       return { success: false, phones: [], emails: [], outOfFunds: true };
     }
 
@@ -408,8 +393,8 @@ export class BatchDataClient {
                     msgStr.includes("forbidden");
 
       if (is403) {
-        console.warn(`[BATCHDATA BALANCE WARNING] Saldo insuficiente o módulo no contratado en Skip Trace de BatchData para ${name}. Activando fallback de base de datos local/simulado.`);
-        return this.getSimulatedResponse(name);
+        console.warn(`[BATCHDATA BALANCE WARNING] Saldo insuficiente o módulo no contratado en Skip Trace de BatchData para ${name}. Retornando vacío.`);
+        return { success: false, phones: [], emails: [], outOfFunds: true };
       }
 
       console.error("[BATCHDATA ERROR] Error al realizar Skip Trace en BatchData:", error.response?.data || error.message);
