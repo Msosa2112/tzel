@@ -8,6 +8,7 @@ import { gisRestClient } from "./gis_rest_client";
 import { applyFlareSolverrBypass } from "./proxy_helper";
 import { chromium } from "playwright-extra";
 import stealthPlugin from "puppeteer-extra-plugin-stealth";
+import { getBrowser } from "./browser_helper";
 
 chromium.use(stealthPlugin());
 
@@ -186,9 +187,7 @@ async function attemptPlaywrightPVAScrape(address: string): Promise<{ ownerName:
   if (addressParts.length < 2) return null;
   
   console.log(`[PVA SCRAPER PLAYWRIGHT] Iniciando consulta PVA con Playwright para: ${cleanAddr}...`);
-  const browser = await chromium.launch({
-    headless: process.env.HEADLESS ? process.env.HEADLESS === "true" : true,
-  });
+  const { browser, isObscura } = await getBrowser(process.env.HEADLESS ? process.env.HEADLESS === "true" : true);
   const context = await browser.newContext({
     userAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
     viewport: { width: 1280, height: 800 },
@@ -216,7 +215,10 @@ async function attemptPlaywrightPVAScrape(address: string): Promise<{ ownerName:
     const htmlContent = await page.content();
     if (htmlContent.toLowerCase().includes("0 records found")) {
       console.log(`[PVA SCRAPER PLAYWRIGHT] 0 registros encontrados en PVA para ${cleanAddr}.`);
-      await browser.close();
+      await context.close();
+      if (!isObscura) {
+        await browser.close();
+      }
       return null;
     }
 
@@ -239,7 +241,10 @@ async function attemptPlaywrightPVAScrape(address: string): Promise<{ ownerName:
     
     if (ownerName && ownerName.length > 2) {
       console.log(`[PVA SCRAPER PLAYWRIGHT SUCCESS] Propietario encontrado: ${ownerName}`);
-      await browser.close();
+      await context.close();
+      if (!isObscura) {
+        await browser.close();
+      }
       return {
         ownerName,
         mailingAddress: `${cleanAddr}, Louisville, KY`
@@ -248,7 +253,10 @@ async function attemptPlaywrightPVAScrape(address: string): Promise<{ ownerName:
   } catch (err: any) {
     console.error(`[PVA SCRAPER PLAYWRIGHT ERROR] Falló extracción con Playwright: ${err.message}`);
   } finally {
-    await browser.close();
+    await context.close().catch(() => {});
+    if (!isObscura) {
+      await browser.close().catch(() => {});
+    }
   }
   return null;
 }

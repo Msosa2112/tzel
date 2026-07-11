@@ -6,8 +6,33 @@ import stealthPlugin from "puppeteer-extra-plugin-stealth";
 import * as dotenv from "dotenv";
 import * as fs from "fs";
 import { analyzeTextWithGemma } from "./llm_underwriter";
+import { getBrowser } from "./browser_helper";
 
 chromium.use(stealthPlugin());
+
+// Launcher personalizado para inyectar conexión CDP de Obscura con fallback local
+const customLauncher: any = {
+  ...chromium,
+  name: () => "chromium",
+  executablePath: () => {
+    try {
+      return chromium.executablePath();
+    } catch {
+      return "";
+    }
+  },
+  launch: async (options?: any) => {
+    const { browser } = await getBrowser(options?.headless !== false);
+    return browser;
+  },
+  launchPersistentContext: async (userDataDir: string, options?: any) => {
+    const { browser, isObscura } = await getBrowser(options?.headless !== false);
+    if (isObscura) {
+      return browser as any;
+    }
+    return await chromium.launchPersistentContext(userDataDir, options);
+  }
+};
 
 dotenv.config();
 
@@ -86,8 +111,12 @@ export async function scrapeIndianaCaseWithCrawlee(caseNumber: string): Promise<
     proxyConfiguration,
     maxRequestRetries: 3,
     requestHandlerTimeoutSecs: 60,
+    browserPoolOptions: {
+      useFingerprints: false,
+    },
     launchContext: {
-      launcher: chromium,
+      launcher: customLauncher,
+      userAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
       launchOptions: {
         headless: process.env.HEADLESS ? process.env.HEADLESS === "true" : false,
       }
@@ -96,6 +125,9 @@ export async function scrapeIndianaCaseWithCrawlee(caseNumber: string): Promise<
     requestHandler: async ({ page, log }) => {
       // Establecer un timeout de acción predeterminado de 15 segundos para evitar hangs de Playwright
       page.setDefaultTimeout(15000);
+
+      const ua = await page.evaluate(() => navigator.userAgent).catch(e => `Error: ${e.message}`);
+      log.info(`User Agent detectado en página: ${ua}`);
 
       log.info(`Navegando al portal judicial de Indiana...`);
       await page.goto("https://public.courts.in.gov/mycase/", { waitUntil: "networkidle", timeout: 25000 });
