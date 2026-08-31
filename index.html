@@ -2637,9 +2637,9 @@
           </div>
           <div>
             <input type="checkbox" id="pill-stack" class="pill-checkbox">
-            <label for="pill-stack" class="pill-label">
+            <label for="pill-stack" class="pill-label" title="Propiedades con múltiples problemas acumulados (Subasta + Multas + Deudas)">
               <i data-lucide="zap"></i>
-              <span>Stacked</span>
+              <span>Multi-Distress</span>
             </label>
           </div>
           <div>
@@ -2663,14 +2663,14 @@
       <div class="sidebar-section" id="investment-financial-section">
         <h3>Estatus Financiero</h3>
         <div class="segment-selector">
-          <button id="btn-deals" class="segment-btn">
+          <button id="btn-deals" class="segment-btn" title="Propiedades con margen de ganancia y equidad positiva">
             <i data-lucide="trending-up"></i> BUENOS DEALS
           </button>
-          <button id="btn-underwater" class="segment-btn">
+          <button id="btn-underwater" class="segment-btn" title="Propiedades donde la deuda supera el valor de la propiedad">
             <i data-lucide="trending-down"></i> BAJO EL AGUA
           </button>
-          <button id="btn-unvalued" class="segment-btn">
-            <i data-lucide="clock"></i> ESPERANDO POR PRECIO
+          <button id="btn-unvalued" class="segment-btn" title="Propiedades recién radicadas cuya deuda aún no se ha publicado en corte">
+            <i data-lucide="clock"></i> ESPERANDO POR DEUDA
           </button>
         </div>
       </div>
@@ -2728,23 +2728,23 @@
           <div class="map-legend-title">Temperatura de Equidad</div>
           <div class="map-legend-item">
             <span class="legend-color-dot" style="background-color: #ef4444; box-shadow: 0 0 6px #ef4444"></span>
-            <span class="legend-label"><i data-lucide="shield-alert" class="inline-icon" style="color: #ef4444"></i> <strong>PIN ROJO: Alta Prioridad</strong><br>Subasta sheriff programada y Margen de Equidad &gt; $30,000</span>
+            <span class="legend-label"><i data-lucide="shield-alert" class="inline-icon" style="color: #ef4444"></i> <strong>PIN ROJO: Subasta / Ejecución</strong><br>Subasta sheriff programada con deuda judicial activa</span>
           </div>
           <div class="map-legend-item">
             <span class="legend-color-dot" style="background-color: #ca8a04; box-shadow: 0 0 6px #ca8a04"></span>
-            <span class="legend-label"><i data-lucide="flame" class="inline-icon" style="color: #ca8a04"></i> <strong>PIN AMARILLO: Oportunidad</strong><br>Estrés físico/violaciones y Margen de Equidad &gt; $0</span>
+            <span class="legend-label"><i data-lucide="flame" class="inline-icon" style="color: #ca8a04"></i> <strong>PIN AMARILLO: Distress Físico</strong><br>Infracciones de código, deterioro y reparaciones</span>
           </div>
           <div class="map-legend-item">
             <span class="legend-color-dot" style="background-color: #0284c7; box-shadow: 0 0 6px #0284c7"></span>
-            <span class="legend-label"><i data-lucide="scale" class="inline-icon" style="color: #0284c7"></i> <strong>PIN AZUL: Otros Leads</strong><br>Deudas bajas con valor catastral PVA</span>
+            <span class="legend-label"><i data-lucide="scale" class="inline-icon" style="color: #0284c7"></i> <strong>PIN AZUL: Otros Leads</strong><br>Sucesiones, divorcios o deudas en seguimiento</span>
           </div>
           <div class="map-legend-item">
             <span class="legend-color-dot" style="background-color: #64748b; box-shadow: 0 0 6px #64748b"></span>
-            <span class="legend-label"><i data-lucide="clock" class="inline-icon" style="color: #64748b"></i> <strong>PIN RELOJ: Esperando por Precio</strong><br>Propiedad en recolección o tasación pendiente</span>
+            <span class="legend-label"><i data-lucide="clock" class="inline-icon" style="color: #64748b"></i> <strong>PIN RELOJ: Esperando por Deuda</strong><br>Caso radicado pero deuda pendiente de publicación en corte</span>
           </div>
           <div class="map-legend-item">
             <span class="legend-color-dot" style="background-color: #fbbf24; box-shadow: 0 0 6px #fbbf24"></span>
-            <span class="legend-label"><i data-lucide="star" class="inline-icon" style="color: #fbbf24"></i> <strong>PIN DORADO: Favorito</strong><br>Propiedad priorizada por el usuario</span>
+            <span class="legend-label"><i data-lucide="star" class="inline-icon" style="color: #fbbf24"></i> <strong>PIN DORADO: Favorito</strong><br>Propiedad priorizada manualmente</span>
           </div>
         </div>
 
@@ -3690,7 +3690,7 @@
         document.getElementById('lbl-metric-total').textContent = 'Total Alertas Encontradas';
         document.getElementById('metric-total').textContent = totalCount;
 
-        document.getElementById('lbl-metric-high').textContent = 'Alta Motivación (🔥 Stacking)';
+        document.getElementById('lbl-metric-high').textContent = 'Alta Urgencia (🔥 Multi-Distress)';
         document.getElementById('metric-high').textContent = highMotivationCount;
 
         document.getElementById('lbl-metric-avg-arv').textContent = 'PVA Promedio de la Zona';
@@ -3850,17 +3850,17 @@
           // Filtro de Margen de Equidad Mínimo (solo si el usuario mueve el slider)
           if (minEquity > 0 && equitySpread < minEquity) return false;
 
-          // Filtro Financiero (Buenos Deals vs Bajo el Agua vs Sin Valorar)
-          const isGoodDeal = marketValue > 0 && equitySpread >= Math.max(40000, marketValue * 0.30);
+          // Filtro Financiero (Buenos Deals vs Bajo el Agua vs Esperando por Deuda)
+          const isGoodDeal = (marketValue > 0 && equitySpread >= Math.max(40000, marketValue * 0.30)) || (totalDebt > 0 && marketValue === 0);
           const isUnderwater = marketValue > 0 && equitySpread < 0;
-          const isUnvalued = marketValue === 0;
+          const isWaitingDebt = totalDebt === 0;
           
           if (financialFilter === 'deals') {
-            if (isUnvalued || !isGoodDeal) return false;
+            if (isWaitingDebt || isUnderwater) return false;
           } else if (financialFilter === 'underwater') {
-            if (isUnvalued || !isUnderwater) return false;
-          } else if (financialFilter === 'unvalued') {
-            if (!isUnvalued) return false;
+            if (isWaitingDebt || !isUnderwater) return false;
+          } else if (financialFilter === 'unvalued') { // Esperando por Deuda
+            if (!isWaitingDebt) return false;
           }
         }
 
@@ -3933,7 +3933,7 @@
           const hasScheduledAuction = hasAuctions && lead.auctions.some(auc => getDaysRemaining(auc.auction_date) !== null);
           const hasPhysical = (lead.physicalDistress && lead.physicalDistress.length > 0) || (lead.violations && lead.violations.length > 0);
 
-           const isFav = favoriteKeys.includes(lead.groupingKey);
+          const isFav = favoriteKeys.includes(lead.groupingKey);
           const isDisaster = lead.physicalDistress && lead.physicalDistress.some(pd => ['Tornado Damage', 'Storm Damage', 'Hail Damage'].includes(pd.distress_type));
           const isRoofViolation = lead.violations && lead.violations.some(v => (v.violation_type || '').toUpperCase().includes('ROOF') || (v.details || '').toLowerCase().includes('roof'));
 
@@ -3949,27 +3949,33 @@
             markerColor = '#0891b2'; // Blue-Cyan
             svgIconKey = 'cloudLightning';
             markerClass = 'roofing-violation';
-          } else if (marketValue === 0) {
-            markerColor = '#64748b'; // Slate Gray for Waiting Price
-            svgIconKey = 'clock';
-            markerClass = 'waiting-price';
-          } else if (hasScheduledAuction && equitySpread > 30000) {
+          } else if (hasScheduledAuction || (hasAuctions && totalDebt > 0)) {
+            // SUBASTA SHERIFF / EJECUCIÓN (PIN ROJO)
             markerColor = '#ef4444';
             svgIconKey = 'shieldAlert';
             markerClass = 'execution-scheduled';
           } else if (lead.preForeclosures && lead.preForeclosures.length > 0) {
+            // PRE-FORECLOSURE (PIN NARANJA)
             markerColor = '#f97316';
-            svgIconKey = 'clock';
+            svgIconKey = 'shieldAlert';
             markerClass = 'pre-foreclosure';
           } else if (lead.taxSales && lead.taxSales.length > 0) {
+            // TAX SALE (PIN AMARILLO ORO)
             markerColor = '#eab308';
             svgIconKey = 'landmark';
             markerClass = 'tax-sale';
-          } else if (hasPhysical && equitySpread > 0) {
+          } else if (hasPhysical) {
+            // DAÑO FÍSICO / VIOLACIÓN (PIN AMARILLO)
             markerColor = '#ca8a04';
             svgIconKey = 'flame';
             markerClass = 'physical';
+          } else if (totalDebt === 0) {
+            // ESPERANDO POR DEUDA (PIN RELOJ SLATE)
+            markerColor = '#64748b';
+            svgIconKey = 'clock';
+            markerClass = 'waiting-debt';
           } else {
+            // OTROS LEADS CON DEUDA O SEGUIMIENTO (PIN AZUL)
             markerColor = '#0284c7';
             svgIconKey = 'scale';
             markerClass = 'others';
@@ -4011,19 +4017,19 @@
                 </div>
                 <div class="popup-row">
                   <span class="popup-row-label">Valor PVA:</span>
-                  <span class="popup-row-value">${marketValue > 0 ? '$' + marketValue.toLocaleString() : '<span style="color: #64748b; font-style: italic;">Esperando por precio</span>'}</span>
+                  <span class="popup-row-value">${marketValue > 0 ? '$' + marketValue.toLocaleString() : '<span style="color: var(--text-muted); font-style: italic;">Sin PVA registrado</span>'}</span>
                 </div>
                 <div class="popup-row">
                   <span class="popup-row-label">Deuda Total:</span>
-                  <span class="popup-row-value" style="color: ${totalDebt > 0 ? '#ef4444' : 'var(--text-muted)'}">${totalDebt > 0 ? '$' + totalDebt.toLocaleString() : '$0 (Sin deuda)'}</span>
+                  <span class="popup-row-value" style="color: ${totalDebt > 0 ? '#ef4444' : '#64748b'}; font-weight: bold;">${totalDebt > 0 ? '$' + totalDebt.toLocaleString() : '<span style="color: #64748b; font-style: italic;">🕒 Esperando por deuda</span>'}</span>
                 </div>
                 <div class="popup-row">
                   <span class="popup-row-label">Equidad Spread:</span>
-                  <span class="popup-row-value" style="color: ${marketValue > 0 ? (equitySpread > 40000 ? 'var(--color-radar-green)' : 'var(--text-main)') : '#64748b'}">${marketValue > 0 ? '$' + equitySpread.toLocaleString() : '<span style="color: #64748b; font-style: italic;">Por tasar</span>'}</span>
+                  <span class="popup-row-value" style="color: ${marketValue > 0 ? (equitySpread > 40000 ? 'var(--color-radar-green)' : (equitySpread < 0 ? '#ef4444' : 'var(--text-main)')) : 'var(--text-muted)'}">${marketValue > 0 ? '$' + equitySpread.toLocaleString() : (totalDebt > 0 ? 'Deuda $' + totalDebt.toLocaleString() : 'Por calcular')}</span>
                 </div>
                 <div class="popup-row">
                   <span class="popup-row-label">Oferta MPO:</span>
-                  <span class="popup-row-value" style="color: ${marketValue > 0 ? 'var(--color-radar-green)' : '#64748b'}; font-weight: bold;">${marketValue > 0 ? '$' + mpo.toLocaleString() : '<span style="color: #64748b; font-style: italic;">Por tasar</span>'}</span>
+                  <span class="popup-row-value" style="color: ${mpo > 0 ? 'var(--color-radar-green)' : 'var(--text-muted)'}; font-weight: bold;">${mpo > 0 ? '$' + mpo.toLocaleString() : (totalDebt > 0 ? '$' + totalDebt.toLocaleString() : 'Por calcular')}</span>
                 </div>
                 <button class="popup-btn" onclick="openLeadDrawer('${lead.groupingKey}')">Ver Ficha Táctica</button>
               </div>
@@ -4120,8 +4126,8 @@
         if (hasManualReview) badgesHtml += `<span class="badge" style="background: rgba(239, 68, 68, 0.15); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.3)"><i data-lucide="alert-triangle" class="inline-icon"></i> Review</span>`;
         
         if (activeSystemMode === 'investment') {
-          if (marketValue === 0) {
-            badgesHtml += `<span class="badge" style="background: rgba(100, 116, 139, 0.15); color: #64748b; border: 1px solid rgba(100, 116, 139, 0.3);"><i data-lucide="clock" class="inline-icon"></i> ESPERANDO PRECIO</span>`;
+          if (totalDebt === 0) {
+            badgesHtml += `<span class="badge" style="background: rgba(100, 116, 139, 0.15); color: #64748b; border: 1px solid rgba(100, 116, 139, 0.3);"><i data-lucide="clock" class="inline-icon"></i> ESPERANDO DEUDA</span>`;
           } else if (equitySpread > 40000) {
             badgesHtml += `<span class="badge badge-equity-high" style="background: rgba(16, 185, 129, 0.15); color: var(--color-radar-green-dark); border: 1px solid var(--color-radar-green-border);"><i data-lucide="trending-up" class="inline-icon"></i> ALTA EQUIDAD</span>`;
           }
@@ -4185,19 +4191,19 @@
             <div class="lead-comps">
               <div class="comp-item">
                 <span class="comp-label">Valor PVA</span>
-                <span class="comp-val">${marketValue > 0 ? '$' + marketValue.toLocaleString() : '<span style="color: #64748b; font-size: 0.72rem; font-style: italic;">Esperando</span>'}</span>
+                <span class="comp-val">${marketValue > 0 ? '$' + marketValue.toLocaleString() : '<span style="color: var(--text-muted); font-size: 0.72rem;">N/A</span>'}</span>
               </div>
               <div class="comp-item">
                 <span class="comp-label">Deuda Total</span>
-                <span class="comp-val" style="color: ${totalDebt > 0 ? '#ef4444' : 'var(--text-muted)'}">${totalDebt > 0 ? '$' + totalDebt.toLocaleString() : '$0'}</span>
+                <span class="comp-val" style="color: ${totalDebt > 0 ? '#ef4444' : '#64748b'}">${totalDebt > 0 ? '$' + totalDebt.toLocaleString() : '<span style="color: #64748b; font-size: 0.7rem; font-style: italic;">Por publicar</span>'}</span>
               </div>
               <div class="comp-item">
                 <span class="comp-label">Oferta MPO</span>
-                <span class="comp-val" style="color: ${marketValue > 0 ? 'var(--color-radar-green)' : '#64748b'}; font-weight: bold;">${marketValue > 0 ? '$' + mpo.toLocaleString() : '<span style="color: #64748b; font-size: 0.72rem;">Por tasar</span>'}</span>
+                <span class="comp-val" style="color: ${mpo > 0 ? 'var(--color-radar-green)' : 'var(--text-muted)'}; font-weight: bold;">${mpo > 0 ? '$' + mpo.toLocaleString() : (totalDebt > 0 ? '$' + totalDebt.toLocaleString() : '<span style="color: var(--text-muted); font-size: 0.7rem;">-</span>')}</span>
               </div>
               <div class="comp-item">
                 <span class="comp-label">Equidad</span>
-                <span class="comp-val" style="color: ${marketValue > 0 ? (equitySpread > 40000 ? 'var(--color-radar-green)' : 'var(--text-main)') : '#64748b'}">${marketValue > 0 ? '$' + equitySpread.toLocaleString() : '<span style="color: #64748b; font-size: 0.72rem;">Por tasar</span>'}</span>
+                <span class="comp-val" style="color: ${marketValue > 0 ? (equitySpread > 40000 ? 'var(--color-radar-green)' : (equitySpread < 0 ? '#ef4444' : 'var(--text-main)')) : 'var(--text-muted)'}">${marketValue > 0 ? '$' + equitySpread.toLocaleString() : '<span style="color: var(--text-muted); font-size: 0.7rem;">-</span>'}</span>
               </div>
             </div>
           `;
@@ -4813,11 +4819,11 @@
 
       // Métricas de Adquisición As-Is
       const pvaVal = (lead.auctions && lead.auctions.length > 0 && lead.auctions[0].appraisal_value > 0) ? lead.auctions[0].appraisal_value : (lead.mlsValue || 0);
-      document.getElementById('uw-pva-assessed').innerHTML = pvaVal > 0 ? `$${pvaVal.toLocaleString()}` : '<span style="color: #64748b; font-style: italic; font-size: 0.85rem;">Esperando precio</span>';
+      document.getElementById('uw-pva-assessed').innerHTML = pvaVal > 0 ? `$${pvaVal.toLocaleString()}` : '<span style="color: var(--text-muted); font-style: italic; font-size: 0.85rem;">Sin PVA registrado</span>';
       document.getElementById('uw-mca-crudo').textContent = 'Calculando...';
 
       const totalDebt = (lead.primaryDebt || 0) + (lead.hiddenMortgages || 0) + (lead.hiddenLiensAmount || 0);
-      document.getElementById('uw-deuda-total').textContent = `$${totalDebt.toLocaleString()}`;
+      document.getElementById('uw-deuda-total').innerHTML = totalDebt > 0 ? `$${totalDebt.toLocaleString()}` : '<span style="color: #64748b; font-style: italic; font-size: 0.85rem;">🕒 Esperando por deuda</span>';
 
       // Desglose tooltip
       document.getElementById('uw-deuda-breakdown').innerHTML = `
@@ -4829,7 +4835,7 @@
 
       // Equity Spread & MPO inicial con pvaVal
       const initialSpread = pvaVal > 0 ? (pvaVal - totalDebt) : 0;
-      document.getElementById('uw-equity-spread').innerHTML = pvaVal > 0 ? `$${initialSpread.toLocaleString()}` : '<span style="color: #64748b; font-style: italic; font-size: 0.85rem;">Pendiente tasación</span>';
+      document.getElementById('uw-equity-spread').innerHTML = pvaVal > 0 ? `$${initialSpread.toLocaleString()}` : (totalDebt > 0 ? `Deuda $${totalDebt.toLocaleString()}` : '<span style="color: var(--text-muted); font-style: italic; font-size: 0.85rem;">Pendiente de PVA</span>');
       if (pvaVal > 0) {
         document.getElementById('uw-equity-spread').style.color = initialSpread > 40000 ? 'var(--color-radar-green)' : (initialSpread < 0 ? '#ef4444' : 'var(--text-main)');
         document.getElementById('uw-equity-badge').style.display = initialSpread > 40000 ? 'inline-block' : 'none';
@@ -4839,8 +4845,8 @@
       }
 
       const df = lead.state === 'KY' ? 0.66 : (lead.isHighMotivation ? 0.70 : 0.75);
-      const initialMpo = pvaVal > 0 ? Math.max(0, Math.round((pvaVal * df) - totalDebt)) : 0;
-      document.getElementById('uw-mpo-asis').innerHTML = pvaVal > 0 ? `$${initialMpo.toLocaleString()}` : '<span style="color: #64748b; font-style: italic; font-size: 0.95rem;">Pendiente tasación</span>';
+      const initialMpo = pvaVal > 0 ? Math.max(0, Math.round((pvaVal * df) - totalDebt)) : (totalDebt > 0 ? totalDebt : 0);
+      document.getElementById('uw-mpo-asis').innerHTML = initialMpo > 0 ? `$${initialMpo.toLocaleString()}` : '<span style="color: var(--text-muted); font-style: italic; font-size: 0.95rem;">Por calcular</span>';
 
       // Toggle Zillow/Redfin manual search links
       const manualSearchDiv = document.getElementById('uw-manual-search');
