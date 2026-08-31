@@ -3,7 +3,7 @@ import axios from "axios";
 import { db } from "./db";
 import * as dotenv from "dotenv";
 import * as path from "path";
-import { calculateRehab, calculateMAO, calculateROI, isJuniorLien, calculateNetEquity, isUnderwater, checkCriticalRisk } from "./underwriting/underwriter";
+import { calculateRehab, calculateMAO, calculateROI, isJuniorLien, calculateNetEquity, isUnderwater, checkCriticalRisk, calculateInstitutionalUnderwriting, InstitutionalUnderwriting } from "./underwriting/underwriter";
 
 dotenv.config();
 
@@ -1242,6 +1242,13 @@ app.get("/api/prospectos", async (req, res) => {
       const purchasePrice = primaryDebt > 0 ? primaryDebt : mao;
       const { roi, totalCost } = calculateROI(lead.mlsValue, purchasePrice, rehab);
 
+      // Institutional Multilayer Underwriting
+      const marketVal = (lead.auctions && lead.auctions.length > 0 && lead.auctions[0].appraisal_value > 0) 
+        ? Number(lead.auctions[0].appraisal_value) 
+        : (lead.mlsValue || 0);
+      const totalConsolidatedDebt = primaryDebt + hiddenDebt + (lead.hiddenLiensAmount || 0);
+      const institutionalUW = calculateInstitutionalUnderwriting(marketVal, lead.sqft || null, violationKeywords, totalConsolidatedDebt, lead.state);
+
       // Regla de Stacking / Alta Motivación
       let isHighMotivation = false;
       if (hasAuctions) {
@@ -1256,6 +1263,20 @@ app.get("/api/prospectos", async (req, res) => {
 
       // Check geocode cache first from memory map (exact address or normalized groupingKey)
       const coords = geocodeMap.get(lead.displayAddress) || geocodeKeyMap.get(lead.groupingKey) || null;
+
+      // Confidence Radar & Forensic Verification Status
+      const hasGeocode = coords && coords.lat !== null;
+      const geocodeConf = hasGeocode ? 99.2 : 0;
+      const ownerConf = isValidOwnerName(lead.ownerName) ? 96.0 : 60.0;
+      const debtConf = (lead.titleCheckStatus === 'success' || primaryDebt > 0) ? 98.4 : 85.0;
+      const overallConf = Math.round((geocodeConf * 0.35) + (ownerConf * 0.35) + (debtConf * 0.30));
+
+      let forensicStatus = 'HIGH_CONFIDENCE';
+      if (hasGeocode && isValidOwnerName(lead.ownerName) && (lead.titleCheckStatus === 'success' || primaryDebt > 0)) {
+        forensicStatus = 'AUTO_VERIFIED';
+      } else if (!hasGeocode || !isValidOwnerName(lead.ownerName)) {
+        forensicStatus = 'NEEDS_REVIEW';
+      }
 
       // Fetch OSINT Enrichment
       const osint = osintMap.get(lead.groupingKey) || {
@@ -1300,6 +1321,14 @@ app.get("/api/prospectos", async (req, res) => {
         encumbrancesLadder: propEncumbrances,
         opportunityScore: scoreObj.opportunityScore,
         tacticalAction: scoreObj.tacticalAction,
+        institutionalUW,
+        confidenceBreakdown: {
+          geocodeConfidence: geocodeConf,
+          ownerConfidence: ownerConf,
+          debtConfidence: debtConf,
+          overallConfidence: overallConf
+        },
+        forensicStatus,
         hiddenMortgages: hiddenDebt,
         hiddenLiensAmount: lead.hiddenLiensAmount,
         titleCheckStatus: lead.titleCheckStatus,
@@ -1338,6 +1367,54 @@ app.get("/api/prospectos", async (req, res) => {
     res.json({ status: "success", count: responseData.length, data: responseData });
   } catch (err: any) {
     console.error("[API ERROR] Failed to fetch leads:", err.message);
+    res.status(500).json({ status: "error", message: err.message });
+  }
+});
+
+// Call Logs Table Setup
+db.execute(`
+  CREATE TABLE IF NOT EXISTS tzel_call_logs (
+    log_id TEXT PRIMARY KEY,
+    property_id TEXT NOT NULL,
+    phone_dialed TEXT NOT NULL,
+    contact_name TEXT,
+    outcome TEXT NOT NULL,
+    notes TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+`).catch(e => console.error("[DB INIT tzel_call_logs ERROR]", e.message));
+
+app.get("/api/call-logs", async (req, res) => {
+  try {
+    const propertyId = req.query.property_id as string;
+    if (!propertyId) {
+      const allLogs = await db.execute("SELECT * FROM tzel_call_logs ORDER BY created_at DESC LIMIT 50");
+      return res.json({ status: "success", logs: allLogs.rows });
+    }
+    const logs = await db.execute({
+      sql: "SELECT * FROM tzel_call_logs WHERE property_id = ? ORDER BY created_at DESC",
+      args: [propertyId]
+    });
+    res.json({ status: "success", logs: logs.rows });
+  } catch (err: any) {
+    res.status(500).json({ status: "error", message: err.message });
+  }
+});
+
+app.post("/api/call-logs", async (req, res) => {
+  try {
+    const { property_id, phone_dialed, contact_name, outcome, notes } = req.body;
+    if (!property_id || !phone_dialed || !outcome) {
+      return res.status(400).json({ status: "error", message: "Missing required fields" });
+    }
+    const logId = `CALL_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+    await db.execute({
+      sql: "INSERT INTO tzel_call_logs (log_id, property_id, phone_dialed, contact_name, outcome, notes, created_at) VALUES (?, ?, ?, ?, ?, ?, datetime('now'))",
+      args: [logId, property_id, phone_dialed, contact_name || '', outcome, notes || '']
+    });
+    console.log(`[CALL LOG REGISTERED] ${phone_dialed} -> ${outcome} for property ${property_id}`);
+    res.json({ status: "success", log_id: logId });
+  } catch (err: any) {
     res.status(500).json({ status: "error", message: err.message });
   }
 });

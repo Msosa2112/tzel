@@ -176,15 +176,68 @@ export function isJuniorLien(plaintiff: string | null, caseNumber: string | null
  * Margen: (MCA - Deuda Primaria - Deudas Ocultas) >= MCA * 0.20
  * Esto equivale a que la Deuda Total no supere el 80% del valor del avalúo pericial.
  */
-export function isHighYieldProperty(
-  mcaOrAppraisal: number,
-  primaryDebt: number,
-  hiddenMortgages: number = 0,
-  hiddenLiensAmount: number = 0,
-  minMarginRatio: number = 0.20
-): boolean {
-  if (mcaOrAppraisal <= 0 || primaryDebt <= 0) return false;
-  const cleanHidden = (hiddenMortgages || 0) + (hiddenLiensAmount || 0);
-  const netEquity = mcaOrAppraisal - primaryDebt - cleanHidden;
-  return netEquity >= (mcaOrAppraisal * minMarginRatio);
+export interface InstitutionalUnderwriting {
+  arv: number;
+  rehab: number;
+  holdingCosts: number;
+  closingCosts: number;
+  desiredProfit: number;
+  assignmentFee: number;
+  targetContractPrice: number;
+  walkAwayPrice: number;
+  auctionMaxBid: number;
+  wholesaleProfitSpread: number;
+  equitySpread: number;
+  isUnderwater: boolean;
+}
+
+/**
+ * Motor de Underwriting Multicapa Institucional
+ * Desglosa ARV, Rehab, Holding, Closing, Margen Deseado, Target Contract Price, Walk-Away y Auction Max Bid.
+ */
+export function calculateInstitutionalUnderwriting(
+  marketValue: number,
+  sqft: number | null,
+  violationKeywords: string[],
+  totalDebt: number,
+  state: string = 'KY'
+): InstitutionalUnderwriting {
+  const baseVal = marketValue > 0 ? marketValue : 180000;
+  const arv = Math.round(baseVal * 1.15);
+  
+  // Rehab calculation
+  let rehabPerSqft = 25;
+  const isSevere = violationKeywords.some(v => /structural|roof|dangerous|unsafe|foundation|fire|demolition/i.test(v));
+  const isModerate = violationKeywords.some(v => /boarded|plumbing|electrical|maintenance|grass|weed/i.test(v));
+  if (isSevere) rehabPerSqft = 65;
+  else if (isModerate) rehabPerSqft = 45;
+
+  const area = (sqft && sqft > 400 && sqft < 10000) ? sqft : 1400;
+  const rehab = Math.round(area * rehabPerSqft * 1.15);
+
+  const holdingCosts = Math.round(arv * 0.04);
+  const closingCosts = Math.round(arv * 0.05);
+  const desiredProfit = Math.round(Math.max(25000, arv * 0.15));
+  const assignmentFee = 15000;
+
+  const targetContractPrice = Math.max(0, arv - rehab - holdingCosts - closingCosts - desiredProfit - assignmentFee);
+  const walkAwayPrice = targetContractPrice + 12000;
+  const discountFactor = (state || '').toUpperCase() === 'KY' ? 0.66 : 0.70;
+  const auctionMaxBid = Math.max(0, Math.round((arv * discountFactor) - rehab));
+  const equitySpread = baseVal - totalDebt;
+
+  return {
+    arv,
+    rehab,
+    holdingCosts,
+    closingCosts,
+    desiredProfit,
+    assignmentFee,
+    targetContractPrice,
+    walkAwayPrice,
+    auctionMaxBid,
+    wholesaleProfitSpread: assignmentFee,
+    equitySpread,
+    isUnderwater: totalDebt > baseVal && baseVal > 0
+  };
 }
