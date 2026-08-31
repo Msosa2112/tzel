@@ -5922,7 +5922,43 @@
       });
 
       if (phones.length === 0 && emails.length === 0) {
-        contactsContainer.innerHTML = `<div style="font-size: 0.75rem; color: var(--text-muted);">Sin contactos de propietario registrados.</div>`;
+        const cleanName = lead.ownerName && lead.ownerName !== 'Unknown' && lead.ownerName !== 'DUEÑO DESCONOCIDO'
+          ? lead.ownerName.replace(/\(.*?\)/g, '').replace(/ET AL\.?/gi, '').replace(/[^a-zA-Z\s]/g, '').trim()
+          : '';
+        const nameQuery = cleanName ? encodeURIComponent(cleanName.replace(/\s+/g, '-')) : '';
+        const addressQuery = encodeURIComponent(lead.displayAddress.replace(/,/g, '').trim().replace(/\s+/g, '-'));
+        
+        const fpsUrl = nameQuery 
+          ? `https://www.fastpeoplesearch.com/name/${nameQuery}_${encodeURIComponent(lead.county || 'Jefferson')}-${lead.state || 'KY'}`
+          : `https://www.fastpeoplesearch.com/address/${addressQuery}`;
+        
+        const tpsUrl = nameQuery
+          ? `https://www.truepeoplesearch.com/results?name=${encodeURIComponent(cleanName)}&citystatezip=${encodeURIComponent((lead.county || '') + ' ' + (lead.state || ''))}`
+          : `https://www.truepeoplesearch.com/resultaddress?streetaddress=${encodeURIComponent(lead.displayAddress)}`;
+
+        const whitepagesUrl = `https://www.whitepages.com/address/${encodeURIComponent(lead.displayAddress)}`;
+
+        contactsContainer.innerHTML = `
+          <div style="background: rgba(245, 158, 11, 0.08); border: 1px dashed rgba(245, 158, 11, 0.4); border-radius: 10px; padding: 12px; display: flex; flex-direction: column; gap: 8px;">
+            <div style="font-size: 0.75rem; color: #b45309; font-weight: 600; display: flex; align-items: center; gap: 6px;">
+              <i data-lucide="search" style="width: 14px; height: 14px;"></i> Skip Trace Directo en 1 Clic
+            </div>
+            <div style="font-size: 0.7rem; color: var(--text-muted);">
+              No hay teléfonos pre-almacenados en base de datos. Consulta las bases públicas en tiempo real:
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 6px; margin-top: 4px;">
+              <a href="${fpsUrl}" target="_blank" rel="noopener noreferrer" class="contact-action-btn" style="background: #e0f2fe; border: 1px solid rgba(14, 165, 233, 0.3); color: #0369a1; text-align: center; padding: 6px 10px; border-radius: 6px; font-weight: 600; text-decoration: none; display: flex; align-items: center; justify-content: center; gap: 6px;">
+                <i data-lucide="external-link" style="width: 12px; height: 12px;"></i> FastPeopleSearch (${cleanName || 'Por Dirección'})
+              </a>
+              <a href="${tpsUrl}" target="_blank" rel="noopener noreferrer" class="contact-action-btn" style="background: #f0fdf4; border: 1px solid rgba(34, 197, 94, 0.3); color: #15803d; text-align: center; padding: 6px 10px; border-radius: 6px; font-weight: 600; text-decoration: none; display: flex; align-items: center; justify-content: center; gap: 6px;">
+                <i data-lucide="external-link" style="width: 12px; height: 12px;"></i> TruePeopleSearch
+              </a>
+              <a href="${whitepagesUrl}" target="_blank" rel="noopener noreferrer" class="contact-action-btn" style="background: #f8fafc; border: 1px solid rgba(100, 116, 139, 0.2); color: #475569; text-align: center; padding: 6px 10px; border-radius: 6px; font-weight: 600; text-decoration: none; display: flex; align-items: center; justify-content: center; gap: 6px;">
+                <i data-lucide="external-link" style="width: 12px; height: 12px;"></i> Whitepages Catastral
+              </a>
+            </div>
+          </div>
+        `;
       }
       
       // Update favorite button in the drawer header
