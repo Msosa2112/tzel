@@ -3105,6 +3105,22 @@
           </div>
         </div>
 
+        <!-- Tactical Intelligence & Opportunity Score Card -->
+        <div class="detail-card tactical-opp-card" id="drawer-opp-card" style="background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); border: 1px solid rgba(0, 207, 204, 0.4); color: #ffffff; padding: 16px; border-radius: 16px; box-shadow: 0 4px 20px rgba(0, 207, 204, 0.15);">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+            <div style="display: flex; align-items: center; gap: 6px; font-size: 0.72rem; text-transform: uppercase; font-weight: 800; letter-spacing: 0.5px; color: var(--color-radar-green);">
+              <i data-lucide="zap" style="width: 14px; height: 14px;"></i> TZEL Opportunity Score
+            </div>
+            <div id="drawer-opp-score-badge" style="background: var(--color-radar-green); color: #0f172a; font-weight: 900; font-size: 0.85rem; padding: 3px 10px; border-radius: 20px;">
+              Score: 88/100
+            </div>
+          </div>
+          <div style="font-size: 0.72rem; color: #94a3b8; text-transform: uppercase; font-weight: 600; margin-bottom: 4px;">Acción Táctica Recomendada:</div>
+          <div id="drawer-opp-action" style="font-size: 0.88rem; font-weight: 800; color: #ffffff; line-height: 1.3; background: rgba(255,255,255,0.08); padding: 8px 12px; border-radius: 8px; border-left: 3px solid var(--color-radar-green);">
+            LLAMAR DUEÑO: OFERTA COMPRA DIRECTA / SUBJECT-TO
+          </div>
+        </div>
+
         <!-- Target Overview -->
         <div class="detail-card">
           <div class="detail-card-title"><i data-lucide="globe"></i> Resumen del Objetivo</div>
@@ -4818,9 +4834,16 @@
         card.className = `timeline-card ${isUrgent ? 'urgent' : ''} ${item.isPreOnly ? 'pre-foreclosure' : ''}`;
         card.setAttribute('data-key', lead.groupingKey);
 
+        const oppScore = lead.opportunityScore !== undefined ? lead.opportunityScore : 65;
+        let oppScoreBadge = `<span class="badge" style="background: rgba(0,207,204,0.15); color: var(--color-radar-green); font-size: 0.6rem; border: 1px solid var(--color-radar-green); font-weight: 800;">⚡ ${oppScore}/100</span>`;
+        if (oppScore >= 75) {
+          oppScoreBadge = `<span class="badge" style="background: var(--color-radar-green); color: #0f172a; font-size: 0.6rem; font-weight: 800;">⚡ ${oppScore}/100</span>`;
+        }
+
         card.innerHTML = `
           <div class="timeline-card-header">
             ${dateBadgeHtml}
+            ${oppScoreBadge}
             ${lead.isHighMotivation ? '<span class="badge badge-high" style="font-size: 0.6rem;"><i data-lucide="zap" class="inline-icon"></i> URGENTE</span>' : ''}
           </div>
           <div class="timeline-card-address" title="${lead.displayAddress}">${lead.displayAddress}</div>
@@ -5247,6 +5270,28 @@
     function hydrateDrawer(lead) {
       document.getElementById('drawer-address').textContent = lead.displayAddress;
 
+      // 0. Hydrate Opportunity Score & Tactical Action
+      const oppScore = lead.opportunityScore !== undefined ? lead.opportunityScore : 65;
+      const tacticalAction = lead.tacticalAction || 'REVISIÓN PRELIMINAR DE EXPEDIENTE';
+      const scoreBadge = document.getElementById('drawer-opp-score-badge');
+      const actionEl = document.getElementById('drawer-opp-action');
+      if (scoreBadge) {
+        scoreBadge.textContent = `Score: ${oppScore}/100`;
+        if (oppScore >= 75) {
+          scoreBadge.style.background = 'var(--color-radar-green)';
+          scoreBadge.style.color = '#0f172a';
+        } else if (oppScore >= 60) {
+          scoreBadge.style.background = '#f59e0b';
+          scoreBadge.style.color = '#ffffff';
+        } else {
+          scoreBadge.style.background = '#3b82f6';
+          scoreBadge.style.color = '#ffffff';
+        }
+      }
+      if (actionEl) {
+        actionEl.textContent = tacticalAction;
+      }
+
       // Resetear estado del carrusel deslizable
       currentPhotoIndex = 0;
       photoUrlsCount = lead.photoUrls ? lead.photoUrls.length : 0;
@@ -5551,7 +5596,7 @@
       if (osintOsmCard) {
         const hasOsm = (lead.envStressors && lead.envStressors.length > 0) || (lead.envAttractors && lead.envAttractors.length > 0);
         if (hasOsm) {
-          osintOsmCard.style.display = 'block';
+osintOsmCard.style.display = 'block';
           osmStressorsList.innerHTML = lead.envStressors && lead.envStressors.length > 0
             ? lead.envStressors.map(s => `<li>${s}</li>`).join('')
             : '<li style="color: var(--text-muted);">Ninguno detectado en 500m</li>';
@@ -5563,268 +5608,135 @@
         }
       }
 
-      // Distress logs
+      // Distress logs & Central Event Timeline
       const logsContainer = document.getElementById('distress-logs-container');
       logsContainer.innerHTML = '';
       
       let activeDistressCategories = [];
 
+      // 1. Render Event Graph Timeline if available
+      if (lead.eventsTimeline && lead.eventsTimeline.length > 0) {
+        const timelineTitle = document.createElement('div');
+        timelineTitle.style.cssText = 'font-size: 0.72rem; font-weight: 800; text-transform: uppercase; color: var(--color-radar-green); margin-bottom: 8px; display: flex; align-items: center; justify-content: space-between;';
+        timelineTitle.innerHTML = `
+          <span style="display: flex; align-items: center; gap: 6px;"><i data-lucide="git-commit" style="width: 14px; height: 14px;"></i> Línea de Tiempo Forense (${lead.eventsTimeline.length} Eventos)</span>
+          <span class="badge" style="background: rgba(0, 207, 204, 0.15); color: var(--color-radar-green); font-size: 0.6rem; border: 1px solid var(--color-radar-green);">Auditado</span>
+        `;
+        logsContainer.appendChild(timelineTitle);
 
-      // A. Auctions
-      if (lead.auctions && lead.auctions.length > 0) {
-        activeDistressCategories.push('auction');
-        lead.auctions.forEach(auc => {
+        lead.eventsTimeline.forEach(ev => {
           const div = document.createElement('div');
           div.className = 'distress-log-item';
           
-          const daysRemaining = getDaysRemaining(auc.auction_date);
-          const isScheduled = daysRemaining !== null;
-          const borderClr = isScheduled ? 'var(--color-execution-red)' : 'var(--color-execution-orange)';
-          const iconName = isScheduled ? 'shield-alert' : 'clock';
-          const titleStr = isScheduled ? 'ZONA DE EJECUCIÓN: SUBASTA PROGRAMADA' : 'ZONA DE EJECUCIÓN: DETECCIÓN PRE-SUBASTA';
-          
+          let icon = 'alert-circle';
+          let borderClr = 'var(--color-radar-green)';
+          let typeLabel = ev.event_type;
+
+          if (ev.event_type === 'AUCTION_SCHEDULED') {
+            icon = 'shield-alert';
+            borderClr = 'var(--color-execution-red)';
+            typeLabel = 'SUBASTA JUDICIAL PROGRAMADA';
+            activeDistressCategories.push('auction');
+          } else if (ev.event_type === 'FORECLOSURE_FILED') {
+            icon = 'clock';
+            borderClr = 'var(--color-execution-orange)';
+            typeLabel = 'PRE-FORECLOSURE (DÍA 0)';
+            activeDistressCategories.push('auction');
+          } else if (ev.event_type === 'CODE_VIOLATION') {
+            icon = 'alert-triangle';
+            borderClr = 'var(--color-others-purple)';
+            typeLabel = 'INFRACCIÓN DE CÓDIGO URBANO';
+            activeDistressCategories.push('violation');
+          } else if (ev.event_type === 'TAX_DELINQUENCY') {
+            icon = 'landmark';
+            borderClr = 'var(--color-financial-yellow)';
+            typeLabel = 'SUBASTA DE IMPUESTOS FISCALES';
+            activeDistressCategories.push('financial');
+          } else if (ev.event_type === 'STORM_IMPACT') {
+            icon = 'cloud-lightning';
+            borderClr = '#06b6d4';
+            typeLabel = 'IMPACTO METEOROLÓGICO SEVERO';
+            activeDistressCategories.push('roofing');
+          } else if (ev.event_type === 'PROBATE_FILED') {
+            icon = 'file-text';
+            borderClr = '#8b5cf6';
+            typeLabel = 'SUCESIONES / PROBATE';
+            activeDistressCategories.push('probate');
+          } else if (ev.event_type === 'BANKRUPTCY_FILED') {
+            icon = 'shield';
+            borderClr = '#ef4444';
+            typeLabel = 'QUIEBRA / BANCARROTA';
+            activeDistressCategories.push('financial');
+          }
+
           div.style.borderLeftColor = borderClr;
-          
-          let pdfLink = '';
-          if (auc.pdf_url) {
-            pdfLink = `<a href="${auc.pdf_url}" target="_blank" rel="noopener noreferrer" style="color: ${borderClr}; margin-left: 10px; font-weight: bold;">[Ver PDF]</a>`;
-          }
-
-          let manualReviewAlert = '';
-          if (auc.needs_manual_review === 2) {
-            manualReviewAlert = `
-              <div style="margin-top: 8px; padding: 8px; background: rgba(139, 92, 246, 0.15); border: 1px solid rgba(139, 92, 246, 0.3); border-radius: 4px; font-size: 0.72rem; color: #d8b4fe; display: flex; align-items: flex-start; gap: 6px; line-height: 1.4;">
-                <i data-lucide="bot" class="inline-icon" style="color: #c084fc"></i>
-                <div>
-                  <strong>Sinceridad del Sistema (Hibernación):</strong> Búsqueda gratuita falló o datos incompletos. Al faltar más de 30 días, se programó un reintento para el <strong>${auc.next_retry_date || 'dentro de 15 días'}</strong> para optimizar costos de API de pago.
-                </div>
-              </div>
-            `;
-          } else if (auc.needs_manual_review === 1) {
-            manualReviewAlert = `
-              <div style="margin-top: 8px; padding: 8px; background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.3); border-radius: 4px; font-size: 0.72rem; color: #fca5a5; display: flex; align-items: flex-start; gap: 6px; line-height: 1.4;">
-                <i data-lucide="alert-triangle" class="inline-icon" style="color: #ef4444"></i>
-                <div>
-                  <strong>Revisión Manual Requerida:</strong> La extracción automática no pudo resolver detalles críticos de esta propiedad. Requiere inspección manual del PDF o registros de la corte.
-                </div>
-              </div>
-            `;
-          }
-
-          // Title check status badge
-          let titleCheckBadge = '';
-          if (auc.title_check_status) {
-            const tcColor = auc.title_check_status === 'success' ? 'var(--color-radar-green)' : (auc.title_check_status === 'failed' ? 'var(--color-execution-red)' : 'var(--text-muted)');
-            const tcText = auc.title_check_status === 'success' ? 'Verificado' : (auc.title_check_status === 'failed' ? 'Error / Sin Deuda' : 'Pendiente');
-            titleCheckBadge = `<span class="badge" style="background: rgba(255,255,255,0.05); color: ${tcColor}; border: 1px solid ${tcColor}; font-size: 0.62rem; margin-left: 8px;">Audit: ${tcText}</span>`;
-          }
+          const confPercent = Math.round((ev.confidence_score || 0.95) * 100);
 
           div.innerHTML = `
             <div class="distress-log-header">
-              <span style="color: ${borderClr}; font-weight: bold; display: flex; align-items: center; gap: 4px;"><i data-lucide="${iconName}" class="inline-icon" style="color: ${borderClr}"></i> ${titleStr} ${titleCheckBadge}</span>
-              <span style="color: ${borderClr}">${auc.auction_date || 'Fecha por fijar'}</span>
-            </div>
-            <div><strong>Caso Judicial:</strong> ${auc.case_number}</div>
-            <div><strong>Demandante:</strong> ${auc.plaintiff || 'No especificado'}</div>
-            <div><strong>Monto del Reclamo:</strong> $${(auc.debt_amount || 0).toLocaleString()} ${pdfLink}</div>
-            ${manualReviewAlert}
-          `;
-          logsContainer.appendChild(div);
-        });
-      }
-
-      // A.1 Pre-Foreclosures (Lis Pendens)
-      if (lead.preForeclosures && lead.preForeclosures.length > 0) {
-        activeDistressCategories.push('auction');
-        lead.preForeclosures.forEach(pf => {
-          const div = document.createElement('div');
-          div.className = 'distress-log-item';
-          div.style.borderLeftColor = 'var(--color-execution-orange)';
-          div.innerHTML = `
-            <div class="distress-log-header">
-              <span style="color: var(--color-execution-orange); font-weight: bold; display: flex; align-items: center; gap: 4px;">
-                <i data-lucide="clock" class="inline-icon" style="color: var(--color-execution-orange)"></i> 
-                DEMANDA TEMPRANA: PRE-FORECLOSURE (LIS PENDENS)
+              <span style="color: ${borderClr}; font-weight: bold; display: flex; align-items: center; gap: 4px;">
+                <i data-lucide="${icon}" class="inline-icon" style="color: ${borderClr}"></i> ${typeLabel}
+                <span class="badge" style="background: rgba(255,255,255,0.06); font-size: 0.6rem; margin-left: 4px; border: 1px solid var(--border-glass);">${confPercent}% Confianza</span>
               </span>
-              <span style="color: var(--color-execution-orange)">Radicado hace ${pf.days_since_filing || '30-90'} días</span>
+              <span style="color: ${borderClr}">${ev.event_date || 'Reciente'}</span>
             </div>
-            <div><strong>Caso Judicial:</strong> ${pf.case_number}</div>
-            <div><strong>Demandante (Banco/Prestamista):</strong> ${pf.plaintiff || 'No especificado'}</div>
-            <div><strong>Demandado / Propietario:</strong> ${pf.defendant || 'No especificado'}</div>
-            <div style="margin-top: 6px; padding: 6px; background: rgba(249, 115, 22, 0.1); border-radius: 4px; font-size: 0.75rem; color: #c2410c;">
-              ⚡ <strong>Ventaja Táctica:</strong> Sin fecha de subasta pública fijada. Negociación directa con el deudor antes del sheriff sale.
-            </div>
+            <div style="font-weight: 700; color: var(--text-main); margin-bottom: 2px; font-size: 0.78rem;">${ev.title}</div>
+            <div style="font-size: 0.72rem; color: var(--text-muted); line-height: 1.35;">${ev.description}</div>
+            ${ev.amount > 0 ? `<div style="font-size: 0.72rem; margin-top: 4px;"><strong>Monto Registrado:</strong> $${Number(ev.amount).toLocaleString()}</div>` : ''}
+            ${ev.source_system ? `<div style="font-size: 0.65rem; color: #64748b; margin-top: 3px;"><strong>Fuente Judicial:</strong> ${ev.source_system}</div>` : ''}
           `;
           logsContainer.appendChild(div);
         });
-      }
-
-      // A.2 Tax Sales (SRI Services)
-      if (lead.taxSales && lead.taxSales.length > 0) {
-        activeDistressCategories.push('financial');
-        lead.taxSales.forEach(ts => {
-          const div = document.createElement('div');
-          div.className = 'distress-log-item';
-          div.style.borderLeftColor = 'var(--color-financial-yellow)';
-          div.innerHTML = `
-            <div class="distress-log-header">
-              <span style="color: var(--color-financial-yellow); font-weight: bold; display: flex; align-items: center; gap: 4px;">
-                <i data-lucide="landmark" class="inline-icon" style="color: var(--color-financial-yellow)"></i> 
-                SUBASTA DE IMPUESTOS FISCALES (TAX SALE)
-              </span>
-              <span style="color: var(--color-financial-yellow)">${ts.sale_date || 'Próximamente'}</span>
-            </div>
-            <div><strong>Parcela ID:</strong> ${ts.parcel_id || 'N/A'}</div>
-            <div><strong>Impuestos Adeudados:</strong> $${(ts.taxes_owed || 0).toLocaleString()}</div>
-            <div><strong>Propietario:</strong> ${ts.owner_name || 'No especificado'}</div>
-          `;
-          logsContainer.appendChild(div);
-        });
-      }
-
-      // B. Violations
-      if (lead.violations && lead.violations.length > 0) {
-        activeDistressCategories.push('violation');
-        const isRoofViol = lead.violations.some(v => (v.violation_type || '').toUpperCase().includes('ROOF') || (v.details || '').toLowerCase().includes('roof'));
-        if (isRoofViol && !activeDistressCategories.includes('roofing')) {
-          activeDistressCategories.push('roofing');
+      } else {
+        // Fallback to legacy categories if event graph not present
+        // A. Auctions
+        if (lead.auctions && lead.auctions.length > 0) {
+          activeDistressCategories.push('auction');
+          lead.auctions.forEach(auc => {
+            const div = document.createElement('div');
+            div.className = 'distress-log-item';
+            const daysRemaining = getDaysRemaining(auc.auction_date);
+            const isScheduled = daysRemaining !== null;
+            const borderClr = isScheduled ? 'var(--color-execution-red)' : 'var(--color-execution-orange)';
+            const iconName = isScheduled ? 'shield-alert' : 'clock';
+            const titleStr = isScheduled ? 'ZONA DE EJECUCIÓN: SUBASTA PROGRAMADA' : 'ZONA DE EJECUCIÓN: DETECCIÓN PRE-SUBASTA';
+            div.style.borderLeftColor = borderClr;
+            let pdfLink = auc.pdf_url ? `<a href="${auc.pdf_url}" target="_blank" rel="noopener noreferrer" style="color: ${borderClr}; margin-left: 10px; font-weight: bold;">[Ver PDF]</a>` : '';
+            div.innerHTML = `
+              <div class="distress-log-header">
+                <span style="color: ${borderClr}; font-weight: bold; display: flex; align-items: center; gap: 4px;"><i data-lucide="${iconName}" class="inline-icon" style="color: ${borderClr}"></i> ${titleStr}</span>
+                <span style="color: ${borderClr}">${auc.auction_date || 'Fecha por fijar'}</span>
+              </div>
+              <div><strong>Caso Judicial:</strong> ${auc.case_number}</div>
+              <div><strong>Demandante:</strong> ${auc.plaintiff || 'No especificado'}</div>
+              <div><strong>Monto del Reclamo:</strong> $${(auc.debt_amount || 0).toLocaleString()} ${pdfLink}</div>
+            `;
+            logsContainer.appendChild(div);
+          });
         }
-        lead.violations.forEach(v => {
-          const div = document.createElement('div');
-          div.className = 'distress-log-item';
-          div.style.borderLeftColor = 'var(--color-others-purple)';
-          div.innerHTML = `
-            <div class="distress-log-header">
-              <span style="color: var(--color-others-purple); font-weight: bold; display: flex; align-items: center; gap: 4px;"><i data-lucide="alert-triangle" class="inline-icon" style="color: var(--color-others-purple)"></i> Otros: Violación de Código Activa</span>
-              <span style="color: var(--color-others-purple)">${v.report_date || 'Reciente'}</span>
-            </div>
-            <div><strong>Caso Violación:</strong> ${v.case_number}</div>
-            <div><strong>Infracción:</strong> ${v.violation_type}</div>
-            <div><strong>Estatus Local:</strong> <span style="text-transform: uppercase;">${v.status || 'Active'}</span></div>
-          `;
-          logsContainer.appendChild(div);
-        });
       }
 
-      // C. Probates
-      if (lead.probates && lead.probates.length > 0) {
-        activeDistressCategories.push('probate');
-        lead.probates.forEach(p => {
-          const div = document.createElement('div');
-          div.className = 'distress-log-item';
-          div.style.borderLeftColor = 'var(--color-others-purple)';
-          div.innerHTML = `
-            <div class="distress-log-header">
-              <span style="color: var(--color-others-purple); font-weight: bold; display: flex; align-items: center; gap: 4px;"><i data-lucide="file-text" class="inline-icon" style="color: var(--color-others-purple)"></i> Otros: Sucesiones (Probate)</span>
-              <span style="color: var(--color-others-purple)">Caso: ${p.case_number}</span>
-            </div>
-            <div><strong>De Cujus (Fallecido):</strong> ${p.deceased_name}</div>
-            <div><strong>Heredero Designado:</strong> ${p.heir_name}</div>
-          `;
-          logsContainer.appendChild(div);
-        });
-      }
+      // 2. Render Encumbrances & Liens Priority Ladder
+      if (lead.encumbrancesLadder && lead.encumbrancesLadder.length > 0) {
+        const ladderHeader = document.createElement('div');
+        ladderHeader.style.cssText = 'font-size: 0.72rem; font-weight: 800; text-transform: uppercase; color: var(--text-main); margin-top: 14px; margin-bottom: 8px; display: flex; align-items: center; gap: 6px;';
+        ladderHeader.innerHTML = `<i data-lucide="layers" style="width: 14px; height: 14px; color: var(--color-execution-red);"></i> Cascada de Gravámenes & Prioridad (${lead.encumbrancesLadder.length})`;
+        logsContainer.appendChild(ladderHeader);
 
-      // D. Divorces
-      if (lead.divorces && lead.divorces.length > 0) {
-        activeDistressCategories.push('divorce');
-        lead.divorces.forEach(d => {
-          const div = document.createElement('div');
-          div.className = 'distress-log-item';
-          div.style.borderLeftColor = 'var(--color-others-purple)';
-          div.innerHTML = `
-            <div class="distress-log-header">
-              <span style="color: var(--color-others-purple); font-weight: bold; display: flex; align-items: center; gap: 4px;"><i data-lucide="heart-off" class="inline-icon" style="color: var(--color-others-purple)"></i> Otros: Demanda de Divorcio</span>
-              <span style="color: var(--color-others-purple)">Caso: ${d.case_number}</span>
+        lead.encumbrancesLadder.forEach(enc => {
+          const encDiv = document.createElement('div');
+          encDiv.style.cssText = 'background: rgba(0,0,0,0.02); border: 1px solid var(--border-glass); border-radius: 8px; padding: 8px 12px; margin-bottom: 6px; font-size: 0.75rem; display: flex; justify-content: space-between; align-items: center;';
+          const pLabel = enc.priority === 1 
+            ? '<span class="badge" style="background: rgba(239,68,68,0.15); color: #ef4444; font-size: 0.6rem;">Prioridad 1 (Senior)</span>' 
+            : `<span class="badge" style="background: rgba(100,116,139,0.15); color: #64748b; font-size: 0.6rem;">Prioridad ${enc.priority} (Junior)</span>`;
+          encDiv.innerHTML = `
+            <div>
+              <div style="font-weight: 700; color: var(--text-main); display: flex; align-items: center; gap: 6px;">${enc.type.replace(/_/g, ' ')} ${pLabel}</div>
+              <div style="font-size: 0.7rem; color: var(--text-muted);">${enc.holder || 'Acreedor Registrado'} &bull; ${enc.source || 'Auditoría Judicial'}</div>
             </div>
-            <div><strong>Cónyuge A:</strong> ${d.spouse_a}</div>
-            <div><strong>Cónyuge B:</strong> ${d.spouse_b}</div>
+            <div style="font-weight: 800; color: #ef4444; font-size: 0.85rem;">$${Number(enc.amount || 0).toLocaleString()}</div>
           `;
-          logsContainer.appendChild(div);
-        });
-      }
-
-      // E. Bankruptcies
-      if (lead.bankruptcies && lead.bankruptcies.length > 0) {
-        activeDistressCategories.push('bankruptcy');
-        lead.bankruptcies.forEach(b => {
-          const div = document.createElement('div');
-          div.className = 'distress-log-item';
-          div.style.borderLeftColor = 'var(--color-others-purple)';
-          div.innerHTML = `
-            <div class="distress-log-header">
-              <span style="color: var(--color-others-purple); font-weight: bold; display: flex; align-items: center; gap: 4px;"><i data-lucide="trending-down" class="inline-icon" style="color: var(--color-others-purple)"></i> Otros: Declaración de Bancarrota</span>
-              <span style="color: var(--color-others-purple)">Caso: ${b.case_number}</span>
-            </div>
-            <div><strong>Deudor Principal:</strong> ${b.debtor_name}</div>
-            <div><strong>Tipo / Capítulo:</strong> ${b.bankruptcy_type || 'Capítulo 7/13'}</div>
-          `;
-          logsContainer.appendChild(div);
-        });
-      }
-
-      // F. Physical Distress
-      if (lead.physicalDistress && lead.physicalDistress.length > 0) {
-        activeDistressCategories.push('physical');
-        const isDisaster = lead.physicalDistress.some(pd => ['Tornado Damage', 'Storm Damage', 'Hail Damage'].includes(pd.distress_type));
-        if (isDisaster && !activeDistressCategories.includes('roofing')) {
-          activeDistressCategories.push('roofing');
-        }
-        lead.physicalDistress.forEach(pd => {
-          const div = document.createElement('div');
-          div.className = 'distress-log-item';
-          div.style.borderLeftColor = 'var(--color-physical-amber)';
-          div.innerHTML = `
-            <div class="distress-log-header">
-              <span style="color: var(--color-physical-amber); font-weight: bold; display: flex; align-items: center; gap: 4px;"><i data-lucide="flame" class="inline-icon" style="color: var(--color-physical-amber)"></i> Estrés Físico / Abandono Municipal</span>
-              <span style="color: var(--color-physical-amber)">${pd.report_date || 'Reciente'}</span>
-            </div>
-            <div><strong>Infracción:</strong> ${pd.distress_type}</div>
-            <div><strong>Detalles:</strong> _${pd.details || 'Sin detalles adicionales'}_</div>
-          `;
-          logsContainer.appendChild(div);
-        });
-      }
-
-      // G. Financial Distress
-      if (lead.financialDistress && lead.financialDistress.length > 0) {
-        activeDistressCategories.push('financial');
-        lead.financialDistress.forEach(fd => {
-          const div = document.createElement('div');
-          div.className = 'distress-log-item';
-          div.style.borderLeftColor = 'var(--color-financial-yellow)';
-          const debtStr = fd.debt_amount ? `$${fd.debt_amount.toLocaleString()}` : 'No especificada';
-          div.innerHTML = `
-            <div class="distress-log-header">
-              <span style="color: var(--color-financial-yellow); font-weight: bold; display: flex; align-items: center; gap: 4px;"><i data-lucide="scale" class="inline-icon" style="color: var(--color-financial-yellow)"></i> Otros: Gravamen / Demanda Financiera</span>
-              <span style="color: var(--color-financial-yellow)">${fd.report_date || 'Reciente'}</span>
-            </div>
-            <div><strong>Tipo:</strong> ${fd.record_type}</div>
-            <div><strong>Caso:</strong> ${fd.case_number || 'N/A'}</div>
-            <div><strong>Acreedor:</strong> ${fd.plaintiff || 'No especificado'}</div>
-            <div><strong>Monto:</strong> ${debtStr}</div>
-          `;
-          logsContainer.appendChild(div);
-        });
-      }
-
-      // H. Life Events
-      if (lead.lifeEvents && lead.lifeEvents.length > 0) {
-        activeDistressCategories.push('life-event');
-        lead.lifeEvents.forEach(le => {
-          const div = document.createElement('div');
-          div.className = 'distress-log-item';
-          div.style.borderLeftColor = 'var(--color-others-purple)';
-          div.innerHTML = `
-            <div class="distress-log-header">
-              <span style="color: var(--color-others-purple); font-weight: bold; display: flex; align-items: center; gap: 4px;"><i data-lucide="alert-circle" class="inline-icon" style="color: var(--color-others-purple)"></i> Otros: Evento de Vida Crítico</span>
-              <span style="color: var(--color-others-purple)">${le.report_date || 'Reciente'}</span>
-            </div>
-            <div><strong>Tipo:</strong> ${le.event_type}</div>
-            <div><strong>Sujeto:</strong> ${le.subject_name}</div>
-            <div><strong>Detalles:</strong> _${le.details || 'Sin detalles adicionales'}_</div>
-          `;
-          logsContainer.appendChild(div);
+          logsContainer.appendChild(encDiv);
         });
       }
 

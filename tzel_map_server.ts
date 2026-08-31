@@ -439,7 +439,13 @@ app.get("/api/prospectos", async (req, res) => {
       // 10. pre_foreclosures
       `SELECT pre_foreclosure_id, case_number, address, county, state, filing_date, plaintiff, defendant, case_status, days_since_filing, defendant_phones, defendant_emails, mailing_address, absentee_owner, photo_urls FROM pre_foreclosures`,
       // 11. tax_sales
-      `SELECT tax_sale_id, parcel_id, address, county, state, owner_name, taxes_owed, sale_date, defendant_phones, defendant_emails, mailing_address, absentee_owner, photo_urls FROM tax_sales`
+      `SELECT tax_sale_id, parcel_id, address, county, state, owner_name, taxes_owed, sale_date, defendant_phones, defendant_emails, mailing_address, absentee_owner, photo_urls FROM tax_sales`,
+      // 12. tzel_events
+      `SELECT * FROM tzel_events ORDER BY event_date ASC`,
+      // 13. tzel_encumbrances
+      `SELECT * FROM tzel_encumbrances ORDER BY priority ASC`,
+      // 14. tzel_opportunity_scores
+      `SELECT * FROM tzel_opportunity_scores`
     ], "read");
 
     const auctionsRes = batchRes[0];
@@ -454,6 +460,9 @@ app.get("/api/prospectos", async (req, res) => {
     const osintRes = batchRes[9];
     const preForeclosuresRes = batchRes[10];
     const taxSalesRes = batchRes[11];
+    const eventsRes = batchRes[12];
+    const encumbrancesRes = batchRes[13];
+    const opportunityScoresRes = batchRes[14];
 
     // Filter auctions to next 60 days or Indiana manual reviews
     const opportunities = auctionsRes.rows.filter(row => {
@@ -1184,6 +1193,35 @@ app.get("/api/prospectos", async (req, res) => {
       }
     }
 
+    // Pre-cargar eventos, encumbrances y opportunity scores del nuevo Grafo
+    const eventsMap = new Map<string, any[]>();
+    for (const row of eventsRes.rows) {
+      const pid = row.property_id as string;
+      if (!eventsMap.has(pid)) eventsMap.set(pid, []);
+      eventsMap.get(pid)!.push(row);
+    }
+
+    const encumbrancesMap = new Map<string, any[]>();
+    for (const row of encumbrancesRes.rows) {
+      const pid = row.property_id as string;
+      if (!encumbrancesMap.has(pid)) encumbrancesMap.set(pid, []);
+      encumbrancesMap.get(pid)!.push(row);
+    }
+
+    const scoresMap = new Map<string, any>();
+    for (const row of opportunityScoresRes.rows) {
+      const pid = row.property_id as string;
+      scoresMap.set(pid, {
+        opportunityScore: row.opportunity_score as number,
+        equityScore: row.equity_score as number,
+        motivationScore: row.motivation_score as number,
+        accessibilityScore: row.accessibility_score as number,
+        legalRiskScore: row.legal_risk_score as number,
+        tacticalAction: row.tactical_action as string,
+        underwritingSummary: row.underwriting_summary ? JSON.parse(row.underwriting_summary as string) : null
+      });
+    }
+
     // Geocodificar y calcular variables en lote
     const responseData: any[] = [];
 
@@ -1229,8 +1267,17 @@ app.get("/api/prospectos", async (req, res) => {
         envAttractors: []
       };
 
+      const propertyId = `PROP_${lead.groupingKey.replace(/[^a-z0-9]/g, '_').substring(0, 40)}`;
+      const propEvents = eventsMap.get(propertyId) || [];
+      const propEncumbrances = encumbrancesMap.get(propertyId) || [];
+      const scoreObj = scoresMap.get(propertyId) || {
+        opportunityScore: 50,
+        tacticalAction: 'REVISIÓN PRELIMINAR DE EXPEDIENTE'
+      };
+
       responseData.push({
         groupingKey: lead.groupingKey,
+        propertyId: propertyId,
         displayAddress: lead.displayAddress,
         state: lead.state,
         county: lead.county,
@@ -1249,6 +1296,10 @@ app.get("/api/prospectos", async (req, res) => {
         lifeEvents: lead.lifeEvents,
         preForeclosures: lead.preForeclosures || [],
         taxSales: lead.taxSales || [],
+        eventsTimeline: propEvents,
+        encumbrancesLadder: propEncumbrances,
+        opportunityScore: scoreObj.opportunityScore,
+        tacticalAction: scoreObj.tacticalAction,
         hiddenMortgages: hiddenDebt,
         hiddenLiensAmount: lead.hiddenLiensAmount,
         titleCheckStatus: lead.titleCheckStatus,
