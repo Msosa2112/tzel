@@ -1,13 +1,10 @@
-import { createClient } from "@libsql/client";
+import { db } from "./db";
 import * as dotenv from "dotenv";
 import { makeGotScrapingRequest } from "./scrapers/got_scraping_helper";
 
 dotenv.config();
 
-const db = createClient({
-  url: process.env.TURSO_DATABASE_URL || "",
-  authToken: process.env.TURSO_AUTH_TOKEN || "",
-});
+
 
 export interface EnvAuditResult {
   stressors: string[];

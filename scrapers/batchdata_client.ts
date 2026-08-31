@@ -283,8 +283,8 @@ export class BatchDataClient {
     name: string,
     propertyAddress: BatchDataAddress
   ): Promise<BatchDataSkipTraceResponse> {
-    if (!this.apiKey) {
-      console.log(`[BATCHDATA SKIP] Sin API Key para: "${name}". Retornando vacío.`);
+    if (process.env.USE_BATCHDATA === "false" || !this.apiKey) {
+      console.log(`[BATCHDATA DISABLED/SKIP] BatchData desactivado o sin API Key para: "${name}". Retornando vacío.`);
       return { success: false, phones: [], emails: [], outOfFunds: true };
     }
 
@@ -415,9 +415,9 @@ export class BatchDataClient {
     county: string,
     filters?: any
   ): Promise<{ success: boolean; results: any[] }> {
-    if (!this.apiKey) {
-      console.log(`[BATCHDATA SIMULATED] searchProperties simulado para ${county}, ${state}`);
-      return { success: true, results: this.getSimulatedSearchResults(state, county, filters) };
+    if (process.env.USE_BATCHDATA === "false" || !this.apiKey) {
+      console.log(`[BATCHDATA DISABLED/SKIP] BatchData desactivado para searchProperties en ${county}, ${state}`);
+      return { success: false, results: [] };
     }
     try {
       console.log(`[BATCHDATA API] Buscando propiedades en ${county}, ${state}...`);
@@ -450,9 +450,9 @@ export class BatchDataClient {
   async lookupPropertyAllAttributes(
     requests: Array<{ address?: BatchDataAddress; apn?: string }>
   ): Promise<{ success: boolean; results: any[] }> {
-    if (!this.apiKey) {
-      console.log(`[BATCHDATA SIMULATED] lookupPropertyAllAttributes simulado para ${requests.length} propiedades`);
-      return { success: true, results: this.getSimulatedLookupResults(requests) };
+    if (process.env.USE_BATCHDATA === "false" || !this.apiKey) {
+      console.log(`[BATCHDATA DISABLED/SKIP] BatchData desactivado para lookupPropertyAllAttributes (${requests.length} propiedades)`);
+      return { success: false, results: [] };
     }
     try {
       console.log(`[BATCHDATA API] Consultando all-attributes para ${requests.length} propiedades...`);

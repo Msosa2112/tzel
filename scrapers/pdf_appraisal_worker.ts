@@ -1,6 +1,7 @@
 import axios from "axios";
 import { createClient } from "@libsql/client";
 import * as dotenv from "dotenv";
+import { isHighYieldProperty } from "../underwriting/underwriter";
 
 dotenv.config();
 
@@ -34,7 +35,7 @@ export async function runPdfAppraisalWorker() {
     const rows = pendingAuctions.rows;
     console.log(`[PDF WORKER] Encontrados ${rows.length} expedientes con PDF pendiente de tasación.`);
 
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${apiKey}`;
 
     for (let i = 0; i < rows.length; i++) {
       const row = rows[i];
@@ -128,7 +129,9 @@ REGLAS:
           throw new Error("Respuesta vacía de la API de Gemini.");
         }
 
-        const result = JSON.parse(responseText.trim());
+        const match = responseText.match(/\{[\s\S]*\}/);
+        const cleanJson = match ? match[0] : responseText;
+        const result = JSON.parse(cleanJson);
         const extAppraisal = result.appraisalValue ? parseFloat(result.appraisalValue) : null;
         const extDebt = result.judgmentDebt ? parseFloat(result.judgmentDebt) : null;
         const explanation = result.explanation || "";
@@ -137,19 +140,22 @@ REGLAS:
         console.log(`  Detalles: ${explanation}`);
 
         if (extAppraisal && extAppraisal > 0) {
+          const finalDebt = (extDebt && extDebt > 0) ? extDebt : (row.debt_amount as number || 0);
+          const isHighYield = (finalDebt > 0 && isHighYieldProperty(extAppraisal, finalDebt, 0, 0, 0.20)) ? 1 : 0;
+
           // Actualizar en base de datos
           if (extDebt && extDebt > 0 && (!row.debt_amount || row.debt_amount === 0)) {
             await db.execute({
-              sql: "UPDATE foreclosure_auctions SET appraisal_value = ?, debt_amount = ? WHERE auction_id = ?",
-              args: [extAppraisal, extDebt, auctionId]
+              sql: "UPDATE foreclosure_auctions SET appraisal_value = ?, debt_amount = ?, is_high_yield = ? WHERE auction_id = ?",
+              args: [extAppraisal, extDebt, isHighYield, auctionId]
             });
-            console.log(`  [DB UPDATE] Actualizados appraisal_value y debt_amount para caso ${caseNumber}.`);
+            console.log(`  [DB UPDATE] Actualizados appraisal_value ($${extAppraisal.toLocaleString()}), debt_amount ($${extDebt.toLocaleString()}) y is_high_yield (${isHighYield}) para caso ${caseNumber}.`);
           } else {
             await db.execute({
-              sql: "UPDATE foreclosure_auctions SET appraisal_value = ? WHERE auction_id = ?",
-              args: [extAppraisal, auctionId]
+              sql: "UPDATE foreclosure_auctions SET appraisal_value = ?, is_high_yield = ? WHERE auction_id = ?",
+              args: [extAppraisal, isHighYield, auctionId]
             });
-            console.log(`  [DB UPDATE] Actualizado appraisal_value para caso ${caseNumber}.`);
+            console.log(`  [DB UPDATE] Actualizado appraisal_value ($${extAppraisal.toLocaleString()}) y is_high_yield (${isHighYield}) para caso ${caseNumber}.`);
           }
         } else {
           console.log(`  [PDF WORKER SKIP] No se extrajo un valor de tasación válido.`);

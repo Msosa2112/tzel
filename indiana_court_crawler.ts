@@ -8,6 +8,7 @@ import { isHighYieldProperty } from "./underwriting/underwriter";
 import { BatchDataClient } from "./scrapers/batchdata_client";
 import { scrapeIndianaCaseWithCrawlee } from "./scrapers/crawlee_court_scraper";
 import { applyFlareSolverrBypass } from "./scrapers/proxy_helper";
+import { skipTracingQueue } from "./queue_config";
 
 chromium.use(stealthPlugin());
 
@@ -745,14 +746,15 @@ async function runIndianaCrawler() {
         // Si no se extrajeron nombres pero hay una deuda válida, omitimos la revisión manual
         const needsManual = debt && debt > 0 ? 0 : 1;
         
-        // Calcular is_high_yield
+        // Calcular is_high_yield (Comparando Deuda vs MCA / Appraisal Value o Valor Catastral con margen >= 20%)
+        const benchmarkValue = (row.appraisal_value as number) || mlsEstimatedValue;
         let isHighYield = 0;
-        if (debt && debt > 0 && mlsEstimatedValue > 0) {
-          const discountPct = ((mlsEstimatedValue - debt) / mlsEstimatedValue) * 100;
-          console.log(`[MATCH SCORING] Deuda: $${debt.toLocaleString("en-US")} vs ARV: $${mlsEstimatedValue.toLocaleString("en-US")} | Descuento potencial: ${discountPct.toFixed(1)}%`);
-          if (isHighYieldProperty(mlsEstimatedValue, debt, hiddenMortgages)) {
+        if (debt && debt > 0 && benchmarkValue > 0) {
+          const discountPct = ((benchmarkValue - debt) / benchmarkValue) * 100;
+          console.log(`[MATCH SCORING] Deuda: $${debt.toLocaleString("en-US")} vs MCA/Valor: $${benchmarkValue.toLocaleString("en-US")} | Margen: ${discountPct.toFixed(1)}%`);
+          if (isHighYieldProperty(benchmarkValue, debt, hiddenMortgages, 0, 0.20)) {
             isHighYield = 1;
-            console.log(`[HIGH YIELD] ¡Propiedad marcada como alta rentabilidad (Equity >= 30% del ARV)!`);
+            console.log(`[HIGH YIELD] ¡Propiedad marcada como alta rentabilidad (Margen Real >= 20% sobre MCA/Valor)!`);
           }
         }
  
@@ -777,6 +779,22 @@ async function runIndianaCrawler() {
           ]
         });
         if (debt && debt > 0) {
+          try {
+            await skipTracingQueue.add("skipTraceLead", {
+              auctionId,
+              address,
+              ownerName: finalDefendant,
+              county,
+              state: "IN"
+            }, {
+              attempts: 3,
+              backoff: { type: "exponential", delay: 5000 }
+            });
+            console.log(`  [BULLMQ] Encolado en SkipTracingQueue para: ${finalDefendant} (${address})`);
+          } catch (queueErr: any) {
+            console.error(`  [BULLMQ ERROR] No se pudo encolar en SkipTracingQueue: ${queueErr.message}`);
+          }
+
           if (finalPlaintiff === "Unknown" || finalDefendant === "Unknown") {
             console.log(`[AVISO] Nombres no extraídos para caso ${caseNumber}, pero se continuó con éxito porque se obtuvo deuda de $${debt.toLocaleString()} (Nombres guardados como 'Unknown').`);
           } else {

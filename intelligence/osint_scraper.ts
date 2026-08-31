@@ -145,21 +145,21 @@ export async function searchOSINTContacts(
   const zip = zipMatches ? zipMatches[zipMatches.length - 1] : "";
   const location = zip || city || stateVal;
   
+  const streetPart = address ? address.split(",")[0].trim() : "";
+  
   // Construir consultas dirigidas
   const queries: string[] = [];
   if (isLLC(cleanName)) {
     const stateName = stateVal === "KY" ? "Kentucky" : (stateVal === "IN" ? "Indiana" : stateVal);
     queries.push(`"${cleanName}" "${stateName}" (bizapedia OR opencorporates OR "secretary of state")`);
   } else {
-    queries.push(`"${cleanName}" "${location}" (obituary OR divorce)`);
-    // QUERY 2: Específica de directorios públicos de personas
+    if (streetPart) {
+      queries.push(`"${cleanName}" "${streetPart}" (site:fastpeoplesearch.com OR site:truepeoplesearch.com OR site:cyberbackgroundchecks.com)`);
+    }
     queries.push(`"${cleanName}" "${location}" (site:fastpeoplesearch.com OR site:truepeoplesearch.com OR site:cyberbackgroundchecks.com OR site:whitepages.com)`);
-    // QUERY 3: Respaldo con Ciudad y Estado (más confiable para indexación en buscadores)
     const cleanCity = city.replace(/\b(ky|in)\b/gi, "").replace(/\d+/g, "").trim();
     if (cleanCity) {
-      queries.push(`"${cleanName}" "${cleanCity}, ${stateVal}" (site:fastpeoplesearch.com OR site:truepeoplesearch.com OR site:cyberbackgroundchecks.com)`);
-    } else {
-      queries.push(`"${cleanName}" "${stateVal}" (site:fastpeoplesearch.com OR site:truepeoplesearch.com OR site:cyberbackgroundchecks.com)`);
+      queries.push(`"${cleanName}" "${cleanCity}, ${stateVal}" (site:fastpeoplesearch.com OR site:truepeoplesearch.com)`);
     }
   }
 

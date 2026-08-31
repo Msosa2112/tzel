@@ -98,13 +98,26 @@ function getSignificantTokens(normalizedName: string): string[] {
     .filter(token => token.length >= 3 && !STOP_WORDS.has(token));
 }
 
-const gemmaCache = new Map<string, boolean>();
+const geminiEntityCache = new Map<string, boolean>();
 
-async function askGemmaIfSameEntity(
+async function askGeminiIfSameEntity(
   nameA: string, mailingA: string,
   nameB: string, mailingB: string
 ): Promise<boolean> {
-  const url = "http://localhost:11434/api/generate";
+  const cacheKey = `${nameA}_${mailingA}__${nameB}_${mailingB}`;
+  if (geminiEntityCache.has(cacheKey)) {
+    return geminiEntityCache.get(cacheKey)!;
+  }
+
+  const geminiApiKey = process.env.GEMINI_API_KEY;
+  if (!geminiApiKey) {
+    if (mailingA && mailingB && mailingA.toLowerCase() === mailingB.toLowerCase() && mailingA.toLowerCase() !== "unknown" && mailingA.length > 5) {
+      return true;
+    }
+    return false;
+  }
+
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiApiKey}`;
   const prompt = `Instrucción: Eres un experto en resolución de entidades y análisis de beneficiarios reales (UBO) en bienes raíces.
 Determina si las siguientes dos entidades/personas representan a la misma entidad legal o beneficiario final físico detrás de una propiedad, basándote en la similitud de nombres y las direcciones fiscales de correo.
 
@@ -135,26 +148,31 @@ Entidad B:
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "gemma:7b",
-        prompt: prompt,
-        stream: false,
-        format: "json"
+        contents: [{
+          parts: [{ text: prompt }]
+        }],
+        generationConfig: {
+          response_mime_type: "application/json"
+        }
       }),
-      signal: AbortSignal.timeout(10000)
+      signal: AbortSignal.timeout(8000)
     });
 
     if (!response.ok) throw new Error(`HTTP Error ${response.status}`);
-    const data = await response.json() as { response: string };
-    if (!data.response) throw new Error("Empty response");
+    const data = await response.json() as any;
+    const textRes = data.candidates?.[0]?.content?.parts?.[0]?.text;
+    if (!textRes) throw new Error("Empty response");
 
-    const parsedResult = JSON.parse(data.response);
+    const parsedResult = JSON.parse(textRes);
     const keys = Object.keys(parsedResult);
     const key = keys.find(k => k.toLowerCase() === "is_same_entity");
+    let result = false;
     if (key) {
       const val = (parsedResult as any)[key];
-      return val === true || val === "true" || val === 1 || String(val).toLowerCase() === "true";
+      result = val === true || val === "true" || val === 1 || String(val).toLowerCase() === "true";
     }
-    return false;
+    geminiEntityCache.set(cacheKey, result);
+    return result;
   } catch (err: any) {
     // Fallback: si falla el LLM, hacemos una simple verificación por heurística
     if (mailingA && mailingB && mailingA.toLowerCase() === mailingB.toLowerCase() && mailingA.toLowerCase() !== "unknown" && mailingA.length > 5) {
@@ -296,25 +314,17 @@ async function resolveEntities() {
           const tokensA = getSignificantTokens(pA.normalizedOwner);
           const tokensB = getSignificantTokens(pB.normalizedOwner);
 
-          // Si comparten algún token significativo (para no llamar a Gemma con todo)
+          // Si comparten algún token significativo (para no llamar a Gemini con todo)
           const intersection = tokensA.filter(t => tokensB.includes(t));
           if (intersection.length > 0) {
-            const cacheKey = [pA.normalizedOwner, pB.normalizedOwner].sort().join("::");
-            let isSame = false;
-
-            if (gemmaCache.has(cacheKey)) {
-              isSame = gemmaCache.get(cacheKey)!;
-            } else {
-              isSame = await askGemmaIfSameEntity(
-                pA.rawOwner, pA.mailingAddress,
-                pB.rawOwner, pB.mailingAddress
-              );
-              gemmaCache.set(cacheKey, isSame);
-            }
+            const isSame = await askGeminiIfSameEntity(
+              pA.rawOwner, pA.mailingAddress,
+              pB.rawOwner, pB.mailingAddress
+            );
 
             if (isSame) {
               matched = true;
-              console.log(`\x1b[32m[MATCH GEMMA LLM] Gemma resolvió que "${pA.rawOwner}" y "${pB.rawOwner}" son la misma entidad.\x1b[0m`);
+              console.log(`\x1b[32m[MATCH GEMINI LLM] Gemini resolvió que "${pA.rawOwner}" y "${pB.rawOwner}" son la misma entidad.\x1b[0m`);
             }
           }
         }

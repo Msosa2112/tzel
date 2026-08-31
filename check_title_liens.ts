@@ -1,19 +1,19 @@
 import axios from "axios";
-import { createClient } from "@libsql/client";
+import pLimit from "p-limit";
+import { db } from "./db";
+import { sendTelegramNotification } from "./telegram_helper";
 import * as dotenv from "dotenv";
 import { chromium } from "playwright-extra";
 import stealthPlugin from "puppeteer-extra-plugin-stealth";
 import { checkPropertyLiens } from "./scrapers/lien_detector";
+import { getPropertyLiensFromAttom } from "./scrapers/attom_client";
 import { calculateMAO, calculateRehab } from "./underwriting/underwriter";
 
 chromium.use(stealthPlugin());
 
 dotenv.config();
 
-const db = createClient({
-  url: process.env.TURSO_DATABASE_URL || "",
-  authToken: process.env.TURSO_AUTH_TOKEN || "",
-});
+
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -162,33 +162,7 @@ async function scrapeCountyClerk(ownerName: string, county: string, state: strin
   return totalSecondaryDebt;
 }
 
-/**
- * Envía un mensaje estructurado a Telegram.
- */
-async function sendTelegramNotification(message: string): Promise<boolean> {
-  const token = process.env.TELEGRAM_BOT_TOKEN;
-  const chatId = process.env.TELEGRAM_CHAT_ID;
-  if (!token || !chatId) {
-    console.log("[TELEGRAM] Advertencia: Credenciales de Telegram no configuradas.");
-    return false;
-  }
-  
-  const url = `https://api.telegram.org/bot${token}/sendMessage`;
-  const payload = {
-    chat_id: chatId,
-    text: message,
-    parse_mode: "Markdown",
-    disable_web_page_preview: true
-  };
-  
-  try {
-    const response = await axios.post(url, payload, { timeout: 10000 });
-    return response.status === 200;
-  } catch (e: any) {
-    console.error(`[TELEGRAM EXCEPTION] Error al enviar mensaje: ${e.message || e}`);
-    return false;
-  }
-}
+
 
 /**
  * Función principal del módulo para auditar deudas en todas las propiedades con alta rentabilidad.
@@ -218,133 +192,163 @@ export async function runTitleLienCheck() {
 
   console.log(`[TITLE LIENS] Oportunidades encontradas para verificar: Subastas: ${auctions.length}, Violaciones: ${violations.length}`);
 
-  // Procesar subastas
-  for (const row of auctions) {
-    const auctionId = row.auction_id as string;
-    const address = row.address as string;
-    const county = row.county as string || "Jefferson";
-    const state = row.state as string || "KY";
-    const ownerName = row.defendant as string || "Unknown";
-    const arv = row.mls_estimated_value as number || 0;
-    const sqft = row.sqft as number || null;
-    const hiddenMortgages = row.hidden_mortgages as number || 0;
+  const limit = pLimit(5);
 
-    console.log(`\n[PROCESANDO] Verificando deudas ocultas para Subasta: ${address} (${ownerName})`);
-    
-    // Intento Primario: Spark API
-    let hiddenDebt = await querySparkPublicRecords(address, state);
-    
-    // Intento Secundario: County Clerk Crawler
-    if (hiddenDebt === null) {
-      hiddenDebt = await scrapeCountyClerk(ownerName, county, state);
-    }
+  // Procesar subastas en paralelo
+  await Promise.all(
+    auctions.map((row) =>
+      limit(async () => {
+        const auctionId = row.auction_id as string;
+        const address = row.address as string;
+        const county = row.county as string || "Jefferson";
+        const state = row.state as string || "KY";
+        const ownerName = row.defendant as string || "Unknown";
+        const arv = row.mls_estimated_value as number || 0;
+        const sqft = row.sqft as number || null;
+        const hiddenMortgages = row.hidden_mortgages as number || 0;
 
-    try {
-      await db.execute({
-        sql: "UPDATE foreclosure_auctions SET hidden_mortgages = ? WHERE auction_id = ?",
-        args: [hiddenDebt, auctionId]
-      });
-      console.log(`[SUCCESS] Base de datos actualizada con hidden_mortgages = $${hiddenDebt} para subasta ${auctionId}`);
-    } catch (err: any) {
-      console.error(`[DB UPDATE ERROR] No se pudo guardar hidden_mortgages para subasta ${auctionId}:`, err.message);
-    }
+        console.log(`\n[PROCESANDO] Verificando deudas ocultas para Subasta: ${address} (${ownerName})`);
+        
+        // Intento Primario: Spark API
+        let hiddenDebt = await querySparkPublicRecords(address, state);
+        
+        // Intento Secundario: County Clerk Crawler
+        if (hiddenDebt === null) {
+          hiddenDebt = await scrapeCountyClerk(ownerName, county, state);
+        }
 
-    // --- Módulo de Detección de Hipotecas Ocultas (Fase 3 - Playwright Stealth + Gemini) ---
-    try {
-      const lienResult = await checkPropertyLiens(ownerName, address, state, county);
-      const hiddenLiensAmount = lienResult.totalHiddenDebt;
+        try {
+          await db.execute({
+            sql: "UPDATE foreclosure_auctions SET hidden_mortgages = ? WHERE auction_id = ?",
+            args: [hiddenDebt, auctionId]
+          });
+          console.log(`[SUCCESS] Base de datos actualizada con hidden_mortgages = $${hiddenDebt} para subasta ${auctionId}`);
+        } catch (err: any) {
+          console.error(`[DB UPDATE ERROR] No se pudo guardar hidden_mortgages para subasta ${auctionId}:`, err.message);
+        }
 
-      await db.execute({
-        sql: "UPDATE foreclosure_auctions SET hidden_liens_amount = ?, title_check_status = 'success' WHERE auction_id = ?",
-        args: [hiddenLiensAmount, auctionId]
-      });
-      console.log(`[SUCCESS] Base de datos actualizada con hidden_liens_amount = $${hiddenLiensAmount} para subasta ${auctionId}`);
+        // --- Módulo de Detección de Hipotecas Ocultas (Premium Attom API first, then Playwright Stealth + Gemini) ---
+        try {
+          const zipMatch = address.match(/\b\d{5}\b/);
+          const zipCode = zipMatch ? zipMatch[0] : "";
+          let hiddenLiensAmount = 0;
 
-      if (hiddenLiensAmount > 0) {
-        const rehab = calculateRehab(sqft, []);
-        const adjustedMao = calculateMAO(arv, rehab, hiddenMortgages, hiddenLiensAmount);
+          const attomResult = await getPropertyLiensFromAttom(address, zipCode);
+          if (attomResult.success) {
+            hiddenLiensAmount = attomResult.totalHiddenDebt;
+          } else {
+            console.log(`[FALLBACK] API Attom falló para ${address}, cayendo a Playwright + Gemini...`);
+            const lienResult = await checkPropertyLiens(ownerName, address, state, county);
+            hiddenLiensAmount = lienResult.totalHiddenDebt;
+          }
 
-        // Alerta roja brillante en consola
-        console.log(`\x1b[1;31m🏦 [ALERTA ROJA] HIPOTECAS OCULTAS DETECTADAS EN ${address}. Deuda extra: $${hiddenLiensAmount}. MAO ajustado a: $${adjustedMao}.\x1b[0m`);
+          await db.execute({
+            sql: "UPDATE foreclosure_auctions SET hidden_liens_amount = ?, title_check_status = 'success' WHERE auction_id = ?",
+            args: [hiddenLiensAmount, auctionId]
+          });
+          console.log(`[SUCCESS] Base de datos actualizada con hidden_liens_amount = $${hiddenLiensAmount} para subasta ${auctionId}`);
 
-        // Alerta de Telegram
-        const tgMsg = `🏦 [ALERTA ROJA] HIPOTECAS OCULTAS DETECTADAS EN ${address}. Deuda extra: $${hiddenLiensAmount.toLocaleString("en-US", { minimumFractionDigits: 2 })}. MAO ajustado a: $${adjustedMao.toLocaleString("en-US", { minimumFractionDigits: 2 })}.`;
-        await sendTelegramNotification(tgMsg);
-      }
-    } catch (err: any) {
-      console.error(`[LIEN DETECTOR ERROR] Falló el escaneo de gravámenes para subasta ${auctionId}:`, err.message);
-      try {
-        await db.execute({
-          sql: "UPDATE foreclosure_auctions SET title_check_status = 'failed' WHERE auction_id = ?",
-          args: [auctionId]
-        });
-      } catch (dbErr) {}
-    }
-    await sleep(1500);
-  }
+          if (hiddenLiensAmount > 0) {
+            const rehab = calculateRehab(sqft, []);
+            const adjustedMao = calculateMAO(arv, rehab, hiddenMortgages, hiddenLiensAmount);
 
-  // Procesar violaciones de código
-  for (const row of violations) {
-    const violationId = row.violation_id as string;
-    const address = row.address as string;
-    const ownerName = row.owner_name as string || "DUEÑO DESCONOCIDO";
-    const arv = row.mls_estimated_value as number || 0;
-    const sqft = row.sqft as number || null;
-    const hiddenMortgages = row.hidden_mortgages as number || 0;
+            // Alerta roja brillante en consola
+            console.log(`\x1b[1;31m🏦 [ALERTA ROJA] HIPOTECAS OCULTAS DETECTADAS EN ${address}. Deuda extra: $${hiddenLiensAmount}. MAO ajustado a: $${adjustedMao}.\x1b[0m`);
 
-    console.log(`\n[PROCESANDO] Verificando deudas ocultas para Violación de Código: ${address} (${ownerName})`);
-    
-    // Intento Primario: Spark API (Violaciones están en Louisville, KY)
-    let hiddenDebt = await querySparkPublicRecords(address, "KY");
-    
-    // Intento Secundario: County Clerk Crawler
-    if (hiddenDebt === null) {
-      hiddenDebt = await scrapeCountyClerk(ownerName, "Jefferson", "KY");
-    }
+            // Alerta de Telegram
+            const tgMsg = `🏦 [ALERTA ROJA] HIPOTECAS OCULTAS DETECTADAS EN ${address}. Deuda extra: $${hiddenLiensAmount.toLocaleString("en-US", { minimumFractionDigits: 2 })}. MAO ajustado a: $${adjustedMao.toLocaleString("en-US", { minimumFractionDigits: 2 })}.`;
+            await sendTelegramNotification(tgMsg);
+          }
+        } catch (err: any) {
+          console.error(`[LIEN DETECTOR ERROR] Falló el escaneo de gravámenes para subasta ${auctionId}:`, err.message);
+          try {
+            await db.execute({
+              sql: "UPDATE foreclosure_auctions SET title_check_status = 'failed' WHERE auction_id = ?",
+              args: [auctionId]
+            });
+          } catch (dbErr) {}
+        }
+        await sleep(1500);
+      })
+    )
+  );
 
-    try {
-      await db.execute({
-        sql: "UPDATE code_violations SET hidden_mortgages = ? WHERE violation_id = ?",
-        args: [hiddenDebt, violationId]
-      });
-      console.log(`[SUCCESS] Base de datos actualizada con hidden_mortgages = $${hiddenDebt} para violación ${violationId}`);
-    } catch (err: any) {
-      console.error(`[DB UPDATE ERROR] No se pudo guardar hidden_mortgages para violación ${violationId}:`, err.message);
-    }
+  // Procesar violaciones de código en paralelo
+  await Promise.all(
+    violations.map((row) =>
+      limit(async () => {
+        const violationId = row.violation_id as string;
+        const address = row.address as string;
+        const ownerName = row.owner_name as string || "DUEÑO DESCONOCIDO";
+        const arv = row.mls_estimated_value as number || 0;
+        const sqft = row.sqft as number || null;
+        const hiddenMortgages = row.hidden_mortgages as number || 0;
 
-    // --- Módulo de Detección de Hipotecas Ocultas (Fase 3 - Playwright Stealth + Gemini) ---
-    try {
-      const lienResult = await checkPropertyLiens(ownerName, address, "KY", "Jefferson");
-      const hiddenLiensAmount = lienResult.totalHiddenDebt;
+        console.log(`\n[PROCESANDO] Verificando deudas ocultas para Violación de Código: ${address} (${ownerName})`);
+        
+        // Intento Primario: Spark API (Violaciones están en Louisville, KY)
+        let hiddenDebt = await querySparkPublicRecords(address, "KY");
+        
+        // Intento Secundario: County Clerk Crawler
+        if (hiddenDebt === null) {
+          hiddenDebt = await scrapeCountyClerk(ownerName, "Jefferson", "KY");
+        }
 
-      await db.execute({
-        sql: "UPDATE code_violations SET hidden_liens_amount = ?, title_check_status = 'success' WHERE violation_id = ?",
-        args: [hiddenLiensAmount, violationId]
-      });
-      console.log(`[SUCCESS] Base de datos actualizada con hidden_liens_amount = $${hiddenLiensAmount} para violación ${violationId}`);
+        try {
+          await db.execute({
+            sql: "UPDATE code_violations SET hidden_mortgages = ? WHERE violation_id = ?",
+            args: [hiddenDebt, violationId]
+          });
+          console.log(`[SUCCESS] Base de datos actualizada con hidden_mortgages = $${hiddenDebt} para violación ${violationId}`);
+        } catch (err: any) {
+          console.error(`[DB UPDATE ERROR] No se pudo guardar hidden_mortgages para violación ${violationId}:`, err.message);
+        }
 
-      if (hiddenLiensAmount > 0) {
-        const rehab = calculateRehab(sqft, []);
-        const adjustedMao = calculateMAO(arv, rehab, hiddenMortgages, hiddenLiensAmount);
+        // --- Módulo de Detección de Hipotecas Ocultas (Premium Attom API first, then Playwright Stealth + Gemini) ---
+        try {
+          const zipMatch = address.match(/\b\d{5}\b/);
+          const zipCode = zipMatch ? zipMatch[0] : "";
+          let hiddenLiensAmount = 0;
 
-        // Alerta roja brillante en consola
-        console.log(`\x1b[1;31m🏦 [ALERTA ROJA] HIPOTECAS OCULTAS DETECTADAS EN ${address}. Deuda extra: $${hiddenLiensAmount}. MAO ajustado a: $${adjustedMao}.\x1b[0m`);
+          const attomResult = await getPropertyLiensFromAttom(address, zipCode);
+          if (attomResult.success) {
+            hiddenLiensAmount = attomResult.totalHiddenDebt;
+          } else {
+            console.log(`[FALLBACK] API Attom falló para ${address}, cayendo a Playwright + Gemini...`);
+            const lienResult = await checkPropertyLiens(ownerName, address, "KY", "Jefferson");
+            hiddenLiensAmount = lienResult.totalHiddenDebt;
+          }
 
-        // Alerta de Telegram
-        const tgMsg = `🏦 [ALERTA ROJA] HIPOTECAS OCULTAS DETECTADAS EN ${address}. Deuda extra: $${hiddenLiensAmount.toLocaleString("en-US", { minimumFractionDigits: 2 })}. MAO ajustado a: $${adjustedMao.toLocaleString("en-US", { minimumFractionDigits: 2 })}.`;
-        await sendTelegramNotification(tgMsg);
-      }
-    } catch (err: any) {
-      console.error(`[LIEN DETECTOR ERROR] Falló el escaneo de gravámenes para violación ${violationId}:`, err.message);
-      try {
-        await db.execute({
-          sql: "UPDATE code_violations SET title_check_status = 'failed' WHERE violation_id = ?",
-          args: [violationId]
-        });
-      } catch (dbErr) {}
-    }
-    await sleep(1500);
-  }
+          await db.execute({
+            sql: "UPDATE code_violations SET hidden_liens_amount = ?, title_check_status = 'success' WHERE violation_id = ?",
+            args: [hiddenLiensAmount, violationId]
+          });
+          console.log(`[SUCCESS] Base de datos actualizada con hidden_liens_amount = $${hiddenLiensAmount} para violación ${violationId}`);
+
+          if (hiddenLiensAmount > 0) {
+            const rehab = calculateRehab(sqft, []);
+            const adjustedMao = calculateMAO(arv, rehab, hiddenMortgages, hiddenLiensAmount);
+
+            // Alerta roja brillante en consola
+            console.log(`\x1b[1;31m🏦 [ALERTA ROJA] HIPOTECAS OCULTAS DETECTADAS EN ${address}. Deuda extra: $${hiddenLiensAmount}. MAO ajustado a: $${adjustedMao}.\x1b[0m`);
+
+            // Alerta de Telegram
+            const tgMsg = `🏦 [ALERTA ROJA] HIPOTECAS OCULTAS DETECTADAS EN ${address}. Deuda extra: $${hiddenLiensAmount.toLocaleString("en-US", { minimumFractionDigits: 2 })}. MAO ajustado a: $${adjustedMao.toLocaleString("en-US", { minimumFractionDigits: 2 })}.`;
+            await sendTelegramNotification(tgMsg);
+          }
+        } catch (err: any) {
+          console.error(`[LIEN DETECTOR ERROR] Falló el escaneo de gravámenes para violación ${violationId}:`, err.message);
+          try {
+            await db.execute({
+              sql: "UPDATE code_violations SET title_check_status = 'failed' WHERE violation_id = ?",
+              args: [violationId]
+            });
+          } catch (dbErr) {}
+        }
+        await sleep(1500);
+      })
+    )
+  );
 
   console.log("\n[FIN] Módulo de Verificación de Títulos y Deudas Ocultas finalizado.");
   
@@ -356,6 +360,7 @@ export async function runTitleLienCheck() {
  * Reintenta las verificaciones de deudas que fallaron o quedaron pendientes debido a caídas de red o límites de cuota de API.
  */
 export async function retryFailedTitleChecks(maxRetries: number = 3) {
+  const limit = pLimit(5);
   console.log(`\n[REINTENTOS] Iniciando reintentos de auditorías financieras fallidas o pendientes (Max Retries: ${maxRetries})...`);
 
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
@@ -394,71 +399,99 @@ export async function retryFailedTitleChecks(maxRetries: number = 3) {
     console.log(`[REINTENTOS] Esperando retraso de ${backoffDelay / 1000} segundos para el intento ${attempt}...`);
     await sleep(backoffDelay);
 
-    // Procesar subastas pendientes
-    for (const row of pendingAuctions) {
-      const auctionId = row.auction_id as string;
-      const address = row.address as string;
-      const county = row.county as string || "Jefferson";
-      const state = row.state as string || "KY";
-      const ownerName = row.defendant as string || "Unknown";
-      const arv = row.mls_estimated_value as number || 0;
-      const sqft = row.sqft as number || null;
-      const hiddenMortgages = row.hidden_mortgages as number || 0;
+    // Procesar subastas pendientes en paralelo
+    await Promise.all(
+      pendingAuctions.map((row) =>
+        limit(async () => {
+          const auctionId = row.auction_id as string;
+          const address = row.address as string;
+          const county = row.county as string || "Jefferson";
+          const state = row.state as string || "KY";
+          const ownerName = row.defendant as string || "Unknown";
+          const arv = row.mls_estimated_value as number || 0;
+          const sqft = row.sqft as number || null;
+          const hiddenMortgages = row.hidden_mortgages as number || 0;
 
-      console.log(`[REINTENTANDO SUBASTA] ${address} (Intento ${attempt})`);
-      try {
-        const lienResult = await checkPropertyLiens(ownerName, address, state, county);
-        const hiddenLiensAmount = lienResult.totalHiddenDebt;
+          console.log(`[REINTENTANDO SUBASTA] ${address} (Intento ${attempt})`);
+          try {
+            const zipMatch = address.match(/\b\d{5}\b/);
+            const zipCode = zipMatch ? zipMatch[0] : "";
+            let hiddenLiensAmount = 0;
 
-        await db.execute({
-          sql: "UPDATE foreclosure_auctions SET hidden_liens_amount = ?, title_check_status = 'success' WHERE auction_id = ?",
-          args: [hiddenLiensAmount, auctionId]
-        });
-        console.log(`[REINTENTO EXITOSO] Subasta ${auctionId} completada. Deuda: $${hiddenLiensAmount}`);
+            const attomResult = await getPropertyLiensFromAttom(address, zipCode);
+            if (attomResult.success) {
+              hiddenLiensAmount = attomResult.totalHiddenDebt;
+            } else {
+              console.log(`[FALLBACK] API Attom falló para ${address}, cayendo a Playwright + Gemini...`);
+              const lienResult = await checkPropertyLiens(ownerName, address, state, county);
+              hiddenLiensAmount = lienResult.totalHiddenDebt;
+            }
 
-        if (hiddenLiensAmount > 0) {
-          const rehab = calculateRehab(sqft, []);
-          const adjustedMao = calculateMAO(arv, rehab, hiddenMortgages, hiddenLiensAmount);
-          const tgMsg = `🏦 [ALERTA DE REINTENTO] HIPOTECAS OCULTAS DETECTADAS EN ${address}. Deuda extra: $${hiddenLiensAmount.toLocaleString("en-US", { minimumFractionDigits: 2 })}. MAO: $${adjustedMao.toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
-          await sendTelegramNotification(tgMsg);
-        }
-      } catch (err: any) {
-        console.error(`[REINTENTO FALLIDO] Subasta ${auctionId} falló de nuevo: ${err.message}`);
-      }
-      await sleep(1500);
-    }
+            await db.execute({
+              sql: "UPDATE foreclosure_auctions SET hidden_liens_amount = ?, title_check_status = 'success' WHERE auction_id = ?",
+              args: [hiddenLiensAmount, auctionId]
+            });
+            console.log(`[REINTENTO EXITOSO] Subasta ${auctionId} completada. Deuda: $${hiddenLiensAmount}`);
 
-    // Procesar violaciones pendientes
-    for (const row of pendingViolations) {
-      const violationId = row.violation_id as string;
-      const address = row.address as string;
-      const ownerName = row.owner_name as string || "DUEÑO DESCONOCIDO";
-      const arv = row.mls_estimated_value as number || 0;
-      const sqft = row.sqft as number || null;
-      const hiddenMortgages = row.hidden_mortgages as number || 0;
+            if (hiddenLiensAmount > 0) {
+              const rehab = calculateRehab(sqft, []);
+              const adjustedMao = calculateMAO(arv, rehab, hiddenMortgages, hiddenLiensAmount);
+              const tgMsg = `🏦 [ALERTA DE REINTENTO] HIPOTECAS OCULTAS DETECTADAS EN ${address}. Deuda extra: $${hiddenLiensAmount.toLocaleString("en-US", { minimumFractionDigits: 2 })}. MAO: $${adjustedMao.toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
+              await sendTelegramNotification(tgMsg);
+            }
+          } catch (err: any) {
+            console.error(`[REINTENTO FALLIDO] Subasta ${auctionId} falló de nuevo: ${err.message}`);
+          }
+          await sleep(1500);
+        })
+      )
+    );
 
-      console.log(`[REINTENTANDO VIOLACIÓN] ${address} (Intento ${attempt})`);
-      try {
-        const lienResult = await checkPropertyLiens(ownerName, address, "KY", "Jefferson");
-        const hiddenLiensAmount = lienResult.totalHiddenDebt;
+    // Procesar violaciones pendientes en paralelo
+    await Promise.all(
+      pendingViolations.map((row) =>
+        limit(async () => {
+          const violationId = row.violation_id as string;
+          const address = row.address as string;
+          const ownerName = row.owner_name as string || "DUEÑO DESCONOCIDO";
+          const arv = row.mls_estimated_value as number || 0;
+          const sqft = row.sqft as number || null;
+          const hiddenMortgages = row.hidden_mortgages as number || 0;
 
-        await db.execute({
-          sql: "UPDATE code_violations SET hidden_liens_amount = ?, title_check_status = 'success' WHERE violation_id = ?",
-          args: [hiddenLiensAmount, violationId]
-        });
-        console.log(`[REINTENTO EXITOSO] Violación ${violationId} completada. Deuda: $${hiddenLiensAmount}`);
+          console.log(`[REINTENTANDO VIOLACIÓN] ${address} (Intento ${attempt})`);
+          try {
+            const zipMatch = address.match(/\b\d{5}\b/);
+            const zipCode = zipMatch ? zipMatch[0] : "";
+            let hiddenLiensAmount = 0;
 
-        if (hiddenLiensAmount > 0) {
-          const rehab = calculateRehab(sqft, []);
-          const adjustedMao = calculateMAO(arv, rehab, hiddenMortgages, hiddenLiensAmount);
-          const tgMsg = `🏦 [ALERTA DE REINTENTO] HIPOTECAS OCULTAS DETECTADAS EN ${address}. Deuda extra: $${hiddenLiensAmount.toLocaleString("en-US", { minimumFractionDigits: 2 })}. MAO: $${adjustedMao.toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
-          await sendTelegramNotification(tgMsg);
-        }
-      } catch (err: any) {
-        console.error(`[REINTENTO FALLIDO] Violación ${violationId} falló de nuevo: ${err.message}`);
-      }
-      await sleep(1500);
-    }
+            const attomResult = await getPropertyLiensFromAttom(address, zipCode);
+            if (attomResult.success) {
+              hiddenLiensAmount = attomResult.totalHiddenDebt;
+            } else {
+              console.log(`[FALLBACK] API Attom falló para ${address}, cayendo a Playwright + Gemini...`);
+              const lienResult = await checkPropertyLiens(ownerName, address, "KY", "Jefferson");
+              hiddenLiensAmount = lienResult.totalHiddenDebt;
+            }
+
+            await db.execute({
+              sql: "UPDATE code_violations SET hidden_liens_amount = ?, title_check_status = 'success' WHERE violation_id = ?",
+              args: [hiddenLiensAmount, violationId]
+            });
+            console.log(`[REINTENTO EXITOSO] Violación ${violationId} completada. Deuda: $${hiddenLiensAmount}`);
+
+            if (hiddenLiensAmount > 0) {
+              const rehab = calculateRehab(sqft, []);
+              const adjustedMao = calculateMAO(arv, rehab, hiddenMortgages, hiddenLiensAmount);
+              const tgMsg = `🏦 [ALERTA DE REINTENTO] HIPOTECAS OCULTAS DETECTADAS EN ${address}. Deuda extra: $${hiddenLiensAmount.toLocaleString("en-US", { minimumFractionDigits: 2 })}. MAO: $${adjustedMao.toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
+              await sendTelegramNotification(tgMsg);
+            }
+          } catch (err: any) {
+            console.error(`[REINTENTO FALLIDO] Violación ${violationId} falló de nuevo: ${err.message}`);
+          }
+          await sleep(1500);
+        })
+      )
+    );
   }
 }
 

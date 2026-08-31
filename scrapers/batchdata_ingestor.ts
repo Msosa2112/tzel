@@ -41,6 +41,11 @@ function isSeverePermit(description: string): boolean {
 }
 
 export async function runBatchDataIngestor() {
+  if (process.env.USE_BATCHDATA === "false" || !process.env.USE_BATCHDATA) {
+    console.log("⏸️ [BATCHDATA INGESTOR] BatchData está temporalmente desactivado por configuración (USE_BATCHDATA=false). Saltando.");
+    return;
+  }
+
   console.log("===============================================================");
   console.log("🚀 INICIANDO INGESTOR DE PARIDAD BATCHDATA (JURISDICCIÓN KY/IN) 🚀");
   console.log("===============================================================");

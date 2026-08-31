@@ -18,7 +18,15 @@ if %errorlevel% neq 0 (
     echo [TZEL STARTUP] Docker ya esta corriendo.
 )
 
-npx ts-node run_pipeline.ts > pipeline_execution.log 2>&1
+REM Verificar si Bun esta disponible para ejecucion ultrarrapida
+set "BUN_EXE=%USERPROFILE%\.bun\bin\bun.exe"
+if exist "%BUN_EXE%" (
+    echo [TZEL STARTUP] Ejecutando con Bun 1.4 ^(Motor ultrarrapido en Rust^)...
+    "%BUN_EXE%" run_pipeline.ts > pipeline_execution.log 2>&1
+) else (
+    echo [TZEL STARTUP] Ejecutando con ts-node...
+    npx ts-node run_pipeline.ts > pipeline_execution.log 2>&1
+)
 
 echo -----------------------------------------------------------------
 echo [TZEL STARTUP] Pipeline completado.

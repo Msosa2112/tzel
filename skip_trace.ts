@@ -1,5 +1,5 @@
 import axios from "axios";
-import { createClient } from "@libsql/client";
+import { db } from "./db";
 import * as dotenv from "dotenv";
 import { querySearXNG } from "./searxng_client";
 import { BatchDataClient } from "./scrapers/batchdata_client";
@@ -10,10 +10,7 @@ import { searchOSINTContacts } from "./intelligence/osint_scraper";
 dotenv.config();
 
 // Inicializar cliente de Turso DB
-const db = createClient({
-  url: process.env.TURSO_DATABASE_URL || "",
-  authToken: process.env.TURSO_AUTH_TOKEN || "",
-});
+
 
 const batchDataClient = new BatchDataClient();
 
@@ -326,13 +323,18 @@ export async function performSkipTrace(
 async function runSkipTracing() {
   console.log("[INICIO] Iniciando Módulo de Skip Tracing...");
 
-  // 1. Consultar subastas de alta rentabilidad sin teléfonos asociados
+  // 1. Consultar subastas judiciales sin teléfonos asociados (priorizando High Yield)
   let leadsRes;
   try {
     leadsRes = await db.execute(`
-      SELECT auction_id, defendant, address, state, county
+      SELECT auction_id, defendant, address, state, county, is_high_yield
       FROM foreclosure_auctions 
-      WHERE is_high_yield = 1 AND (defendant_phones IS NULL OR defendant_phones = '')
+      WHERE (defendant_phones IS NULL OR defendant_phones = '')
+        AND defendant IS NOT NULL 
+        AND defendant != '' 
+        AND defendant != 'Unknown' 
+        AND defendant != 'DUEÑO DESCONOCIDO'
+      ORDER BY is_high_yield DESC, auction_id ASC
     `);
   } catch (dbErr: any) {
     console.error("[DB ERROR] Error al consultar deudores pendientes:", dbErr.message);
@@ -340,7 +342,7 @@ async function runSkipTracing() {
   }
 
   const leads = leadsRes.rows;
-  console.log(`[SKIP TRACE] Se encontraron ${leads.length} leads de alta rentabilidad sin teléfonos asignados.`);
+  console.log(`[SKIP TRACE] Se encontraron ${leads.length} subastas pendientes para enriquecer contactos.`);
 
   let processedCount = 0;
 
@@ -350,13 +352,14 @@ async function runSkipTracing() {
     const address = row.address as string;
     const state = row.state as string;
     const county = row.county as string;
+    const isHy = row.is_high_yield as number;
 
     if (!address || address.trim() === "") {
       console.log(`[SKIP TRACE] Saltando caso ${auctionId}: Dirección no válida.`);
       continue;
     }
 
-    console.log(`[PROCESANDO] Lead: ${defendant} | Dirección: ${address}`);
+    console.log(`[PROCESANDO SUBASTA] (${isHy === 1 ? '⭐ HIGH YIELD' : 'ESTÁNDAR'}) Lead: ${defendant} | Dirección: ${address}`);
     
     // Obtener los contactos de la API
     const contacts = await performSkipTrace(defendant, address, state, county);
@@ -373,24 +376,33 @@ async function runSkipTracing() {
         `,
         args: [phonesStr, emailsStr, auctionId]
       });
-      console.log(`[ÉXITO] Contactos guardados en base de datos.`);
+      if (phonesStr) {
+        console.log(`[ÉXITO] Contactos guardados: ${phonesStr}`);
+      } else {
+        console.log(`[INFO] No se encontraron teléfonos para ${defendant}.`);
+      }
       processedCount++;
     } catch (dbErr: any) {
       console.error(`[DB ERROR] Error al guardar teléfonos para ${defendant}:`, dbErr.message);
     }
 
-    // Adaptive Jitter: random delay between 3000ms and 5000ms with a minimum of 4000ms
-    const jitterDelay = Math.max(4000, Math.random() * 2000 + 3000);
+    // Adaptive Jitter: random delay between 1500ms and 2500ms
+    const jitterDelay = Math.max(1500, Math.random() * 1000 + 1500);
     await new Promise((resolve) => setTimeout(resolve, jitterDelay));
   }
 
-  // 3. Consultar violaciones de código de alta rentabilidad sin contactos asociados
+  // 2. Consultar violaciones de código sin contactos asociados (priorizando High Yield)
   let violationsRes;
   try {
     violationsRes = await db.execute(`
-      SELECT violation_id, owner_name, address
+      SELECT violation_id, owner_name, address, is_high_yield
       FROM code_violations
-      WHERE is_high_yield = 1 AND (defendant_phones IS NULL OR defendant_phones = '')
+      WHERE (defendant_phones IS NULL OR defendant_phones = '')
+        AND owner_name IS NOT NULL 
+        AND owner_name != '' 
+        AND owner_name != 'DUEÑO DESCONOCIDO'
+        AND owner_name != 'Unknown'
+      ORDER BY is_high_yield DESC, violation_id ASC
     `);
   } catch (dbErr: any) {
     console.error("[DB ERROR] Error al consultar violaciones de código pendientes de skip trace:", dbErr.message);
@@ -398,7 +410,7 @@ async function runSkipTracing() {
   }
 
   const violations = violationsRes.rows;
-  console.log(`\n[SKIP TRACE] Se encontraron ${violations.length} violaciones de código de alta rentabilidad sin teléfonos asignados.`);
+  console.log(`\n[SKIP TRACE] Se encontraron ${violations.length} violaciones de código pendientes para enriquecer contactos.`);
 
   let violationProcessedCount = 0;
 
@@ -406,6 +418,7 @@ async function runSkipTracing() {
     const violationId = row.violation_id as string;
     const ownerName = row.owner_name as string;
     const address = row.address as string;
+    const isHy = row.is_high_yield as number;
     const state = "KY";
     const county = "Jefferson";
 
@@ -414,7 +427,7 @@ async function runSkipTracing() {
       continue;
     }
 
-    console.log(`[PROCESANDO VIOLACIÓN] Lead: ${ownerName} | Dirección: ${address}`);
+    console.log(`[PROCESANDO VIOLACIÓN] (${isHy === 1 ? '⭐ HIGH YIELD' : 'ESTÁNDAR'}) Lead: ${ownerName} | Dirección: ${address}`);
     
     // Obtener los contactos de la API
     const contacts = await performSkipTrace(ownerName, address, state, county);
@@ -431,14 +444,18 @@ async function runSkipTracing() {
         `,
         args: [phonesStr, emailsStr, violationId]
       });
-      console.log(`[ÉXITO] Contactos de violación guardados en base de datos.`);
+      if (phonesStr) {
+        console.log(`[ÉXITO] Contactos de violación guardados: ${phonesStr}`);
+      } else {
+        console.log(`[INFO] No se encontraron teléfonos para ${ownerName}.`);
+      }
       violationProcessedCount++;
     } catch (dbErr: any) {
       console.error(`[DB ERROR] Error al guardar teléfonos para la violación de ${ownerName}:`, dbErr.message);
     }
 
-    // Adaptive Jitter: random delay between 3000ms and 5000ms with a minimum of 4000ms
-    const jitterDelay = Math.max(4000, Math.random() * 2000 + 3000);
+    // Adaptive Jitter: random delay between 1500ms and 2500ms
+    const jitterDelay = Math.max(1500, Math.random() * 1000 + 1500);
     await new Promise((resolve) => setTimeout(resolve, jitterDelay));
   }
 
@@ -645,7 +662,7 @@ async function skipTraceGenericTable(
   return count;
 }
 
-// Ejecutar si se corre directamente
+// Ejecutar directamente si es invocado como script principal
 if (require.main === module) {
   runSkipTracing().catch(console.error);
 }

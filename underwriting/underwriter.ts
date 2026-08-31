@@ -172,16 +172,19 @@ export function isJuniorLien(plaintiff: string | null, caseNumber: string | null
 
 /**
  * Determina si una propiedad es de Alta Rentabilidad (High Yield).
- * Criterio: El Equity Neto (ARV - Deuda Primaria - Deudas Ocultas) debe ser de al menos el 30% del ARV.
+ * Criterio Real: El Equity Neto respecto al Avalúo Judicial Oficial (MCA / Appraisal Value) debe ser de al menos el 20%.
+ * Margen: (MCA - Deuda Primaria - Deudas Ocultas) >= MCA * 0.20
+ * Esto equivale a que la Deuda Total no supere el 80% del valor del avalúo pericial.
  */
 export function isHighYieldProperty(
-  arv: number,
+  mcaOrAppraisal: number,
   primaryDebt: number,
   hiddenMortgages: number = 0,
-  hiddenLiensAmount: number = 0
+  hiddenLiensAmount: number = 0,
+  minMarginRatio: number = 0.20
 ): boolean {
-  if (arv <= 0) return false;
+  if (mcaOrAppraisal <= 0 || primaryDebt <= 0) return false;
   const cleanHidden = (hiddenMortgages || 0) + (hiddenLiensAmount || 0);
-  const netEquity = arv - primaryDebt - cleanHidden;
-  return netEquity >= arv * 0.30;
+  const netEquity = mcaOrAppraisal - primaryDebt - cleanHidden;
+  return netEquity >= (mcaOrAppraisal * minMarginRatio);
 }

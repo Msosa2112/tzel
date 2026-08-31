@@ -295,4 +295,48 @@ CREATE TABLE IF NOT EXISTS osint_enrichment (
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Tabla de Pre-Foreclosures (Lis Pendens & Demandas Recientes 90-180 días antes)
+CREATE TABLE IF NOT EXISTS pre_foreclosures (
+    pre_foreclosure_id TEXT PRIMARY KEY,
+    case_number TEXT NOT NULL,
+    address TEXT NOT NULL,
+    county TEXT NOT NULL,
+    state TEXT NOT NULL,
+    filing_date TEXT NOT NULL,
+    plaintiff TEXT, -- Banco demandante
+    defendant TEXT, -- Deudor / Propietario
+    case_status TEXT DEFAULT 'PENDING', -- 'PENDING', 'JUDGMENT_ENTERED', 'DISMISSED'
+    days_since_filing INTEGER DEFAULT 0,
+    mls_status TEXT DEFAULT 'pending_check',
+    mls_estimated_value REAL,
+    defendant_phones TEXT,
+    defendant_emails TEXT,
+    mailing_address TEXT,
+    absentee_owner INTEGER DEFAULT 0,
+    photo_urls TEXT,
+    stress_score INTEGER DEFAULT 0,
+    telegram_sent INTEGER DEFAULT 0,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Tabla de Subastas de Impuestos (Tax Sales / SRI Services)
+CREATE TABLE IF NOT EXISTS tax_sales (
+    tax_sale_id TEXT PRIMARY KEY,
+    parcel_id TEXT NOT NULL,
+    address TEXT NOT NULL,
+    county TEXT NOT NULL,
+    state TEXT NOT NULL,
+    owner_name TEXT,
+    taxes_owed REAL,
+    sale_date TEXT,
+    defendant_phones TEXT,
+    defendant_emails TEXT,
+    mailing_address TEXT,
+    absentee_owner INTEGER DEFAULT 0,
+    photo_urls TEXT,
+    telegram_sent INTEGER DEFAULT 0,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+
 

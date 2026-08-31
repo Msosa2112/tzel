@@ -19,7 +19,11 @@ async function scrapeClerkPortal(
   county: string,
   state: string
 ): Promise<string> {
-  const browser = await chromium.launch({ headless: true });
+  const launchOptions: any = { headless: true };
+  if (process.env.PROXY_URL) {
+    launchOptions.proxy = { server: process.env.PROXY_URL };
+  }
+  const browser = await chromium.launch(launchOptions);
   const context = await browser.newContext({
     userAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
     viewport: { width: 1280, height: 800 },
@@ -63,7 +67,7 @@ export async function analyzeLienTextWithGemini(rawText: string): Promise<LienDe
     return runLienRuleBasedFallback(rawText);
   }
 
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${apiKey}`;
   const prompt = `Instrucción: Eres un analista de títulos inmobiliarios experto. Analiza el siguiente texto de registros públicos del secretario del condado (county clerk) para una propiedad/propietario y determina si existen gravámenes secundarios (junior liens), hipotecas adicionales (mortgages), deudas de impuestos (Tax Liens, IRS) o juicios civiles (Judgments) vigentes.
 
 REGLAS DE EXTRACCIÓN:
@@ -138,7 +142,9 @@ ${rawText}`;
   }
 
   try {
-    const result = JSON.parse(responseText) as LienDetectorResult;
+    const match = responseText.match(/\{[\s\S]*\}/);
+    const cleanJson = match ? match[0] : responseText;
+    const result = JSON.parse(cleanJson) as LienDetectorResult;
     return {
       hasHiddenLiens: !!result.hasHiddenLiens,
       totalHiddenDebt: Number(result.totalHiddenDebt) || 0

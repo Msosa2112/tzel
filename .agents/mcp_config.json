@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "docker-tzel-gateway": {
+      "command": "docker",
+      "args": [
+        "mcp",
+        "gateway",
+        "run",
+        "--profile",
+        "tzel"
+      ]
+    }
+  }
+}

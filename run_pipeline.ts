@@ -14,7 +14,7 @@ import { runIndianaCrawler } from "./indiana_court_crawler";
 import { runSkipTracing } from "./skip_trace";
 import { scoreAllProperties } from "./intelligence/stress_scorer";
 import { notifyOpportunities, sendTelegramNotification } from "./notify_opportunities";
-import { createClient } from "@libsql/client";
+import { db } from "./db";
 import { runSurplusAuditRoutine, SURPLUS_FUNDS_MOCKS } from "./surplus_funds";
 import { runBatchDataIngestor } from "./scrapers/batchdata_ingestor";
 import { scrapeStatePublicNotices } from "./scrapers/state_public_notices_scraper";
@@ -155,10 +155,7 @@ async function runPipeline() {
   try {
     // Si un registro quedó con propietario 'Unknown' o vacío en Indiana y no tiene caso, se marca para revisión manual.
     // En Louisville, si el PVA falló completamente y sigue en 'DUEÑO DESCONOCIDO', no avanza.
-    const db = createClient({
-      url: process.env.TURSO_DATABASE_URL || "",
-      authToken: process.env.TURSO_AUTH_TOKEN || "",
-    });
+
     await db.execute(`
       UPDATE foreclosure_auctions 
       SET needs_manual_review = 1 

@@ -196,7 +196,7 @@ async function runCrossReference() {
   let auctionsRes;
   try {
     auctionsRes = await db.execute(
-      "SELECT auction_id, case_number, address, county, state FROM foreclosure_auctions WHERE mls_status = 'pending_check'"
+      "SELECT auction_id, case_number, address, county, state, appraisal_value, debt_amount, hidden_mortgages, hidden_liens_amount FROM foreclosure_auctions WHERE mls_status = 'pending_check'"
     );
   } catch (dbErr: any) {
     console.error("[DB ERROR] Error al consultar subastas pendientes:", dbErr.message);
@@ -327,16 +327,19 @@ async function runCrossReference() {
         // Calcular ARV usando Comps en tiempo real
         console.log(`[ARV COMPS] Calculando Valor Comercial Real (ARV) con comparables...`);
         const mlsValue = await calculateARV(mlsHeaders, zip, beds, sqft, closePrice, listPrice);
-        console.log(`[ARV RESULT] Estatus MLS: ${mlsStatus} | Valor ARV (Comps): $${mlsValue.toLocaleString("en-US")}`);
-        
-        // Determinar si es de Alta Rentabilidad (Equity Neto >= 30% del ARV)
+        // Determinar si es de Alta Rentabilidad (Comparando Deuda vs MCA / Appraisal Value con margen >= 20%)
+        const mcaVal = (row.appraisal_value as number) || mlsValue;
+        const hiddenMort = (row.hidden_mortgages as number) || 0;
+        const hiddenLiens = (row.hidden_liens_amount as number) || 0;
+        const totalDebt = (debtAmount || 0) + hiddenMort + hiddenLiens;
+
         let isHighYield = 0;
-        if (debtAmount && debtAmount > 0 && mlsValue > 0) {
-          const discountPct = ((mlsValue - debtAmount) / mlsValue) * 100;
-          console.log(`[MATCH SCORING] Deuda: $${debtAmount.toLocaleString("en-US")} vs ARV: $${mlsValue.toLocaleString("en-US")} | Descuento potencial: ${discountPct.toFixed(1)}%`);
-          if (isHighYieldProperty(mlsValue, debtAmount, 0)) {
+        if (mcaVal > 0 && totalDebt > 0) {
+          const discountPct = ((mcaVal - totalDebt) / mcaVal) * 100;
+          console.log(`[MCA SCORING] Deuda Total: $${totalDebt.toLocaleString("en-US")} vs MCA/Valor: $${mcaVal.toLocaleString("en-US")} | Margen: ${discountPct.toFixed(1)}%`);
+          if (isHighYieldProperty(mcaVal, totalDebt, 0, 0, 0.20)) {
             isHighYield = 1;
-            console.log(`[HIGH YIELD] ¡Propiedad marcada como alta rentabilidad (Equity >= 30% del ARV)!`);
+            console.log(`[HIGH YIELD] ¡Propiedad marcada como alta rentabilidad (Margen Real >= 20% sobre MCA/Valor)!`);
           }
         }
 

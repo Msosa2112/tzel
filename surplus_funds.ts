@@ -1,4 +1,4 @@
-import { createClient } from "@libsql/client";
+import { db } from "./db";
 import * as dotenv from "dotenv";
 import * as crypto from "crypto";
 import { performSkipTrace } from "./skip_trace";
@@ -6,10 +6,7 @@ import { sendTelegramNotification } from "./notify_opportunities";
 
 dotenv.config();
 
-const db = createClient({
-  url: process.env.TURSO_DATABASE_URL || "",
-  authToken: process.env.TURSO_AUTH_TOKEN || "",
-});
+
 
 export interface CompletedAuction {
   owner_name: string;

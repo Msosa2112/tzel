@@ -30,3 +30,4 @@ storage/
 # Local venv and temporary files
 .venv_scrapegraph/
 *.pdf
+browser_profiles/

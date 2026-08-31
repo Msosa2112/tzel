@@ -1,19 +1,18 @@
 import axios from "axios";
-import { createClient } from "@libsql/client";
+import { db } from "./db";
 import * as dotenv from "dotenv";
 import * as path from "path";
+import { sendTelegramNotification } from "./telegram_helper";
 import { calculateRehab, calculateMAO, calculateROI, isJuniorLien, calculateNetEquity, isUnderwater, checkCriticalRisk } from "./underwriting/underwriter";
 import { querySearXNG } from "./searxng_client";
+import { classifyPhone } from "./intelligence/phone_classifier";
 
 
 // Cargar variables de entorno
 dotenv.config();
 
 // Inicializar cliente de Turso DB
-const db = createClient({
-  url: process.env.TURSO_DATABASE_URL || "",
-  authToken: process.env.TURSO_AUTH_TOKEN || "",
-});
+
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -207,108 +206,7 @@ function escapeHtml(text: string): string {
     .replace(/>/g, "&gt;");
 }
 
-/**
- * Envía un mensaje estructurado premium a Telegram, soportando botones interactivos (inline keyboard).
- */
-async function sendTelegramNotification(
-  message: string,
-  replyMarkup?: any,
-  photoUrl: string | null = null,
-  parseMode: "Markdown" | "HTML" = "Markdown",
-  retryCount = 0
-): Promise<boolean> {
-  const token = process.env.TELEGRAM_BOT_TOKEN;
-  const chatId = process.env.TELEGRAM_CHAT_ID;
-  if (!token || !chatId) {
-    console.log("[TELEGRAM] Advertencia: Credenciales de Telegram no configuradas.");
-    return false;
-  }
 
-  if (retryCount > 3) {
-    console.error("[TELEGRAM ERROR] Superado el número máximo de reintentos por rate limit (429).");
-    return false;
-  }
-  
-  if (photoUrl) {
-    if (message.length <= 1024) {
-      console.log("[TELEGRAM] Enviando foto única con caption (longitud <= 1024)...");
-      const url = `https://api.telegram.org/bot${token}/sendPhoto`;
-      const payload: any = {
-        chat_id: chatId,
-        photo: photoUrl,
-        caption: message,
-        parse_mode: parseMode
-      };
-      if (replyMarkup) {
-        payload.reply_markup = replyMarkup;
-      }
-      try {
-        const response = await axios.post(url, payload, { timeout: 10000 });
-        if (response.status === 200) return true;
-      } catch (err: any) {
-        if (err.response?.status === 429) {
-          const retryAfter = err.response?.data?.parameters?.retry_after || 9;
-          console.warn(`[TELEGRAM 429] Rate limit en sendPhoto. Esperando ${retryAfter}s (Intento ${retryCount + 1})...`);
-          await sleep(retryAfter * 1000);
-          return sendTelegramNotification(message, replyMarkup, photoUrl, parseMode, retryCount + 1);
-        }
-        console.warn(`[TELEGRAM PHOTO WARNING] Falló el envío de foto con caption: ${err.message}. Reintentando texto...`);
-      }
-    } else {
-      console.log("[TELEGRAM] Reporte largo detectado (> 1024). Enviando foto primero y luego el reporte...");
-      const urlPhoto = `https://api.telegram.org/bot${token}/sendPhoto`;
-      const firstLine = message.split("\n")[0] || "Reporte de Oportunidad";
-      const title = parseMode === "HTML"
-        ? `📸 <b>Foto de Propiedad para:</b> ${firstLine}`
-        : `📸 *Foto de Propiedad para:* ${firstLine}`;
-      try {
-        await axios.post(urlPhoto, {
-          chat_id: chatId,
-          photo: photoUrl,
-          caption: title,
-          parse_mode: parseMode
-        }, { timeout: 10000 });
-      } catch (err: any) {
-        if (err.response?.status === 429) {
-          const retryAfter = err.response?.data?.parameters?.retry_after || 9;
-          console.warn(`[TELEGRAM 429] Rate limit en sendPhoto previa. Esperando ${retryAfter}s (Intento ${retryCount + 1})...`);
-          await sleep(retryAfter * 1000);
-          return sendTelegramNotification(message, replyMarkup, photoUrl, parseMode, retryCount + 1);
-        }
-        console.warn(`[TELEGRAM PHOTO WARNING] Falló el envío de la foto previa: ${err.message}`);
-      }
-    }
-  }
-
-  const url = `https://api.telegram.org/bot${token}/sendMessage`;
-  const payload: any = {
-    chat_id: chatId,
-    text: message,
-    parse_mode: parseMode,
-    disable_web_page_preview: true
-  };
-
-  if (replyMarkup) {
-    payload.reply_markup = replyMarkup;
-  }
-  
-  try {
-    const response = await axios.post(url, payload, { timeout: 10000 });
-    return response.status === 200;
-  } catch (e: any) {
-    if (e.response?.status === 429) {
-      const retryAfter = e.response?.data?.parameters?.retry_after || 9;
-      console.warn(`[TELEGRAM 429] Rate limit en sendMessage. Esperando ${retryAfter}s (Intento ${retryCount + 1})...`);
-      await sleep(retryAfter * 1000);
-      return sendTelegramNotification(message, replyMarkup, photoUrl, parseMode, retryCount + 1);
-    }
-    console.error(`[TELEGRAM EXCEPTION] Error al enviar mensaje: ${e.message || e}`);
-    if (e.response && e.response.data) {
-      console.error("[TELEGRAM RESPONSE ERROR DETAIL]:", JSON.stringify(e.response.data));
-    }
-    return false;
-  }
-}
 
 interface GroupedLead {
   groupingKey: string;
@@ -1266,11 +1164,20 @@ async function notifyOpportunities(mode?: 'legal' | 'physical') {
     const cleanOwner = escapeHtml(lead.ownerName);
     const cleanMail = escapeHtml(lead.mailingAddress || "");
 
+    let debtLine = "";
+    if (totalDebt > 0) {
+      debtLine = `Deuda Consolidada: $${totalDebt.toLocaleString("en-US", { maximumFractionDigits: 0 })} (Impuestos + Liens)`;
+    } else if (hasAuctions) {
+      debtLine = `Deuda Judicial: ⏳ Pendiente de publicación por la corte (Ver caso judicial)`;
+    } else {
+      debtLine = `Deuda Judicial: N/A (Lead de Infracción de Código Municipal)`;
+    }
+
     let msg = `🚨 <b>NUEVO LEAD DE EQUIDAD DETECTADO:</b> ${cleanAddr}
 --------------------------------------------------
 Propietario: ${cleanOwner}
-Valor Catastral PVA: $${pvaStr} | MCA Crudo: $${mcaStr}
-Deuda Consolidada: $${totalDebt.toLocaleString("en-US", { maximumFractionDigits: 0 })} (Impuestos + Liens)
+Valor Catastral PVA: $${pvaStr} | MCA Oficial: $${mcaStr}
+${debtLine}
 
 💰 Margen de Equidad (Spread): $${equitySpread.toLocaleString("en-US", { maximumFractionDigits: 0 })}
 📢 Oferta Máxima Sugerida (MPO): $${mpo.toLocaleString("en-US", { maximumFractionDigits: 0 })}
@@ -1310,7 +1217,11 @@ Deuda Consolidada: $${totalDebt.toLocaleString("en-US", { maximumFractionDigits:
     }
 
     if (regularPhones.length > 0) {
-      msg += `📞 <b>Teléfonos:</b> <code>${regularPhones.join(", ")}</code>\n`;
+      const classifiedStr = regularPhones.map(p => {
+        const c = classifyPhone(p);
+        return `${c.icon} <code>${c.formatted}</code> <i>(${c.label})</i>`;
+      }).join(", ");
+      msg += `📞 <b>Teléfonos:</b> ${classifiedStr}\n`;
     }
     if (regularEmails.length > 0) {
       msg += `✉️ <b>Correos:</b> <code>${regularEmails.join(", ")}</code>\n`;
@@ -1534,105 +1445,116 @@ Deuda Consolidada: $${totalDebt.toLocaleString("en-US", { maximumFractionDigits:
 
     
     if (success) {
+      const dbPromises: Promise<any>[] = [];
+
       // Marcar subastas asociadas como notificadas
       for (const a of lead.auctions) {
-        try {
-          await db.execute({
+        dbPromises.push(
+          db.execute({
             sql: "UPDATE foreclosure_auctions SET telegram_sent = 1 WHERE auction_id = ?",
             args: [a.auction_id]
-          });
-          notifiedAuctionsCount++;
-        } catch (dbErr: any) {
-          console.error(`[DB ERROR] No se pudo marcar como notificada la subasta ${a.auction_id}:`, dbErr.message);
-        }
+          }).then(() => {
+            notifiedAuctionsCount++;
+          }).catch((dbErr: any) => {
+            console.error(`[DB ERROR] No se pudo marcar como notificada la subasta ${a.auction_id}:`, dbErr.message);
+          })
+        );
       }
       
       // Marcar violaciones asociadas como notificadas
       for (const v of lead.violations) {
-        try {
-          await db.execute({
+        dbPromises.push(
+          db.execute({
             sql: "UPDATE code_violations SET telegram_sent = 1 WHERE violation_id = ?",
             args: [v.violation_id]
-          });
-          notifiedViolationsCount++;
-        } catch (dbErr: any) {
-          console.error(`[DB ERROR] No se pudo marcar como notificada la violación ${v.violation_id}:`, dbErr.message);
-        }
+          }).then(() => {
+            notifiedViolationsCount++;
+          }).catch((dbErr: any) => {
+            console.error(`[DB ERROR] No se pudo marcar como notificada la violación ${v.violation_id}:`, dbErr.message);
+          })
+        );
       }
 
       // Marcar herencias asociadas como notificadas
       for (const p of lead.probates) {
-        try {
-          await db.execute({
+        dbPromises.push(
+          db.execute({
             sql: "UPDATE probates SET telegram_sent = 1 WHERE probate_id = ?",
             args: [p.probate_id]
-          });
-        } catch (dbErr: any) {
-          console.error(`[DB ERROR] No se pudo marcar como notificado el probate ${p.probate_id}:`, dbErr.message);
-        }
+          }).catch((dbErr: any) => {
+            console.error(`[DB ERROR] No se pudo marcar como notificado el probate ${p.probate_id}:`, dbErr.message);
+          })
+        );
       }
 
       // Marcar divorcios asociados como notificados
       for (const d of lead.divorces) {
-        try {
-          await db.execute({
+        dbPromises.push(
+          db.execute({
             sql: "UPDATE divorces SET telegram_sent = 1 WHERE divorce_id = ?",
             args: [d.divorce_id]
-          });
-        } catch (dbErr: any) {
-          console.error(`[DB ERROR] No se pudo marcar como notificado el divorce ${d.divorce_id}:`, dbErr.message);
-        }
+          }).catch((dbErr: any) => {
+            console.error(`[DB ERROR] No se pudo marcar como notificado el divorce ${d.divorce_id}:`, dbErr.message);
+          })
+        );
       }
 
       // Marcar bankruptcies asociados como notificados
       for (const b of lead.bankruptcies) {
-        try {
-          await db.execute({
+        dbPromises.push(
+          db.execute({
             sql: "UPDATE bankruptcies SET telegram_sent = 1 WHERE bankruptcy_id = ?",
             args: [b.bankruptcy_id]
-          });
-        } catch (dbErr: any) {
-          console.error(`[DB ERROR] No se pudo marcar como notificado el bankruptcy ${b.bankruptcy_id}:`, dbErr.message);
-        }
+          }).catch((dbErr: any) => {
+            console.error(`[DB ERROR] No se pudo marcar como notificado el bankruptcy ${b.bankruptcy_id}:`, dbErr.message);
+          })
+        );
       }
 
       // Marcar physical_distress asociadas como notificadas
       for (const pd of lead.physicalDistress) {
-        try {
-          await db.execute({
+        dbPromises.push(
+          db.execute({
             sql: "UPDATE physical_distress SET telegram_sent = 1 WHERE distress_id = ?",
             args: [pd.distress_id]
-          });
-          notifiedPhysicalCount++;
-        } catch (dbErr: any) {
-          console.error(`[DB ERROR] No se pudo marcar como notificado el physical_distress ${pd.distress_id}:`, dbErr.message);
-        }
+          }).then(() => {
+            notifiedPhysicalCount++;
+          }).catch((dbErr: any) => {
+            console.error(`[DB ERROR] No se pudo marcar como notificado el physical_distress ${pd.distress_id}:`, dbErr.message);
+          })
+        );
       }
 
       // Marcar financial_distress asociadas como notificadas
       for (const fd of lead.financialDistress) {
-        try {
-          await db.execute({
+        dbPromises.push(
+          db.execute({
             sql: "UPDATE financial_distress SET telegram_sent = 1 WHERE record_id = ?",
             args: [fd.record_id]
-          });
-          notifiedFinancialCount++;
-        } catch (dbErr: any) {
-          console.error(`[DB ERROR] No se pudo marcar como notificado el financial_distress ${fd.record_id}:`, dbErr.message);
-        }
+          }).then(() => {
+            notifiedFinancialCount++;
+          }).catch((dbErr: any) => {
+            console.error(`[DB ERROR] No se pudo marcar como notificado el financial_distress ${fd.record_id}:`, dbErr.message);
+          })
+        );
       }
 
       // Marcar life_events asociados como notificados
       for (const le of lead.lifeEvents) {
-        try {
-          await db.execute({
+        dbPromises.push(
+          db.execute({
             sql: "UPDATE life_events SET telegram_sent = 1 WHERE event_id = ?",
             args: [le.event_id]
-          });
-          notifiedLifeCount++;
-        } catch (dbErr: any) {
-          console.error(`[DB ERROR] No se pudo marcar como notificado el life_event ${le.event_id}:`, dbErr.message);
-        }
+          }).then(() => {
+            notifiedLifeCount++;
+          }).catch((dbErr: any) => {
+            console.error(`[DB ERROR] No se pudo marcar como notificado el life_event ${le.event_id}:`, dbErr.message);
+          })
+        );
+      }
+
+      if (dbPromises.length > 0) {
+        await Promise.all(dbPromises);
       }
     }
 
@@ -1650,7 +1572,6 @@ Deuda Consolidada: $${totalDebt.toLocaleString("en-US", { maximumFractionDigits:
   console.log("========================================================\n");
 }
 
-// Ejecutar si se corre directamente
 if (require.main === module) {
   notifyOpportunities().catch(console.error);
 }

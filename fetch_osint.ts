@@ -1,41 +1,14 @@
 import * as dotenv from "dotenv";
 import axios from "axios";
-import { createClient } from "@libsql/client";
+import { db } from "./db";
+import { sendTelegramNotification } from "./telegram_helper";
 
 // Load environment variables
 dotenv.config();
 
-// Initialize Turso client
-const db = createClient({
-  url: process.env.TURSO_DATABASE_URL || "",
-  authToken: process.env.TURSO_AUTH_TOKEN || "",
-});
-
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-async function sendTelegramNotification(message: string) {
-  const token = process.env.TELEGRAM_BOT_TOKEN;
-  const chatId = process.env.TELEGRAM_CHAT_ID;
-  if (!token || !chatId) {
-    console.log("[TELEGRAM] Warning: Telegram credentials not set in .env. Skipping notification.");
-    return;
-  }
-  
-  const url = `https://api.telegram.org/bot${token}/sendMessage`;
-  const payload = {
-    chat_id: chatId,
-    text: message,
-    parse_mode: "Markdown"
-  };
-  try {
-    const response = await axios.post(url, payload, { timeout: 10000 });
-    if (response.status !== 200) {
-      console.error(`[TELEGRAM ERROR] Failed to send message: ${JSON.stringify(response.data)}`);
-    }
-  } catch (e: any) {
-    console.error(`[TELEGRAM EXCEPTION] Failed to connect: ${e.message || e}`);
-  }
-}
+
 
 // Keywords for OSINT Lexical Analysis of Distressed/Motivated Sellers
 const DISTRESSED_KEYWORDS = [

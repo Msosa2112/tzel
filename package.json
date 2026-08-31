@@ -4,21 +4,36 @@
   "description": "OSINT Real Estate engine for Surplus Funds and Distressed Properties",
   "main": "dist/fetch_osint.js",
   "scripts": {
-    "fetch": "ts-node fetch_osint.ts",
-    "test-db": "ts-node test_turso.py",
-    "setup-db": "ts-node setup_turso.py"
+    "pipeline:realestate": "bun run_pipeline.ts",
+    "pipeline:legal": "bun run_pipeline_legal.ts",
+    "pipeline:physical": "bun run_pipeline_physical.ts",
+    "server:map": "bun tzel_map_server.ts",
+    "fetch": "bun fetch_osint.ts",
+    "radar:facebook": "bun modules/construction/schedulers/facebook_hourly_daemon.ts",
+    "pipeline:construction": "bun modules/construction/run_construction_pipeline.ts --notify",
+    "sync:barbapro": "bun -e \"import { syncAllLeadsToBarbaPro } from './modules/construction/integrations/barbapro_bridge'; (async () => { await syncAllLeadsToBarbaPro(100); })()\"",
+    "login:barba-facebook": "bun modules/construction/scrapers/login_barba_facebook.ts",
+    "login:my-facebook": "bun modules/construction/scrapers/login_user_facebook.ts",
+    "login:nextdoor": "bun modules/construction/scrapers/login_nextdoor.ts",
+    "login:skiptrace": "bun modules/construction/scrapers/login_skiptrace_session.ts",
+    "skiptrace:free": "bun modules/construction/leads/free_osint_skiptracer.ts",
+    "radar:expanded": "bun modules/construction/leads/expanded_deep_radar.ts"
   },
   "dependencies": {
     "@crawlee/playwright": "^3.17.0",
     "@libsql/client": "^0.14.0",
+    "@supabase/supabase-js": "^2.112.3",
     "@types/cheerio": "^0.22.35",
     "axios": "^1.7.9",
+    "bullmq": "^5.80.2",
     "cheerio": "^1.2.0",
     "crawlee": "^3.17.0",
     "csv-parser": "^3.2.1",
     "dotenv": "^16.4.7",
     "express": "^5.2.1",
     "got-scraping": "^4.2.1",
+    "ioredis": "^5.11.1",
+    "p-limit": "^3.1.0",
     "pdf-parse": "^2.4.5",
     "playwright": "^1.60.0",
     "playwright-extra": "^4.3.6",
@@ -28,9 +43,9 @@
   },
   "devDependencies": {
     "@types/express": "^5.0.6",
-    "@types/node": "^22.10.2",
+    "@types/node": "^22.20.1",
     "@types/ssh2-sftp-client": "^9.0.6",
     "ts-node": "^10.9.2",
-    "typescript": "^5.7.2"
+    "typescript": "^5.9.3"
   }
 }

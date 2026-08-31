@@ -1,21 +1,13 @@
 import express from "express";
 import axios from "axios";
-import { createClient } from "@libsql/client";
+import { db } from "./db";
 import * as dotenv from "dotenv";
 import * as path from "path";
 import { calculateRehab, calculateMAO, calculateROI, isJuniorLien, calculateNetEquity, isUnderwater, checkCriticalRisk } from "./underwriting/underwriter";
 
 dotenv.config();
 
-let dbUrl = process.env.TURSO_DATABASE_URL || "";
-if (dbUrl.startsWith("libsql://")) {
-  dbUrl = dbUrl.replace("libsql://", "https://");
-}
 
-const db = createClient({
-  url: dbUrl,
-  authToken: process.env.TURSO_AUTH_TOKEN || "",
-});
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -172,6 +164,8 @@ interface GroupedLead {
   physicalDistress: any[];
   financialDistress: any[];
   lifeEvents: any[];
+  preForeclosures?: any[];
+  taxSales?: any[];
   hiddenMortgages: number;
   hiddenLiensAmount: number;
   titleCheckStatus: string;
@@ -400,7 +394,11 @@ app.get("/api/prospectos", async (req, res) => {
       // 8. geocode_cache
       `SELECT address, lat, lon FROM geocode_cache`,
       // 9. osint_enrichment
-      `SELECT address_key, llc_directors, corporate_address, social_profiles, usernames_found, env_stressors, env_attractors FROM osint_enrichment`
+      `SELECT address_key, llc_directors, corporate_address, social_profiles, usernames_found, env_stressors, env_attractors FROM osint_enrichment`,
+      // 10. pre_foreclosures
+      `SELECT pre_foreclosure_id, case_number, address, county, state, filing_date, plaintiff, defendant, case_status, days_since_filing, defendant_phones, defendant_emails, mailing_address, absentee_owner, photo_urls FROM pre_foreclosures`,
+      // 11. tax_sales
+      `SELECT tax_sale_id, parcel_id, address, county, state, owner_name, taxes_owed, sale_date, defendant_phones, defendant_emails, mailing_address, absentee_owner, photo_urls FROM tax_sales`
     ], "read");
 
     const auctionsRes = batchRes[0];
@@ -413,6 +411,8 @@ app.get("/api/prospectos", async (req, res) => {
     const lifeEventsRes = batchRes[7];
     const cacheRes = batchRes[8];
     const osintRes = batchRes[9];
+    const preForeclosuresRes = batchRes[10];
+    const taxSalesRes = batchRes[11];
 
     // Filter auctions to next 60 days or Indiana manual reviews
     const opportunities = auctionsRes.rows.filter(row => {
@@ -996,6 +996,126 @@ app.get("/api/prospectos", async (req, res) => {
       lead.lifeEvents.push(row);
     }
 
+    // I. Group pre_foreclosures
+    for (const row of (preForeclosuresRes.rows || [])) {
+      const address = row.address as string;
+      const key = getGroupingKey(address);
+      const rowPhones = (row.defendant_phones as string || "").split(/,\s*|;\s*/).map(p => p.trim()).filter(Boolean);
+      const rowEmails = (row.defendant_emails as string || "").split(/,\s*|;\s*/).map(e => e.trim()).filter(Boolean);
+
+      if (!groupedMap.has(key)) {
+        groupedMap.set(key, {
+          groupingKey: key,
+          displayAddress: address,
+          state: row.state as string || "KY",
+          county: row.county as string || "Jefferson",
+          ownerName: row.defendant as string || "No especificado",
+          phones: new Set(rowPhones),
+          emails: new Set(rowEmails),
+          mlsValue: 0,
+          mlsId: "N/A",
+          auctions: [],
+          violations: [],
+          probates: [],
+          divorces: [],
+          bankruptcies: [],
+          physicalDistress: [],
+          financialDistress: [],
+          lifeEvents: [],
+          preForeclosures: [],
+          taxSales: [],
+          hiddenMortgages: 0,
+          hiddenLiensAmount: 0,
+          titleCheckStatus: "pending",
+          nextRetryDate: undefined,
+          mailingAddress: row.mailing_address as string || undefined,
+          isAbsentee: (row.absentee_owner as number) === 1,
+          sqft: undefined,
+          beds: undefined,
+          baths: undefined,
+          photoUrls: []
+        });
+      } else {
+        const existing = groupedMap.get(key)!;
+        if (row.defendant && row.defendant !== "Unknown" && (existing.ownerName === "No especificado" || existing.ownerName === "DUEÑO DESCONOCIDO")) {
+          existing.ownerName = row.defendant as string;
+        }
+        if (!existing.mailingAddress && row.mailing_address) existing.mailingAddress = row.mailing_address as string;
+        if ((row.absentee_owner as number) === 1) existing.isAbsentee = true;
+        rowPhones.forEach(p => existing.phones.add(p));
+        rowEmails.forEach(e => existing.emails.add(e));
+        if (address.length > existing.displayAddress.length) existing.displayAddress = address;
+      }
+
+      const lead = groupedMap.get(key)!;
+      if (!lead.preForeclosures) lead.preForeclosures = [];
+      lead.preForeclosures.push(row);
+      if (row.photo_urls) {
+        try {
+          const parsed = JSON.parse(row.photo_urls as string);
+          if (Array.isArray(parsed)) {
+            parsed.forEach((url: string) => {
+              if (url && !lead.photoUrls.includes(url)) lead.photoUrls.push(url);
+            });
+          }
+        } catch (e) {}
+      }
+    }
+
+    // J. Group tax_sales
+    for (const row of (taxSalesRes.rows || [])) {
+      const address = row.address as string;
+      const key = getGroupingKey(address);
+      const rowPhones = (row.defendant_phones as string || "").split(/,\s*|;\s*/).map(p => p.trim()).filter(Boolean);
+      const rowEmails = (row.defendant_emails as string || "").split(/,\s*|;\s*/).map(e => e.trim()).filter(Boolean);
+
+      if (!groupedMap.has(key)) {
+        groupedMap.set(key, {
+          groupingKey: key,
+          displayAddress: address,
+          state: row.state as string || "IN",
+          county: row.county as string || "Clark",
+          ownerName: row.owner_name as string || "No especificado",
+          phones: new Set(rowPhones),
+          emails: new Set(rowEmails),
+          mlsValue: 0,
+          mlsId: "N/A",
+          auctions: [],
+          violations: [],
+          probates: [],
+          divorces: [],
+          bankruptcies: [],
+          physicalDistress: [],
+          financialDistress: [],
+          lifeEvents: [],
+          preForeclosures: [],
+          taxSales: [],
+          hiddenMortgages: 0,
+          hiddenLiensAmount: 0,
+          titleCheckStatus: "pending",
+          nextRetryDate: undefined,
+          mailingAddress: row.mailing_address as string || undefined,
+          isAbsentee: (row.absentee_owner as number) === 1,
+          sqft: undefined,
+          beds: undefined,
+          baths: undefined,
+          photoUrls: []
+        });
+      } else {
+        const existing = groupedMap.get(key)!;
+        if (row.owner_name && (existing.ownerName === "No especificado" || existing.ownerName === "DUEÑO DESCONOCIDO")) {
+          existing.ownerName = row.owner_name as string;
+        }
+        rowPhones.forEach(p => existing.phones.add(p));
+        rowEmails.forEach(e => existing.emails.add(e));
+        if (address.length > existing.displayAddress.length) existing.displayAddress = address;
+      }
+
+      const lead = groupedMap.get(key)!;
+      if (!lead.taxSales) lead.taxSales = [];
+      lead.taxSales.push(row);
+    }
+
     // Pre-cargar la caché de geocodificación en memoria para evitar el problema de consultas N+1
     const geocodeMap = new Map<string, { lat: number; lon: number }>();
     for (const row of cacheRes.rows) {
@@ -1082,6 +1202,8 @@ app.get("/api/prospectos", async (req, res) => {
         physicalDistress: lead.physicalDistress,
         financialDistress: lead.financialDistress,
         lifeEvents: lead.lifeEvents,
+        preForeclosures: lead.preForeclosures || [],
+        taxSales: lead.taxSales || [],
         hiddenMortgages: hiddenDebt,
         hiddenLiensAmount: lead.hiddenLiensAmount,
         titleCheckStatus: lead.titleCheckStatus,

@@ -2663,14 +2663,14 @@
       <div class="sidebar-section" id="investment-financial-section">
         <h3>Estatus Financiero</h3>
         <div class="segment-selector">
-          <button id="btn-deals" class="segment-btn active">
+          <button id="btn-deals" class="segment-btn">
             <i data-lucide="trending-up"></i> BUENOS DEALS
           </button>
           <button id="btn-underwater" class="segment-btn">
             <i data-lucide="trending-down"></i> BAJO EL AGUA
           </button>
           <button id="btn-unvalued" class="segment-btn">
-            <i data-lucide="help-circle"></i> SIN VALORAR
+            <i data-lucide="clock"></i> ESPERANDO POR PRECIO
           </button>
         </div>
       </div>
@@ -2736,7 +2736,11 @@
           </div>
           <div class="map-legend-item">
             <span class="legend-color-dot" style="background-color: #0284c7; box-shadow: 0 0 6px #0284c7"></span>
-            <span class="legend-label"><i data-lucide="scale" class="inline-icon" style="color: #0284c7"></i> <strong>PIN AZUL: Otros Leads</strong><br>Deudas bajas, datos en recolección con valor catastral PVA</span>
+            <span class="legend-label"><i data-lucide="scale" class="inline-icon" style="color: #0284c7"></i> <strong>PIN AZUL: Otros Leads</strong><br>Deudas bajas con valor catastral PVA</span>
+          </div>
+          <div class="map-legend-item">
+            <span class="legend-color-dot" style="background-color: #64748b; box-shadow: 0 0 6px #64748b"></span>
+            <span class="legend-label"><i data-lucide="clock" class="inline-icon" style="color: #64748b"></i> <strong>PIN RELOJ: Esperando por Precio</strong><br>Propiedad en recolección o tasación pendiente</span>
           </div>
           <div class="map-legend-item">
             <span class="legend-color-dot" style="background-color: #fbbf24; box-shadow: 0 0 6px #fbbf24"></span>
@@ -3130,7 +3134,8 @@
       scale: `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m16 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z"/><path d="m2 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z"/><path d="M7 21h10"/><path d="M12 3v18"/><path d="M3 7h18"/></svg>`,
       user: `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>`,
       tornado: `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 4H3"/><path d="M19 8H5"/><path d="M17 12H7"/><path d="M15 16H9"/><path d="M13 20h-2"/></svg>`,
-      cloudLightning: `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 16.9A5 5 0 0 0 18 7h-1.26a8 8 0 1 0-11.62 8.58M13 11l-4 6h6l-3 5"/></svg>`
+      cloudLightning: `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 16.9A5 5 0 0 0 18 7h-1.26a8 8 0 1 0-11.62 8.58M13 11l-4 6h6l-3 5"/></svg>`,
+      landmark: `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="22" x2="21" y2="22"/><line x1="6" y1="18" x2="6" y2="11"/><line x1="10" y1="18" x2="10" y2="11"/><line x1="14" y1="18" x2="14" y2="11"/><line x1="18" y1="18" x2="18" y2="11"/><polygon points="12 2 20 7 4 7"/></svg>`
     };
 
     let map;
@@ -3140,7 +3145,7 @@
     let allLeads = [];
     let selectedLead = null;
     let mapMarkers = new Map(); // key -> leaflet marker
-    let financialFilter = 'deals'; // 'deals' or 'underwater'
+    let financialFilter = 'all'; // 'all', 'deals', 'underwater', 'unvalued'
 
     // Favorites & Comparison State
     let favoriteKeys = JSON.parse(localStorage.getItem('tzel_favorites') || '[]');
@@ -3270,12 +3275,26 @@
     });
 
     function setFinancialFilter(filter) {
-      financialFilter = filter;
       const btnDeals = document.getElementById('btn-deals');
       const btnUnder = document.getElementById('btn-underwater');
       const btnUnvalued = document.getElementById('btn-unvalued');
       
-      // Reset all buttons to default inactive style (handled by CSS class segment-btn)
+      // If clicking the active button, toggle off to 'all'
+      if (financialFilter === filter) {
+        financialFilter = 'all';
+        [btnDeals, btnUnder, btnUnvalued].forEach(b => {
+          b.classList.remove('active');
+          b.style.background = '';
+          b.style.color = '';
+          b.style.boxShadow = '';
+        });
+        applyFilters();
+        return;
+      }
+
+      financialFilter = filter;
+      
+      // Reset all buttons to default inactive style
       [btnDeals, btnUnder, btnUnvalued].forEach(b => {
         b.classList.remove('active');
         b.style.background = '';
@@ -3529,14 +3548,15 @@
 
       // Initialize different layer styles
       mapLayers = {
-        light: L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
-          maxZoom: 20
+        light: L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          maxZoom: 19,
+          attribution: '&copy; OpenStreetMap contributors'
         }),
         satellite: L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
           maxZoom: 19
         }),
-        dark: L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-          maxZoom: 20
+        dark: L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+          maxZoom: 19
         })
       };
 
@@ -3824,14 +3844,11 @@
         const bypassFinancial = showRoofing && isRoofingLead;
 
         if (!bypassFinancial) {
-          // Excluir propiedades sin deuda (van a la Bóveda de Deuda Cero)
-          if (totalDebt === 0) return false;
+          // Filtro de Deuda Activa Mínima (solo si el usuario mueve el slider)
+          if (minDebt > 0 && totalDebt < minDebt) return false;
 
-          // Filtro de Deuda Activa Mínima
-          if (totalDebt < minDebt) return false;
-
-          // Filtro de Margen de Equidad Mínimo
-          if (equitySpread < minEquity) return false;
+          // Filtro de Margen de Equidad Mínimo (solo si el usuario mueve el slider)
+          if (minEquity > 0 && equitySpread < minEquity) return false;
 
           // Filtro Financiero (Buenos Deals vs Bajo el Agua vs Sin Valorar)
           const isGoodDeal = marketValue > 0 && equitySpread >= Math.max(40000, marketValue * 0.30);
@@ -3861,7 +3878,9 @@
         if (stateVal !== 'ALL' && lead.state !== stateVal) return false;
 
         // Distress Stacking / Type Filter
-        const hasAuctions = lead.auctions && lead.auctions.length > 0;
+        const hasAuctions = (lead.auctions && lead.auctions.length > 0) || 
+                            (lead.preForeclosures && lead.preForeclosures.length > 0) || 
+                            (lead.taxSales && lead.taxSales.length > 0);
         const hasPhysical = (lead.physicalDistress && lead.physicalDistress.length > 0) || 
                             (lead.violations && lead.violations.length > 0);
         const hasOthers = (lead.financialDistress && lead.financialDistress.length > 0) || 
@@ -3930,10 +3949,22 @@
             markerColor = '#0891b2'; // Blue-Cyan
             svgIconKey = 'cloudLightning';
             markerClass = 'roofing-violation';
+          } else if (marketValue === 0) {
+            markerColor = '#64748b'; // Slate Gray for Waiting Price
+            svgIconKey = 'clock';
+            markerClass = 'waiting-price';
           } else if (hasScheduledAuction && equitySpread > 30000) {
             markerColor = '#ef4444';
             svgIconKey = 'shieldAlert';
             markerClass = 'execution-scheduled';
+          } else if (lead.preForeclosures && lead.preForeclosures.length > 0) {
+            markerColor = '#f97316';
+            svgIconKey = 'clock';
+            markerClass = 'pre-foreclosure';
+          } else if (lead.taxSales && lead.taxSales.length > 0) {
+            markerColor = '#eab308';
+            svgIconKey = 'landmark';
+            markerClass = 'tax-sale';
           } else if (hasPhysical && equitySpread > 0) {
             markerColor = '#ca8a04';
             svgIconKey = 'flame';
@@ -3980,19 +4011,19 @@
                 </div>
                 <div class="popup-row">
                   <span class="popup-row-label">Valor PVA:</span>
-                  <span class="popup-row-value">${marketValue > 0 ? '$' + marketValue.toLocaleString() : 'N/A'}</span>
+                  <span class="popup-row-value">${marketValue > 0 ? '$' + marketValue.toLocaleString() : '<span style="color: #64748b; font-style: italic;">Esperando por precio</span>'}</span>
                 </div>
                 <div class="popup-row">
                   <span class="popup-row-label">Deuda Total:</span>
-                  <span class="popup-row-value" style="color: #ef4444">$${totalDebt.toLocaleString()}</span>
+                  <span class="popup-row-value" style="color: ${totalDebt > 0 ? '#ef4444' : 'var(--text-muted)'}">${totalDebt > 0 ? '$' + totalDebt.toLocaleString() : '$0 (Sin deuda)'}</span>
                 </div>
                 <div class="popup-row">
                   <span class="popup-row-label">Equidad Spread:</span>
-                  <span class="popup-row-value" style="color: ${equitySpread > 40000 ? 'var(--color-radar-green)' : 'var(--text-main)'}">$${equitySpread.toLocaleString()}</span>
+                  <span class="popup-row-value" style="color: ${marketValue > 0 ? (equitySpread > 40000 ? 'var(--color-radar-green)' : 'var(--text-main)') : '#64748b'}">${marketValue > 0 ? '$' + equitySpread.toLocaleString() : '<span style="color: #64748b; font-style: italic;">Por tasar</span>'}</span>
                 </div>
                 <div class="popup-row">
                   <span class="popup-row-label">Oferta MPO:</span>
-                  <span class="popup-row-value" style="color: var(--color-radar-green); font-weight: bold;">$${mpo.toLocaleString()}</span>
+                  <span class="popup-row-value" style="color: ${marketValue > 0 ? 'var(--color-radar-green)' : '#64748b'}; font-weight: bold;">${marketValue > 0 ? '$' + mpo.toLocaleString() : '<span style="color: #64748b; font-style: italic;">Por tasar</span>'}</span>
                 </div>
                 <button class="popup-btn" onclick="openLeadDrawer('${lead.groupingKey}')">Ver Ficha Táctica</button>
               </div>
@@ -4089,7 +4120,9 @@
         if (hasManualReview) badgesHtml += `<span class="badge" style="background: rgba(239, 68, 68, 0.15); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.3)"><i data-lucide="alert-triangle" class="inline-icon"></i> Review</span>`;
         
         if (activeSystemMode === 'investment') {
-          if (equitySpread > 40000) {
+          if (marketValue === 0) {
+            badgesHtml += `<span class="badge" style="background: rgba(100, 116, 139, 0.15); color: #64748b; border: 1px solid rgba(100, 116, 139, 0.3);"><i data-lucide="clock" class="inline-icon"></i> ESPERANDO PRECIO</span>`;
+          } else if (equitySpread > 40000) {
             badgesHtml += `<span class="badge badge-equity-high" style="background: rgba(16, 185, 129, 0.15); color: var(--color-radar-green-dark); border: 1px solid var(--color-radar-green-border);"><i data-lucide="trending-up" class="inline-icon"></i> ALTA EQUIDAD</span>`;
           }
         } else {
@@ -4152,19 +4185,19 @@
             <div class="lead-comps">
               <div class="comp-item">
                 <span class="comp-label">Valor PVA</span>
-                <span class="comp-val">${marketValue > 0 ? '$' + marketValue.toLocaleString() : 'N/A'}</span>
+                <span class="comp-val">${marketValue > 0 ? '$' + marketValue.toLocaleString() : '<span style="color: #64748b; font-size: 0.72rem; font-style: italic;">Esperando</span>'}</span>
               </div>
               <div class="comp-item">
                 <span class="comp-label">Deuda Total</span>
-                <span class="comp-val" style="color: #ef4444">$${totalDebt.toLocaleString()}</span>
+                <span class="comp-val" style="color: ${totalDebt > 0 ? '#ef4444' : 'var(--text-muted)'}">${totalDebt > 0 ? '$' + totalDebt.toLocaleString() : '$0'}</span>
               </div>
               <div class="comp-item">
                 <span class="comp-label">Oferta MPO</span>
-                <span class="comp-val" style="color: var(--color-radar-green); font-weight: bold;">$${mpo.toLocaleString()}</span>
+                <span class="comp-val" style="color: ${marketValue > 0 ? 'var(--color-radar-green)' : '#64748b'}; font-weight: bold;">${marketValue > 0 ? '$' + mpo.toLocaleString() : '<span style="color: #64748b; font-size: 0.72rem;">Por tasar</span>'}</span>
               </div>
               <div class="comp-item">
                 <span class="comp-label">Equidad</span>
-                <span class="comp-val" style="color: ${equitySpread > 40000 ? 'var(--color-radar-green)' : 'var(--text-main)'}">$${equitySpread.toLocaleString()}</span>
+                <span class="comp-val" style="color: ${marketValue > 0 ? (equitySpread > 40000 ? 'var(--color-radar-green)' : 'var(--text-main)') : '#64748b'}">${marketValue > 0 ? '$' + equitySpread.toLocaleString() : '<span style="color: #64748b; font-size: 0.72rem;">Por tasar</span>'}</span>
               </div>
             </div>
           `;
@@ -4780,7 +4813,7 @@
 
       // Métricas de Adquisición As-Is
       const pvaVal = (lead.auctions && lead.auctions.length > 0 && lead.auctions[0].appraisal_value > 0) ? lead.auctions[0].appraisal_value : (lead.mlsValue || 0);
-      document.getElementById('uw-pva-assessed').textContent = pvaVal > 0 ? `$${pvaVal.toLocaleString()}` : 'N/A';
+      document.getElementById('uw-pva-assessed').innerHTML = pvaVal > 0 ? `$${pvaVal.toLocaleString()}` : '<span style="color: #64748b; font-style: italic; font-size: 0.85rem;">Esperando precio</span>';
       document.getElementById('uw-mca-crudo').textContent = 'Calculando...';
 
       const totalDebt = (lead.primaryDebt || 0) + (lead.hiddenMortgages || 0) + (lead.hiddenLiensAmount || 0);
@@ -4796,7 +4829,7 @@
 
       // Equity Spread & MPO inicial con pvaVal
       const initialSpread = pvaVal > 0 ? (pvaVal - totalDebt) : 0;
-      document.getElementById('uw-equity-spread').textContent = pvaVal > 0 ? `$${initialSpread.toLocaleString()}` : 'N/A';
+      document.getElementById('uw-equity-spread').innerHTML = pvaVal > 0 ? `$${initialSpread.toLocaleString()}` : '<span style="color: #64748b; font-style: italic; font-size: 0.85rem;">Pendiente tasación</span>';
       if (pvaVal > 0) {
         document.getElementById('uw-equity-spread').style.color = initialSpread > 40000 ? 'var(--color-radar-green)' : (initialSpread < 0 ? '#ef4444' : 'var(--text-main)');
         document.getElementById('uw-equity-badge').style.display = initialSpread > 40000 ? 'inline-block' : 'none';
@@ -4807,7 +4840,7 @@
 
       const df = lead.state === 'KY' ? 0.66 : (lead.isHighMotivation ? 0.70 : 0.75);
       const initialMpo = pvaVal > 0 ? Math.max(0, Math.round((pvaVal * df) - totalDebt)) : 0;
-      document.getElementById('uw-mpo-asis').textContent = pvaVal > 0 ? `$${initialMpo.toLocaleString()}` : 'N/A';
+      document.getElementById('uw-mpo-asis').innerHTML = pvaVal > 0 ? `$${initialMpo.toLocaleString()}` : '<span style="color: #64748b; font-style: italic; font-size: 0.95rem;">Pendiente tasación</span>';
 
       // Toggle Zillow/Redfin manual search links
       const manualSearchDiv = document.getElementById('uw-manual-search');
@@ -5093,6 +5126,55 @@
             <div><strong>Demandante:</strong> ${auc.plaintiff || 'No especificado'}</div>
             <div><strong>Monto del Reclamo:</strong> $${(auc.debt_amount || 0).toLocaleString()} ${pdfLink}</div>
             ${manualReviewAlert}
+          `;
+          logsContainer.appendChild(div);
+        });
+      }
+
+      // A.1 Pre-Foreclosures (Lis Pendens)
+      if (lead.preForeclosures && lead.preForeclosures.length > 0) {
+        activeDistressCategories.push('auction');
+        lead.preForeclosures.forEach(pf => {
+          const div = document.createElement('div');
+          div.className = 'distress-log-item';
+          div.style.borderLeftColor = 'var(--color-execution-orange)';
+          div.innerHTML = `
+            <div class="distress-log-header">
+              <span style="color: var(--color-execution-orange); font-weight: bold; display: flex; align-items: center; gap: 4px;">
+                <i data-lucide="clock" class="inline-icon" style="color: var(--color-execution-orange)"></i> 
+                DEMANDA TEMPRANA: PRE-FORECLOSURE (LIS PENDENS)
+              </span>
+              <span style="color: var(--color-execution-orange)">Radicado hace ${pf.days_since_filing || '30-90'} días</span>
+            </div>
+            <div><strong>Caso Judicial:</strong> ${pf.case_number}</div>
+            <div><strong>Demandante (Banco/Prestamista):</strong> ${pf.plaintiff || 'No especificado'}</div>
+            <div><strong>Demandado / Propietario:</strong> ${pf.defendant || 'No especificado'}</div>
+            <div style="margin-top: 6px; padding: 6px; background: rgba(249, 115, 22, 0.1); border-radius: 4px; font-size: 0.75rem; color: #c2410c;">
+              ⚡ <strong>Ventaja Táctica:</strong> Sin fecha de subasta pública fijada. Negociación directa con el deudor antes del sheriff sale.
+            </div>
+          `;
+          logsContainer.appendChild(div);
+        });
+      }
+
+      // A.2 Tax Sales (SRI Services)
+      if (lead.taxSales && lead.taxSales.length > 0) {
+        activeDistressCategories.push('financial');
+        lead.taxSales.forEach(ts => {
+          const div = document.createElement('div');
+          div.className = 'distress-log-item';
+          div.style.borderLeftColor = 'var(--color-financial-yellow)';
+          div.innerHTML = `
+            <div class="distress-log-header">
+              <span style="color: var(--color-financial-yellow); font-weight: bold; display: flex; align-items: center; gap: 4px;">
+                <i data-lucide="landmark" class="inline-icon" style="color: var(--color-financial-yellow)"></i> 
+                SUBASTA DE IMPUESTOS FISCALES (TAX SALE)
+              </span>
+              <span style="color: var(--color-financial-yellow)">${ts.sale_date || 'Próximamente'}</span>
+            </div>
+            <div><strong>Parcela ID:</strong> ${ts.parcel_id || 'N/A'}</div>
+            <div><strong>Impuestos Adeudados:</strong> $${(ts.taxes_owed || 0).toLocaleString()}</div>
+            <div><strong>Propietario:</strong> ${ts.owner_name || 'No especificado'}</div>
           `;
           logsContainer.appendChild(div);
         });
@@ -5594,14 +5676,24 @@
             const tr = document.createElement('tr');
             
             // Calculate days since auction
-            const daysRemaining = getDaysRemaining(item.auction_date);
-            const daysAgo = daysRemaining !== null ? Math.abs(daysRemaining) : 'N/A';
-            const daysStr = daysRemaining !== null ? `${daysAgo} días` : 'Fecha indefinida';
+            let daysStr = 'Reciente';
+            if (item.auction_date) {
+              const d = new Date(item.auction_date);
+              if (!isNaN(d.getTime())) {
+                const diff = Math.floor((new Date().getTime() - d.getTime()) / (1000 * 60 * 60 * 24));
+                daysStr = diff >= 0 ? `${diff} días` : `En ${Math.abs(diff)} días`;
+              }
+            }
             
             const surplusVal = item.surplus_amount || 0;
             const winningBid = item.winning_bid || 0;
             const judgmentAmt = item.judgment_amount || 0;
             
+            const cleanedPhones = item.defendant_phones ? cleanAllPhoneTags(item.defendant_phones) : '';
+            const phonesHtml = cleanedPhones && cleanedPhones !== 'No disponible' && !cleanedPhones.includes('555-')
+              ? `<code style="background: var(--bg-darker); padding: 4px 8px; border-radius: 4px; color: #854d0e; font-family: monospace; font-size: 0.85rem;">${cleanedPhones}</code>`
+              : `<span style="color: var(--text-muted); font-size: 0.8rem; font-style: italic;">Pendiente Skip Trace</span>`;
+
             tr.innerHTML = `
               <td style="font-weight: bold; color: var(--text-main); padding: 14px 16px;">${item.owner_name}</td>
               <td style="color: var(--text-muted); padding: 14px 16px;">${item.address}</td>
@@ -5609,9 +5701,7 @@
               <td style="text-align: right; color: var(--text-muted); padding: 14px 16px;">$${winningBid.toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
               <td style="text-align: right; font-weight: bold; color: var(--color-radar-green-dark); font-size: 1rem; padding: 14px 16px;">$${surplusVal.toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
               <td style="padding: 14px 16px;">
-                <code style="background: var(--bg-darker); padding: 4px 8px; border-radius: 4px; color: #854d0e; font-family: monospace; font-size: 0.85rem;">
-                  ${cleanAllPhoneTags(item.defendant_phones)}
-                </code>
+                ${phonesHtml}
               </td>
               <td style="text-align: center; color: var(--text-muted); padding: 14px 16px;">${daysStr}</td>
               <td style="text-align: center; padding: 14px 16px;">

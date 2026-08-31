@@ -49,9 +49,11 @@ export async function getBrowser(headless: boolean = true): Promise<GetBrowserRe
     console.warn(`[BROWSER HELPER] Falló la conexión a Obscura CDP: ${err.message}. Iniciando fallback con Chromium local...`);
     
     // 3. Fallback: Lanzar instancia local estándar de Playwright con plugin de sigilo
-    const browser = await playwrightExtraChromium.launch({
-      headless,
-    }) as unknown as Browser;
+    const launchOptions: any = { headless };
+    if (process.env.PROXY_URL) {
+      launchOptions.proxy = { server: process.env.PROXY_URL };
+    }
+    const browser = await playwrightExtraChromium.launch(launchOptions) as unknown as Browser;
     
     return { browser, isObscura: false };
   }

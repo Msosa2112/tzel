@@ -72,74 +72,25 @@ export async function querySearXNG(query: string): Promise<SearXNGResult[]> {
     console.warn(`[SEARXNG WARNING] Instancia local no disponible o falló: ${err.message}. Iniciando fallback público...`);
   }
 
-  // 2. Fallback: Búsqueda con Playwright Stealth a través del pool de instancias públicas
-  console.log(`[SEARXNG STEALTH FALLBACK] Iniciando navegador headless para buscar en instancias públicas...`);
-  
-  const browser = await chromium.launch({
-    headless: true,
-  });
-
-  const context = await browser.newContext({
-    userAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36",
-    viewport: { width: 1280, height: 800 },
-    locale: "en-US",
-  });
-
-  const page = await context.newPage();
-  const shuffledInstances = shuffle(SEARXNG_JSON_INSTANCES);
-  
-  let results: SearXNGResult[] = [];
-
-  for (const instance of shuffledInstances) {
-    const searchUrl = `${instance}/search?q=${encodeURIComponent(query)}&format=json`;
-    try {
-      console.log(`[SEARXNG STEALTH] Probando instancia pública: ${instance}...`);
-      await page.goto(searchUrl, { waitUntil: "networkidle", timeout: 15000 });
-      
-      const pageText = await page.innerText("body");
-      
-      try {
-        const parsed = JSON.parse(pageText);
-        if (parsed && Array.isArray(parsed.results)) {
-          results = parsed.results;
-          console.log(`[SEARXNG STEALTH SUCCESS] Éxito en instancia pública ${instance}. Encontrados ${results.length} resultados.`);
-          break; // Encontrado con éxito, salir del bucle
-        } else {
-          console.warn(`[SEARXNG STEALTH WARN] Respuesta de ${instance} no contiene array de resultados.`);
-        }
-      } catch (jsonErr) {
-        console.warn(`[SEARXNG STEALTH WARN] No se pudo parsear como JSON en ${instance}. Excerpt: ${pageText.substring(0, 100)}`);
-      }
-    } catch (err: any) {
-      console.warn(`[SEARXNG STEALTH WARN] Error al consultar ${instance}: ${err.message}`);
+  // 2. Fallback Inmediato: DuckDuckGo Lite (rápido y limpio)
+  try {
+    const ddgResults = await queryDuckDuckGoLite(query);
+    if (ddgResults && ddgResults.length > 0) {
+      return ddgResults;
     }
+  } catch (ddgErr: any) {
+    console.warn(`[DDG LITE FALLBACK ERROR] Falló DuckDuckGo Lite: ${ddgErr.message}`);
   }
 
-  await browser.close();
-
-  // 3. Fallback adicional a DuckDuckGo Lite si SearXNG local y público fallaron o están vacíos (Comentado temporalmente por bloqueo de red)
-  /*
-  if (results.length === 0) {
-    try {
-      console.log(`[SEARXNG CLIENT] Sin resultados de SearXNG. Intentando fallback secundario a DuckDuckGo Lite...`);
-      results = await queryDuckDuckGoLite(query);
-    } catch (err: any) {
-      console.warn(`[DDG LITE FALLBACK ERROR] Falló búsqueda en DuckDuckGo Lite: ${err.message}`);
-    }
+  // 3. Fallback terciario a Yahoo si DuckDuckGo Lite no devolvió resultados
+  try {
+    console.log(`[SEARXNG CLIENT] Intentando fallback terciario a Yahoo...`);
+    const yahooResults = await queryYahoo(query);
+    return yahooResults;
+  } catch (err: any) {
+    console.warn(`[YAHOO FALLBACK ERROR] Falló búsqueda en Yahoo: ${err.message}`);
+    return [];
   }
-  */
-
-  // 4. Fallback terciario a Yahoo si SearXNG y DuckDuckGo Lite fallaron o están vacíos
-  if (results.length === 0) {
-    try {
-      console.log(`[SEARXNG CLIENT] Sin resultados. Intentando fallback terciario a Yahoo...`);
-      results = await queryYahoo(query);
-    } catch (err: any) {
-      console.warn(`[YAHOO FALLBACK ERROR] Falló búsqueda en Yahoo: ${err.message}`);
-    }
-  }
-
-  return results;
 }
 
 /**

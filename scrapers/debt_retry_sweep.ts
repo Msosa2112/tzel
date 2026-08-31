@@ -75,7 +75,11 @@ async function performOSINTDebtSearch(
     console.log("  [OSINT SWEEP] Resultados de SearXNG vacíos o insuficientes. Intentando DDG Lite...");
     let browser;
     try {
-      browser = await chromium.launch({ headless: true });
+      const launchOptions: any = { headless: true };
+      if (process.env.PROXY_URL) {
+        launchOptions.proxy = { server: process.env.PROXY_URL };
+      }
+      browser = await chromium.launch(launchOptions);
       const context = await browser.newContext({
         userAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
       });
@@ -121,7 +125,7 @@ async function performOSINTDebtSearch(
   }
 
   // Enviar a Gemini para análisis financiero
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${apiKey}`;
   const prompt = `Eres un perito auditor inmobiliario. Analiza la siguiente recopilación de resultados de búsqueda pública para una propiedad o deudor y extrae:
   1. El monto total de la deuda hipotecaria en ejecución de subasta ("debtAmount").
   2. El monto de hipotecas secundarias (segundas hipotecas) no liberadas ("hiddenMortgages").
@@ -174,7 +178,9 @@ async function performOSINTDebtSearch(
     const textRes = response.data.candidates?.[0]?.content?.parts?.[0]?.text;
     if (textRes) {
       try {
-        const parsed = JSON.parse(textRes);
+        const match = textRes.match(/\{[\s\S]*\}/);
+        const cleanJson = match ? match[0] : textRes;
+        const parsed = JSON.parse(cleanJson);
         console.log("  [OSINT SWEEP GEMINI] Extracción completada:", JSON.stringify(parsed));
         return {
           debt: parsed.debtAmount ? Number(parsed.debtAmount) : null,

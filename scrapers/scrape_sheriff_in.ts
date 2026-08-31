@@ -1,6 +1,7 @@
 import axios from "axios";
 import * as cheerio from "cheerio";
-import { createClient } from "@libsql/client";
+import { db } from "../db";
+import { sendTelegramNotification } from "../telegram_helper";
 import * as dotenv from "dotenv";
 import { isAddressInJurisdiction } from "./geo_fencing";
 import { chromium } from "playwright-extra";
@@ -13,10 +14,7 @@ chromium.use(stealthPlugin());
 dotenv.config();
 
 // Inicializar cliente de Turso DB
-const db = createClient({
-  url: process.env.TURSO_DATABASE_URL || "",
-  authToken: process.env.TURSO_AUTH_TOKEN || "",
-});
+
 
 // Ciudades comunes en Clark County e Indiana para geofiltros
 const CLARK_CITIES = ["jeffersonville", "clarksville", "sellersburg", "charlestown", "henryville", "borden", "new washington"];
@@ -180,6 +178,7 @@ async function scrapeClarkCounty() {
     const $ = cheerio.load(response.data);
     let currentDate = "Unknown Date 2026";
     let activeSavedCount = 0;
+    let propertyRowCount = 0;
     
     // Extraeremos todos los elementos que contengan texto (p, span, div, strong)
     // para procesar el flujo secuencial de fechas y direcciones.
@@ -250,6 +249,7 @@ async function scrapeClarkCounty() {
       const containsClarkCity = CLARK_CITIES.some(c => textLower.includes(c));
       
       if (startsWithNumber && containsClarkCity) {
+        propertyRowCount++;
         // Verificar si está cancelada
         if (textLower.includes("cancelled") || textLower.includes("cancelled") || textLower.includes("c a n c e l l e d")) {
           // Ignorar las subastas canceladas
@@ -324,6 +324,9 @@ async function scrapeClarkCounty() {
     }
     
     console.log(`[SCRAPER CLARK] Finalizado. Guardadas/Actualizadas: ${activeSavedCount} subastas.`);
+    if (propertyRowCount > 0 && activeSavedCount === 0) {
+      await sendTelegramNotification("⚠️ *Alerta de Mantenimiento:* El scraper de Clark County procesó propiedades (" + propertyRowCount + ") pero guardó 0 registros. Posible cambio en el HTML del portal.");
+    }
   } catch (error: any) {
     console.error("[SCRAPER CLARK ERROR] Falló la extracción en Clark County:", error.message || error);
   }
@@ -384,6 +387,7 @@ async function scrapeFloydCounty() {
     const $ = cheerio.load(data.data.output);
     let currentDate = "Unknown Date 2026";
     let activeSavedCount = 0;
+    let propertyRowCount = 0;
     
     let lastPlaintiff: string | null = null;
     let lastDefendant: string | null = null;
@@ -425,6 +429,7 @@ async function scrapeFloydCounty() {
       // 2. Fila de Propiedad
       // Columnas: ['', Address, City, State, Zip, Status]
       if (cells.length >= 5 && cells[1] && cells[2]) {
+        propertyRowCount++;
         const address = cells[1];
         const city = cells[2];
         const state = cells[3] || "IN";
@@ -515,6 +520,9 @@ async function scrapeFloydCounty() {
     }
     
     console.log(`[SCRAPER FLOYD] Finalizado. Guardadas/Actualizadas: ${activeSavedCount} subastas.`);
+    if (propertyRowCount > 0 && activeSavedCount === 0) {
+      await sendTelegramNotification("⚠️ *Alerta de Mantenimiento:* El scraper de Floyd County procesó propiedades (" + propertyRowCount + ") pero guardó 0 registros. Posible cambio en el HTML del portal.");
+    }
     
   } catch (error: any) {
     console.error("[SCRAPER FLOYD ERROR] Falló la extracción en Floyd County:", error.message || error);
@@ -527,7 +535,11 @@ async function scrapeFloydCounty() {
 async function scrapeHarrisonCounty() {
   console.log("[SCRAPER HARRISON] Iniciando extracción de subastas de Harrison County, IN...");
   
-  const browser = await chromium.launch({ headless: true });
+  const launchOptions: any = { headless: true };
+  if (process.env.PROXY_URL) {
+    launchOptions.proxy = { server: process.env.PROXY_URL };
+  }
+  const browser = await chromium.launch(launchOptions);
   const context = await browser.newContext({
     userAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
     viewport: { width: 1280, height: 800 },
@@ -536,6 +548,7 @@ async function scrapeHarrisonCounty() {
   const page = await context.newPage();
   
   let activeSavedCount = 0;
+  let cardCount = 0;
   
   try {
     const url = "https://www.sriservices.com/properties?state=IN&county=Harrison&saleType=foreclosure";
@@ -547,7 +560,7 @@ async function scrapeHarrisonCounty() {
       console.log("[SCRAPER HARRISON] No se encontraron tarjetas de propiedades.");
     });
     
-    const cardCount = await page.locator(".card-body").count();
+    cardCount = await page.locator(".card-body").count();
     console.log(`[SCRAPER HARRISON] Se encontraron ${cardCount} tarjetas.`);
     
     for (let idx = 0; idx < cardCount; idx++) {
@@ -671,6 +684,9 @@ async function scrapeHarrisonCounty() {
   }
   
   console.log(`[SCRAPER HARRISON] Finalizado. Guardadas/Actualizadas: ${activeSavedCount} subastas.`);
+  if (cardCount > 0 && activeSavedCount === 0) {
+    await sendTelegramNotification("⚠️ *Alerta de Mantenimiento:* El scraper de Harrison County procesó propiedades (" + cardCount + ") pero guardó 0 registros. Posible cambio en el HTML del portal.");
+  }
 }
 
 /**
@@ -681,9 +697,11 @@ async function scrapeIndiana() {
   console.log("[INDIANA MAIN] Iniciando Extracción Completa de Indiana...");
   console.log("========================================================\n");
   
-  await scrapeClarkCounty();
-  await scrapeFloydCounty();
-  await scrapeHarrisonCounty();
+  await Promise.all([
+    scrapeClarkCounty().catch((err: any) => console.error("[CLARK COUNTY ERROR] Falló:", err.message)),
+    scrapeFloydCounty().catch((err: any) => console.error("[FLOYD COUNTY ERROR] Falló:", err.message)),
+    scrapeHarrisonCounty().catch((err: any) => console.error("[HARRISON COUNTY ERROR] Falló:", err.message))
+  ]);
 }
 
 // Ejecutar si se corre directamente

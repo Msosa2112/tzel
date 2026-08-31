@@ -101,7 +101,9 @@ ${rawText}`;
         throw new Error("Respuesta vacía recibida desde Gemini.");
       }
 
-      const parsedResult = JSON.parse(responseText);
+      const match = responseText.match(/\{[\s\S]*\}/);
+      const cleanJson = match ? match[0] : responseText;
+      const parsedResult = JSON.parse(cleanJson);
       
       let isDismissed = false;
       let reason = "Sin detalles adicionales del LLM.";

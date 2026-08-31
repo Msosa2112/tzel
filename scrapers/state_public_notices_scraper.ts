@@ -117,62 +117,44 @@ export async function extractNoticeDetails(rawText: string): Promise<{
     defendant = vsMatch[2].replace(/Notice is hereby.*/i, "").replace(/You are notified.*/i, "").trim();
   }
 
-  // 2. Extracción asistida por Ollama/Gemma con fallback a Gemini
+  // 2. Extracción asistida por Gemini API
   try {
     const axios = require("axios");
-    
-    // Consultar Ollama local (puerto 11434)
-    const ollamaResponse = await axios.post("http://localhost:11434/api/generate", {
-      model: "gemma:2b",
-      prompt: `Extract structured info from this legal notice: "${rawText}". Respond strictly in JSON format: {"address": "", "caseNumber": "", "defendant": "", "plaintiff": "", "debtAmount": 0}`,
-      stream: false,
-      options: { temperature: 0.1 }
-    }, { timeout: 3000 }).catch(() => null);
-
-    if (ollamaResponse && ollamaResponse.data && ollamaResponse.data.response) {
-      const jsonStr = ollamaResponse.data.response;
-      const parsed = JSON.parse(jsonStr.substring(jsonStr.indexOf("{"), jsonStr.lastIndexOf("}") + 1));
-      if (parsed.address) address = parsed.address;
-      if (parsed.caseNumber) caseNumber = parsed.caseNumber;
-      if (parsed.defendant) defendant = parsed.defendant;
-      if (parsed.plaintiff) plaintiff = parsed.plaintiff;
-      if (parsed.debtAmount) debtAmount = Number(parsed.debtAmount);
-      console.log("[LLM OLLAMA SUCCESS] Datos estructurados extraídos por Gemma local.");
-    } else {
-      // Fallback a Gemini si Ollama no responde o no tiene el modelo listo
-      const geminiApiKey = process.env.GEMINI_API_KEY;
-      if (geminiApiKey) {
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiApiKey}`;
-        const geminiRes = await axios.post(url, {
-          contents: [{
-            parts: [{
-              text: `Extrae la dirección, caso, demandante (plaintiff/banco), deudor/demandado (defendant) y monto de la deuda del siguiente aviso legal en formato JSON:
-              {
-                "address": "dirección completa",
-                "caseNumber": "caso de la corte",
-                "defendant": "nombre del deudor",
-                "plaintiff": "nombre del acreedor",
-                "debtAmount": monto como número
-              }
-              
-              Texto:
-              ${rawText}`
-            }]
-          }],
-          generationConfig: {
-            response_mime_type: "application/json"
-          }
-        }, { timeout: 8000 }).catch(() => null);
-
-        if (geminiRes && geminiRes.data && geminiRes.data.candidates?.[0]?.content?.parts?.[0]?.text) {
-          const parsed = JSON.parse(geminiRes.data.candidates[0].content.parts[0].text);
-          if (parsed.address) address = parsed.address;
-          if (parsed.caseNumber) caseNumber = parsed.caseNumber;
-          if (parsed.defendant) defendant = parsed.defendant;
-          if (parsed.plaintiff) plaintiff = parsed.plaintiff;
-          if (parsed.debtAmount) debtAmount = Number(parsed.debtAmount);
-          console.log("[LLM GEMINI FALLBACK SUCCESS] Datos extraídos por Gemini.");
+    const geminiApiKey = process.env.GEMINI_API_KEY;
+    if (geminiApiKey) {
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiApiKey}`;
+      const geminiRes = await axios.post(url, {
+        contents: [{
+          parts: [{
+            text: `Extrae la dirección, caso, demandante (plaintiff/banco), deudor/demandado (defendant) y monto de la deuda del siguiente aviso legal en formato JSON:
+            {
+              "address": "dirección completa",
+              "caseNumber": "caso de la corte",
+              "defendant": "nombre del deudor",
+              "plaintiff": "nombre del acreedor",
+              "debtAmount": monto como número
+            }
+            
+            Texto:
+            ${rawText}`
+          }]
+        }],
+        generationConfig: {
+          response_mime_type: "application/json"
         }
+      }, { timeout: 8000 }).catch(() => null);
+
+      if (geminiRes && geminiRes.data && geminiRes.data.candidates?.[0]?.content?.parts?.[0]?.text) {
+        const textRes = geminiRes.data.candidates[0].content.parts[0].text;
+        const match = textRes.match(/\{[\s\S]*\}/);
+        const cleanJson = match ? match[0] : textRes;
+        const parsed = JSON.parse(cleanJson);
+        if (parsed.address) address = parsed.address;
+        if (parsed.caseNumber) caseNumber = parsed.caseNumber;
+        if (parsed.defendant) defendant = parsed.defendant;
+        if (parsed.plaintiff) plaintiff = parsed.plaintiff;
+        if (parsed.debtAmount) debtAmount = Number(parsed.debtAmount);
+        console.log("[LLM GEMINI SUCCESS] Datos extraídos por Gemini Flash.");
       }
     }
   } catch (err: any) {
