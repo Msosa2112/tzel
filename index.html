@@ -2731,6 +2731,10 @@
             <span class="legend-label"><i data-lucide="shield-alert" class="inline-icon" style="color: #ef4444"></i> <strong>PIN ROJO: Subasta / Ejecución</strong><br>Subasta sheriff programada con deuda judicial activa</span>
           </div>
           <div class="map-legend-item">
+            <span class="legend-color-dot" style="background-color: #f97316; box-shadow: 0 0 6px #f97316"></span>
+            <span class="legend-label"><i data-lucide="shield-alert" class="inline-icon" style="color: #f97316"></i> <strong>PIN NARANJA: Pre-Foreclosure</strong><br>Caso recién radicado en corte (Lis Pendens / Demanda)</span>
+          </div>
+          <div class="map-legend-item">
             <span class="legend-color-dot" style="background-color: #ca8a04; box-shadow: 0 0 6px #ca8a04"></span>
             <span class="legend-label"><i data-lucide="flame" class="inline-icon" style="color: #ca8a04"></i> <strong>PIN AMARILLO: Distress Físico</strong><br>Infracciones de código, deterioro y reparaciones</span>
           </div>
@@ -3848,7 +3852,7 @@
           if (minDebt > 0 && totalDebt < minDebt) return false;
 
           // Filtro de Margen de Equidad Mínimo (solo si el usuario mueve el slider)
-          if (minEquity > 0 && equitySpread < minEquity) return false;
+          if (minEquity > 0 && marketValue > 0 && equitySpread < minEquity) return false;
 
           // Filtro Financiero (Buenos Deals vs Bajo el Agua vs Esperando por Deuda)
           const isGoodDeal = (marketValue > 0 && equitySpread >= Math.max(40000, marketValue * 0.30)) || (totalDebt > 0 && marketValue === 0);
@@ -4126,7 +4130,9 @@
         if (hasManualReview) badgesHtml += `<span class="badge" style="background: rgba(239, 68, 68, 0.15); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.3)"><i data-lucide="alert-triangle" class="inline-icon"></i> Review</span>`;
         
         if (activeSystemMode === 'investment') {
-          if (totalDebt === 0) {
+          if (lead.preForeclosures && lead.preForeclosures.length > 0) {
+            badgesHtml += `<span class="badge" style="background: rgba(249, 115, 22, 0.15); color: #ea580c; border: 1px solid rgba(249, 115, 22, 0.3);"><i data-lucide="shield-alert" class="inline-icon"></i> PRE-FORECLOSURE</span>`;
+          } else if (totalDebt === 0) {
             badgesHtml += `<span class="badge" style="background: rgba(100, 116, 139, 0.15); color: #64748b; border: 1px solid rgba(100, 116, 139, 0.3);"><i data-lucide="clock" class="inline-icon"></i> ESPERANDO DEUDA</span>`;
           } else if (equitySpread > 40000) {
             badgesHtml += `<span class="badge badge-equity-high" style="background: rgba(16, 185, 129, 0.15); color: var(--color-radar-green-dark); border: 1px solid var(--color-radar-green-border);"><i data-lucide="trending-up" class="inline-icon"></i> ALTA EQUIDAD</span>`;
