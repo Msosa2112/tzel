@@ -92,10 +92,42 @@ function getGroupingKey(address: string): string {
   return unit ? `${baseKey}_${unit}` : baseKey;
 }
 
+function cleanLegalOwnerName(rawName: string | null | undefined): string {
+  if (!rawName) return "";
+  let clean = rawName.trim();
+  
+  // 1. Remove trailing ET AL
+  clean = clean.replace(/,\s*ET\s+AL\.?/gi, '').replace(/\s+ET\s+AL\.?/gi, '');
+  
+  // 2. Heirs of / Estate of / Spouse of regex
+  const regexPatterns = [
+    /UNKNOWN\s+(?:SPOUSE|HEIRS|DEVISEES|LEGATEES|BENEFICIARIES|DEFENDANTS)[^]*?\b(?:OF|TO THE ESTATE OF)\s+([^,]+?)(?:,|\s+AKA|\s*\(DECEASED\)|$)/i,
+    /THE\s+UNKNOWN\s+HEIRS\s+OF\s+([^,]+?)(?:,|\s+AKA|\s*\(DECEASED\)|$)/i,
+    /(?:ADMINISTRAT(?:OR|RIX)|EXECUT(?:OR|RIX))\s+OF\s+THE\s+ESTATE\s+OF\s+([^,]+?)(?:,|\s+AKA|\s*\(DECEASED\)|$)/i,
+    /ESTATE\s+OF\s+([^,]+?)(?:,|\s+AKA|\s*\(DECEASED\)|$)/i
+  ];
+
+  for (const regex of regexPatterns) {
+    const match = clean.match(regex);
+    if (match && match[1]) {
+      let extracted = match[1].trim().replace(/\s+AKA.*$/i, '').replace(/,\s*$/, '').replace(/\(DECEASED\)/gi, '').trim();
+      if (extracted.length > 2) {
+        if (/SPOUSE/i.test(clean)) {
+          return `${extracted} (Cónyuge / Titular)`;
+        }
+        return `${extracted} (Sucesión / Heirs)`;
+      }
+    }
+  }
+
+  return clean;
+}
+
 function isValidOwnerName(name: string | null | undefined): boolean {
   if (!name) return false;
-  const lower = name.toLowerCase().trim();
-  if (lower === "" || lower === "no especificado" || lower === "dueño desconocido" || lower === "unknown" || lower === "unknown defendant" || lower === "unknown plaintiff" || lower === "propietario inmueble" || lower === "deudor desconocido" || lower === "heredero desconocido" || lower === "n/a" || lower === "null" || lower.startsWith("unknown")) {
+  const cleaned = cleanLegalOwnerName(name);
+  const lower = cleaned.toLowerCase().trim();
+  if (lower === "" || lower === "no especificado" || lower === "dueño desconocido" || lower === "unknown" || lower === "unknown defendant" || lower === "unknown plaintiff" || lower === "propietario inmueble" || lower === "deudor desconocido" || lower === "heredero desconocido" || lower === "n/a" || lower === "null" || (lower.startsWith("unknown") && !lower.includes("sucesión") && !lower.includes("cónyuge"))) {
     return false;
   }
   return true;
@@ -1125,9 +1157,15 @@ app.get("/api/prospectos", async (req, res) => {
 
     // Pre-cargar la caché de geocodificación en memoria para evitar el problema de consultas N+1
     const geocodeMap = new Map<string, { lat: number; lon: number }>();
+    const geocodeKeyMap = new Map<string, { lat: number; lon: number }>();
     for (const row of cacheRes.rows) {
       if (row.address && row.lat !== null && row.lon !== null) {
-        geocodeMap.set(row.address as string, { lat: row.lat as number, lon: row.lon as number });
+        const coords = { lat: row.lat as number, lon: row.lon as number };
+        geocodeMap.set(row.address as string, coords);
+        const gKey = getGroupingKey(row.address as string);
+        if (!geocodeKeyMap.has(gKey)) {
+          geocodeKeyMap.set(gKey, coords);
+        }
       }
     }
 
@@ -1178,8 +1216,8 @@ app.get("/api/prospectos", async (req, res) => {
         }
       }
 
-      // Check geocode cache first from memory map
-      const coords = geocodeMap.get(lead.displayAddress) || null;
+      // Check geocode cache first from memory map (exact address or normalized groupingKey)
+      const coords = geocodeMap.get(lead.displayAddress) || geocodeKeyMap.get(lead.groupingKey) || null;
 
       // Fetch OSINT Enrichment
       const osint = osintMap.get(lead.groupingKey) || {
