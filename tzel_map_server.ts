@@ -92,6 +92,15 @@ function getGroupingKey(address: string): string {
   return unit ? `${baseKey}_${unit}` : baseKey;
 }
 
+function isValidOwnerName(name: string | null | undefined): boolean {
+  if (!name) return false;
+  const lower = name.toLowerCase().trim();
+  if (lower === "" || lower === "no especificado" || lower === "dueño desconocido" || lower === "unknown" || lower === "unknown defendant" || lower === "unknown plaintiff" || lower === "propietario inmueble" || lower === "deudor desconocido" || lower === "heredero desconocido" || lower === "n/a" || lower === "null" || lower.startsWith("unknown")) {
+    return false;
+  }
+  return true;
+}
+
 function getDaysRemaining(dateStr: string): number | null {
   try {
     let cleanDate = dateStr.toLowerCase().replace(/\s+/g, " ").trim();
@@ -502,7 +511,7 @@ app.get("/api/prospectos", async (req, res) => {
           existing.mlsValue = row.mls_estimated_value as number;
         }
         if (row.mls_id && row.mls_id !== "N/A") existing.mlsId = row.mls_id as string;
-        if (existing.ownerName === "No especificado" && row.defendant) existing.ownerName = row.defendant as string;
+        if (!isValidOwnerName(existing.ownerName) && isValidOwnerName(row.defendant as string)) existing.ownerName = row.defendant as string;
         if (!existing.mailingAddress && row.mailing_address) existing.mailingAddress = row.mailing_address as string;
         if ((row.absentee_owner as number) === 1) existing.isAbsentee = true;
         if (!existing.sqft && row.sqft) existing.sqft = row.sqft as number;
@@ -581,7 +590,7 @@ app.get("/api/prospectos", async (req, res) => {
         });
       } else {
         const existing = groupedMap.get(key)!;
-        if (row.owner_name && row.owner_name !== "DUEÑO DESCONOCIDO" && (existing.ownerName === "No especificado" || existing.ownerName === "DUEÑO DESCONOCIDO")) {
+        if (!isValidOwnerName(existing.ownerName) && isValidOwnerName(row.owner_name as string)) {
           existing.ownerName = row.owner_name as string;
         }
         if (row.mls_estimated_value && (row.mls_estimated_value as number) > existing.mlsValue) {
@@ -659,8 +668,8 @@ app.get("/api/prospectos", async (req, res) => {
         });
       } else {
         const existing = groupedMap.get(key)!;
-        if (existing.ownerName === "No especificado" || existing.ownerName === "DUEÑO DESCONOCIDO") {
-          existing.ownerName = row.heir_name as string || existing.ownerName;
+        if (!isValidOwnerName(existing.ownerName) && isValidOwnerName(row.heir_name as string)) {
+          existing.ownerName = row.heir_name as string;
         }
         rowPhones.forEach(p => existing.phones.add(p));
         rowEmails.forEach(e => existing.emails.add(e));
@@ -750,8 +759,8 @@ app.get("/api/prospectos", async (req, res) => {
         });
       } else {
         const existing = groupedMap.get(key)!;
-        if (existing.ownerName === "No especificado" || existing.ownerName === "DUEÑO DESCONOCIDO") {
-          existing.ownerName = row.debtor_name as string || existing.ownerName;
+        if (!isValidOwnerName(existing.ownerName) && isValidOwnerName(row.debtor_name as string)) {
+          existing.ownerName = row.debtor_name as string;
         }
         rowPhones.forEach(p => existing.phones.add(p));
         rowEmails.forEach(e => existing.emails.add(e));
@@ -798,7 +807,7 @@ app.get("/api/prospectos", async (req, res) => {
         });
       } else {
         const existing = groupedMap.get(key)!;
-        if (row.owner_name && row.owner_name !== "DUEÑO DESCONOCIDO" && (existing.ownerName === "No especificado" || existing.ownerName === "DUEÑO DESCONOCIDO")) {
+        if (!isValidOwnerName(existing.ownerName) && isValidOwnerName(row.owner_name as string)) {
           existing.ownerName = row.owner_name as string;
         }
         if (row.mls_estimated_value && (row.mls_estimated_value as number) > existing.mlsValue) {
@@ -877,7 +886,7 @@ app.get("/api/prospectos", async (req, res) => {
         });
       } else {
         const existing = groupedMap.get(key)!;
-        if (row.owner_name && row.owner_name !== "DUEÑO DESCONOCIDO" && (existing.ownerName === "No especificado" || existing.ownerName === "DUEÑO DESCONOCIDO")) {
+        if (!isValidOwnerName(existing.ownerName) && isValidOwnerName(row.owner_name as string)) {
           existing.ownerName = row.owner_name as string;
         }
         if (row.mls_estimated_value && (row.mls_estimated_value as number) > existing.mlsValue) {
@@ -956,7 +965,7 @@ app.get("/api/prospectos", async (req, res) => {
         });
       } else {
         const existing = groupedMap.get(key)!;
-        if (row.subject_name && row.subject_name !== "No especificado" && (existing.ownerName === "No especificado" || existing.ownerName === "DUEÑO DESCONOCIDO")) {
+        if (!isValidOwnerName(existing.ownerName) && isValidOwnerName(row.subject_name as string)) {
           existing.ownerName = row.subject_name as string;
         }
         if (row.mls_estimated_value && (row.mls_estimated_value as number) > existing.mlsValue) {
@@ -1037,9 +1046,7 @@ app.get("/api/prospectos", async (req, res) => {
         });
       } else {
         const existing = groupedMap.get(key)!;
-        if (row.defendant && row.defendant !== "Unknown" && (existing.ownerName === "No especificado" || existing.ownerName === "DUEÑO DESCONOCIDO")) {
-          existing.ownerName = row.defendant as string;
-        }
+        if (!isValidOwnerName(existing.ownerName) && isValidOwnerName(row.defendant as string)) existing.ownerName = row.defendant as string;
         if (!existing.mailingAddress && row.mailing_address) existing.mailingAddress = row.mailing_address as string;
         if ((row.absentee_owner as number) === 1) existing.isAbsentee = true;
         rowPhones.forEach(p => existing.phones.add(p));
@@ -1103,7 +1110,7 @@ app.get("/api/prospectos", async (req, res) => {
         });
       } else {
         const existing = groupedMap.get(key)!;
-        if (row.owner_name && (existing.ownerName === "No especificado" || existing.ownerName === "DUEÑO DESCONOCIDO")) {
+        if (!isValidOwnerName(existing.ownerName) && isValidOwnerName(row.owner_name as string)) {
           existing.ownerName = row.owner_name as string;
         }
         rowPhones.forEach(p => existing.phones.add(p));
@@ -1154,7 +1161,7 @@ app.get("/api/prospectos", async (req, res) => {
       const rehab = calculateRehab(lead.sqft || null, violationKeywords);
       const hiddenDebt = lead.hiddenMortgages || 0;
       const mao = calculateMAO(lead.mlsValue, rehab, hiddenDebt, lead.hiddenLiensAmount);
-      const primaryDebt = hasAuctions ? (lead.auctions[0].debt_amount as number || 0) : 0;
+      const primaryDebt = hasAuctions ? Math.max(...lead.auctions.map(a => (a.debt_amount as number) || 0)) : 0;
       const netEquity = calculateNetEquity(lead.mlsValue, primaryDebt, hiddenDebt, lead.hiddenLiensAmount);
       const purchasePrice = primaryDebt > 0 ? primaryDebt : mao;
       const { roi, totalCost } = calculateROI(lead.mlsValue, purchasePrice, rehab);

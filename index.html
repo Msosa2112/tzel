@@ -5132,7 +5132,7 @@
           div.innerHTML = `
             <div class="distress-log-header">
               <span style="color: ${borderClr}; font-weight: bold; display: flex; align-items: center; gap: 4px;"><i data-lucide="${iconName}" class="inline-icon" style="color: ${borderClr}"></i> ${titleStr} ${titleCheckBadge}</span>
-              <span style="color: ${borderClr}">${auc.auction_date}</span>
+              <span style="color: ${borderClr}">${auc.auction_date || 'Fecha por fijar'}</span>
             </div>
             <div><strong>Caso Judicial:</strong> ${auc.case_number}</div>
             <div><strong>Demandante:</strong> ${auc.plaintiff || 'No especificado'}</div>
