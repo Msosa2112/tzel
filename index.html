@@ -4107,150 +4107,62 @@
       const searchVal = document.getElementById('address-search').value.toLowerCase().trim();
       const stateVal = document.getElementById('state-filter').value;
       
-      if (activeSystemMode === 'disaster') {
-        const showTornado = document.getElementById('chk-dis-tornado').checked;
-        const showStorm = document.getElementById('chk-dis-storm').checked;
-        const showHail = document.getElementById('chk-dis-hail').checked;
-        const showViolation = document.getElementById('chk-dis-violation').checked;
-        const minEfVal = document.getElementById('dis-ef-filter').value;
-        const dateFilterVal = document.getElementById('dis-date-filter').value;
-
-        return allLeads.filter(lead => {
-          const isRoofViol = lead.violations && lead.violations.some(v => (v.violation_type || '').toUpperCase().includes('ROOF') || (v.details || '').toLowerCase().includes('roof'));
-          const disasters = lead.physicalDistress || [];
-          
-          const hasTornado = disasters.some(pd => pd.distress_type === 'Tornado Damage');
-          const hasStorm = disasters.some(pd => pd.distress_type === 'Storm Damage');
-          const hasHail = disasters.some(pd => pd.distress_type === 'Hail Damage');
-
-          // Check event checkboxes
-          let matchesType = false;
-          if (showTornado && hasTornado) matchesType = true;
-          if (showStorm && hasStorm) matchesType = true;
-          if (showHail && hasHail) matchesType = true;
-          if (showViolation && isRoofViol) matchesType = true;
-
-          if (!matchesType) return false;
-
-          // EF Scale Filter
-          if (hasTornado && minEfVal !== 'ALL') {
-            const firstTornado = disasters.find(pd => pd.distress_type === 'Tornado Damage');
-            const scaleStr = firstTornado ? (firstTornado.ef_scale || '') : '';
-            const scaleNum = parseInt(scaleStr.replace(/[^0-9]/g, '')) || 0;
-            const filterNum = parseInt(minEfVal.replace(/[^0-9]/g, '')) || 0;
-            if (scaleNum < filterNum) return false;
-          }
-
-          // Date Filter
-          if (dateFilterVal !== 'ALL') {
-            let dates = [];
-            disasters.forEach(d => { if (d.report_date) dates.push(new Date(d.report_date)); });
-            lead.violations?.forEach(v => { if (v.report_date) dates.push(new Date(v.report_date)); });
-            if (dates.length > 0) {
-              const maxDate = new Date(Math.max(...dates.map(d => d.getTime())));
-              const today = new Date();
-              const diffTime = today.getTime() - maxDate.getTime();
-              const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-              const maxAllowedDays = parseInt(dateFilterVal) || 90;
-              if (diffDays > maxAllowedDays) return false;
-            }
-          }
-
-          // Search text filter
-          const matchesSearch = 
-            lead.displayAddress.toLowerCase().includes(searchVal) ||
-            lead.ownerName.toLowerCase().includes(searchVal);
-          if (!matchesSearch) return false;
-
-          // State filter
-          if (stateVal !== 'ALL' && lead.state !== stateVal) return false;
-
-          return true;
-        });
-      }
-
-      const showExecution = document.getElementById('pill-execution').checked;
-      const showPhysical = document.getElementById('pill-physical').checked;
-      const showOthers = document.getElementById('pill-others').checked;
-      const showStackOnly = document.getElementById('pill-stack').checked;
-      const showFavorites = document.getElementById('pill-favorites').checked;
-      const showRoofing = document.getElementById('pill-roofing').checked;
+      const showExecution = document.getElementById('pill-execution') ? document.getElementById('pill-execution').checked : true;
+      const showPre = document.getElementById('pill-preforeclosure') ? document.getElementById('pill-preforeclosure').checked : true;
+      const showFavorites = document.getElementById('pill-favorites') ? document.getElementById('pill-favorites').checked : false;
 
       const minEquity = parseFloat(document.getElementById('equity-spread-filter').value) || 0;
       const minDebt = parseFloat(document.getElementById('active-debt-filter').value) || 0;
 
       return allLeads.filter(lead => {
-        const isRoofingLead = (lead.violations && lead.violations.some(v => (v.violation_type || '').toUpperCase().includes('ROOF') || (v.details || '').toLowerCase().includes('roof'))) || 
-                              (lead.physicalDistress && lead.physicalDistress.some(pd => ['Tornado Damage', 'Storm Damage', 'Hail Damage'].includes(pd.distress_type)));
-
         const totalDebt = (lead.primaryDebt || 0) + (lead.hiddenMortgages || 0) + (lead.hiddenLiensAmount || 0);
         const marketValue = (lead.auctions && lead.auctions.length > 0 && lead.auctions[0].appraisal_value > 0) ? lead.auctions[0].appraisal_value : (lead.mlsValue || 0);
         const equitySpread = marketValue - totalDebt;
 
-        // Skip financial/debt filters if it's a roofing lead and the roofing filter is active
-        const bypassFinancial = showRoofing && isRoofingLead;
+        // 1. Descartar si supera $350k
+        if (marketValue > 350000) return false;
 
-        if (!bypassFinancial) {
-          // 1. Descartar propiedades con valor superior a $350k (regla institucional de mercado rápido)
-          if (marketValue > 350000) return false;
+        // 2. Filtro de Deuda Activa Mínima
+        if (minDebt > 0 && totalDebt < minDebt) return false;
 
-          // 2. Filtro de Deuda Activa Mínima (solo si el usuario mueve el slider)
-          if (minDebt > 0 && totalDebt < minDebt) return false;
-
-          // 3. Filtro de Margen de Equidad Mínimo: si se exige margen > $0, descartar las que no tienen valor PVA o margen < minEquity
-          if (minEquity > 0) {
-            if (marketValue <= 0 || equitySpread < minEquity) return false;
-          }
-
-          // 4. Filtro Financiero (Buenos Deals vs Bajo el Agua vs Esperando por Deuda)
-          const isGoodDeal = (marketValue > 0 && equitySpread >= Math.max(40000, marketValue * 0.30));
-          const isUnderwater = marketValue > 0 && equitySpread < 0;
-          const isWaitingDebt = totalDebt === 0;
-          
-          if (financialFilter === 'deals') {
-            if (isWaitingDebt || isUnderwater || marketValue <= 0) return false;
-          } else if (financialFilter === 'underwater') {
-            if (isWaitingDebt || !isUnderwater) return false;
-          } else if (financialFilter === 'unvalued') { // Esperando por Deuda
-            if (!isWaitingDebt) return false;
-          }
+        // 3. Filtro de Margen de Equidad Mínimo
+        if (minEquity > 0) {
+          if (marketValue <= 0 || equitySpread < minEquity) return false;
         }
 
-        // Favorites filter
+        // 4. Filtro Financiero
+        const isUnderwater = marketValue > 0 && equitySpread < 0;
+        const isWaitingDebt = totalDebt === 0;
+        
+        if (financialFilter === 'deals') {
+          if (isWaitingDebt || isUnderwater || marketValue <= 0) return false;
+        } else if (financialFilter === 'underwater') {
+          if (isWaitingDebt || !isUnderwater) return false;
+        } else if (financialFilter === 'unvalued') {
+          if (!isWaitingDebt) return false;
+        }
+
+        // Favoritos
         if (showFavorites && !favoriteKeys.includes(lead.groupingKey)) return false;
 
-        // Search text filter
+        // Búsqueda
         const matchesSearch = 
           lead.displayAddress.toLowerCase().includes(searchVal) ||
           lead.ownerName.toLowerCase().includes(searchVal);
-        
         if (!matchesSearch) return false;
 
-        // State filter
+        // Estado
         if (stateVal !== 'ALL' && lead.state !== stateVal) return false;
 
-        // Distress Stacking / Type Filter
-        const hasAuctions = (lead.auctions && lead.auctions.length > 0) || 
-                            (lead.preForeclosures && lead.preForeclosures.length > 0) || 
-                            (lead.taxSales && lead.taxSales.length > 0);
-        const hasPhysical = (lead.physicalDistress && lead.physicalDistress.length > 0) || 
-                            (lead.violations && lead.violations.length > 0);
-        const hasOthers = (lead.financialDistress && lead.financialDistress.length > 0) || 
-                          (lead.lifeEvents && lead.lifeEvents.length > 0) || 
-                          (lead.probates && lead.probates.length > 0) || 
-                          (lead.divorces && lead.divorces.length > 0) || 
-                          (lead.bankruptcies && lead.bankruptcies.length > 0);
+        // Subasta vs Pre-Foreclosure
+        const hasAuctions = lead.auctions && lead.auctions.length > 0;
+        const hasPreForeclosures = lead.preForeclosures && lead.preForeclosures.length > 0;
 
-        if (showStackOnly && !lead.isHighMotivation) return false;
-        
-        // Check if it matches any of the active category filters
-        let matchesCategory = false;
-        if (showExecution && hasAuctions) matchesCategory = true;
-        if (showPhysical && hasPhysical) matchesCategory = true;
-        if (showOthers && hasOthers) matchesCategory = true;
-        if (showRoofing && isRoofingLead) matchesCategory = true;
+        let matchesType = false;
+        if (showExecution && hasAuctions) matchesType = true;
+        if (showPre && hasPreForeclosures) matchesType = true;
 
-        if (!matchesCategory) return false;
+        if (!matchesType && (showExecution || showPre)) return false;
 
         return true;
       });
@@ -4721,8 +4633,7 @@
     // ----------------------------------------------------
     // CHRONOLOGICAL AUCTION TIMELINE (RIGHT BASE PANEL)
     // ----------------------------------------------------
-    let currentTimelineFilter = 'all';
-
+    
     window.toggleAuctionTimeline = function() {
       const timeline = document.getElementById('auction-schedule-drawer');
       const reopenBtn = document.getElementById('btn-reopen-timeline');
