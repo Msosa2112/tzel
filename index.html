@@ -3491,7 +3491,8 @@
     let allLeads = [];
     let selectedLead = null;
     let mapMarkers = new Map(); // key -> leaflet marker
-    let financialFilter = 'all'; // 'all', 'deals', 'underwater', 'unvalued'
+    let financialFilter = 'all';
+    let currentTimelineFilter = 'all'; // 'all', 'deals', 'underwater', 'unvalued'
 
     // Favorites & Comparison State
     let favoriteKeys = JSON.parse(localStorage.getItem('tzel_favorites') || '[]');
@@ -4750,6 +4751,7 @@
     };
 
     function renderAuctionTimeline() {
+      if (typeof currentTimelineFilter === 'undefined') currentTimelineFilter = 'all';
       const container = document.getElementById('timeline-items-container');
       const countBadge = document.getElementById('timeline-auction-count');
       const reopenCountBadge = document.getElementById('reopen-timeline-count');
