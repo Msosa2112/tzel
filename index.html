@@ -4351,7 +4351,7 @@
           const marker = L.marker([lead.lat, lead.lon], { icon: customIcon })
             .addTo(markersLayer);
 
-          const popupPhotoUrl = lead.photoUrls && lead.photoUrls.length > 0 ? lead.photoUrls[0] : null;
+          const popupPhotoUrl = lead.photoUrls && validPhotos.length > 0 ? validPhotos[0] : null;
           const popupPhotoHtml = popupPhotoUrl
             ? `<img class="popup-photo" src="${popupPhotoUrl}" alt="Foto Propiedad">`
             : '';
@@ -4503,20 +4503,21 @@
         }
 
         // Photos
-        const hasPhotos = lead.photoUrls && lead.photoUrls.length > 0;
+        const validPhotos = (lead.photoUrls || []).filter(u => u && !u.includes('.html') && !u.includes('.htm') && !u.includes('realbiz360') && !u.includes('guidedtour.tv') && !u.includes('90phut')).map(u => u.startsWith('http://') ? u.replace('http://', 'https://') : u);
+        const hasPhotos = validPhotos.length > 0;
         let photoHtml = '';
         if (hasPhotos) {
-          if (lead.photoUrls.length === 1) {
-            photoHtml = `<img class="lead-card-photo" src="${lead.photoUrls[0]}" alt="Foto Propiedad">`;
+          if (validPhotos.length === 1) {
+            photoHtml = `<img class="lead-card-photo" src="${validPhotos[0]}" alt="Foto Propiedad" onerror="this.onerror=null; this.style.display='none';">`;
           } else {
             photoHtml = `
               <div class="lead-card-photo-carousel" onclick="event.stopPropagation()">
-                <div class="lead-card-photo-slider" data-current-index="0" data-photo-count="${lead.photoUrls.length}">
-                  ${lead.photoUrls.map(url => `<img class="lead-card-carousel-photo" src="${url}" alt="Foto Propiedad" draggable="false">`).join('')}
+                <div class="lead-card-photo-slider" data-current-index="0" data-photo-count="${validPhotos.length}">
+                  ${validPhotos.map(url => `<img class="lead-card-carousel-photo" src="${url}" alt="Foto Propiedad" draggable="false" onerror="this.onerror=null; this.style.display=\'none\';">`).join('')}
                 </div>
                 <button class="lead-card-carousel-arrow prev" onclick="navigateCardPhotos(this, -1)">&lsaquo;</button>
                 <button class="lead-card-carousel-arrow next" onclick="navigateCardPhotos(this, 1)">&rsaquo;</button>
-                <div class="lead-card-carousel-indicator">1/${lead.photoUrls.length}</div>
+                <div class="lead-card-carousel-indicator">1/${validPhotos.length}</div>
               </div>
             `;
           }
@@ -5218,20 +5219,20 @@
       let rDistress = `<tr><th>Distress Activo</th>`;
       
       leads.forEach(lead => {
-        const hasPhotos = lead.photoUrls && lead.photoUrls.length > 0;
+        const hasPhotos = lead.photoUrls && validPhotos.length > 0;
         let photoHtml = '';
         if (hasPhotos) {
-          if (lead.photoUrls.length === 1) {
-            photoHtml = `<img class="comp-prop-img" src="${lead.photoUrls[0]}" alt="Foto">`;
+          if (validPhotos.length === 1) {
+            photoHtml = `<img class="comp-prop-img" src="${validPhotos[0]}" alt="Foto">`;
           } else {
             photoHtml = `
               <div class="comp-prop-photo-carousel" onclick="event.stopPropagation()">
-                <div class="comp-prop-photo-slider" data-current-index="0" data-photo-count="${lead.photoUrls.length}">
-                  ${lead.photoUrls.map(url => `<img class="comp-prop-carousel-photo" src="${url}" alt="Foto" draggable="false">`).join('')}
+                <div class="comp-prop-photo-slider" data-current-index="0" data-photo-count="${validPhotos.length}">
+                  ${validPhotos.map(url => `<img class="comp-prop-carousel-photo" src="${url}" alt="Foto" draggable="false">`).join('')}
                 </div>
                 <button class="comp-prop-carousel-arrow prev" onclick="navigateCompPhotos(this, -1)">&lsaquo;</button>
                 <button class="comp-prop-carousel-arrow next" onclick="navigateCompPhotos(this, 1)">&rsaquo;</button>
-                <div class="comp-prop-carousel-indicator">1/${lead.photoUrls.length}</div>
+                <div class="comp-prop-carousel-indicator">1/${validPhotos.length}</div>
               </div>
             `;
           }
@@ -5328,7 +5329,7 @@
 
       // Resetear estado del carrusel deslizable
       currentPhotoIndex = 0;
-      photoUrlsCount = lead.photoUrls ? lead.photoUrls.length : 0;
+      photoUrlsCount = lead.photoUrls ? validPhotos.length : 0;
 
       // Hydrate Photos Carousel
       const photosCard = document.getElementById('drawer-photos-card');
@@ -5342,10 +5343,10 @@
       const prevArrow = document.getElementById('drawer-photos-prev');
       const nextArrow = document.getElementById('drawer-photos-next');
 
-      if (lead.photoUrls && lead.photoUrls.length > 0) {
+      if (lead.photoUrls && validPhotos.length > 0) {
         photosCard.style.display = 'block';
         
-        if (lead.photoUrls.length > 1) {
+        if (validPhotos.length > 1) {
           if (prevArrow) prevArrow.style.display = 'flex';
           if (nextArrow) nextArrow.style.display = 'flex';
         } else {
@@ -5363,7 +5364,7 @@
           img.draggable = false; // Desactivar drag nativo para no interferir con swipe
           photosSlider.appendChild(img);
           
-          if (lead.photoUrls.length > 1) {
+          if (validPhotos.length > 1) {
             const dot = document.createElement('span');
             dot.className = `drawer-photo-dot ${index === 0 ? 'active' : ''}`;
             dot.onclick = () => switchDrawerPhoto(index);

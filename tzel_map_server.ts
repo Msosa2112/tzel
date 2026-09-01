@@ -123,6 +123,21 @@ function cleanLegalOwnerName(rawName: string | null | undefined): string {
   return clean;
 }
 
+
+function sanitizeImageUrl(rawUrl: string): string | null {
+  if (!rawUrl || typeof rawUrl !== 'string') return null;
+  let url = rawUrl.trim();
+  if (url.toLowerCase().startsWith('http://')) {
+    url = 'https://' + url.substring(7);
+  }
+  if (!url.toLowerCase().startsWith('https://')) return null;
+  const lower = url.toLowerCase();
+  if (lower.includes('.html') || lower.includes('.htm') || lower.includes('realbiz360') || lower.includes('guidedtour.tv') || lower.includes('90phut') || lower.includes('youtube.com') || lower.includes('vimeo.com')) {
+    return null;
+  }
+  return url;
+}
+
 function isValidOwnerName(name: string | null | undefined): boolean {
   if (!name) return false;
   const cleaned = cleanLegalOwnerName(name);
@@ -583,7 +598,8 @@ app.get("/api/prospectos", async (req, res) => {
           const parsed = JSON.parse(row.photo_urls as string);
           if (Array.isArray(parsed)) {
             parsed.forEach((url: string) => {
-              if (url && !lead.photoUrls.includes(url)) lead.photoUrls.push(url);
+              const valid = sanitizeImageUrl(url);
+              if (valid && !lead.photoUrls.includes(valid)) lead.photoUrls.push(valid);
             });
           }
         } catch (e) {}
@@ -665,7 +681,8 @@ app.get("/api/prospectos", async (req, res) => {
           const parsed = JSON.parse(row.photo_urls as string);
           if (Array.isArray(parsed)) {
             parsed.forEach((url: string) => {
-              if (url && !lead.photoUrls.includes(url)) lead.photoUrls.push(url);
+              const valid = sanitizeImageUrl(url);
+              if (valid && !lead.photoUrls.includes(valid)) lead.photoUrls.push(valid);
             });
           }
         } catch (e) {}
@@ -879,7 +896,8 @@ app.get("/api/prospectos", async (req, res) => {
           const parsed = JSON.parse(row.photo_urls as string);
           if (Array.isArray(parsed)) {
             parsed.forEach((url: string) => {
-              if (url && !lead.photoUrls.includes(url)) lead.photoUrls.push(url);
+              const valid = sanitizeImageUrl(url);
+              if (valid && !lead.photoUrls.includes(valid)) lead.photoUrls.push(valid);
             });
           }
         } catch (e) {}
@@ -958,7 +976,8 @@ app.get("/api/prospectos", async (req, res) => {
           const parsed = JSON.parse(row.photo_urls as string);
           if (Array.isArray(parsed)) {
             parsed.forEach((url: string) => {
-              if (url && !lead.photoUrls.includes(url)) lead.photoUrls.push(url);
+              const valid = sanitizeImageUrl(url);
+              if (valid && !lead.photoUrls.includes(valid)) lead.photoUrls.push(valid);
             });
           }
         } catch (e) {}
@@ -1037,7 +1056,8 @@ app.get("/api/prospectos", async (req, res) => {
           const parsed = JSON.parse(row.photo_urls as string);
           if (Array.isArray(parsed)) {
             parsed.forEach((url: string) => {
-              if (url && !lead.photoUrls.includes(url)) lead.photoUrls.push(url);
+              const valid = sanitizeImageUrl(url);
+              if (valid && !lead.photoUrls.includes(valid)) lead.photoUrls.push(valid);
             });
           }
         } catch (e) {}
@@ -1103,7 +1123,8 @@ app.get("/api/prospectos", async (req, res) => {
           const parsed = JSON.parse(row.photo_urls as string);
           if (Array.isArray(parsed)) {
             parsed.forEach((url: string) => {
-              if (url && !lead.photoUrls.includes(url)) lead.photoUrls.push(url);
+              const valid = sanitizeImageUrl(url);
+              if (valid && !lead.photoUrls.includes(valid)) lead.photoUrls.push(valid);
             });
           }
         } catch (e) {}
