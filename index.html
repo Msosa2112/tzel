@@ -4190,19 +4190,24 @@
         const bypassFinancial = showRoofing && isRoofingLead;
 
         if (!bypassFinancial) {
-          // Filtro de Deuda Activa Mínima (solo si el usuario mueve el slider)
+          // 1. Descartar propiedades con valor superior a $350k (regla institucional de mercado rápido)
+          if (marketValue > 350000) return false;
+
+          // 2. Filtro de Deuda Activa Mínima (solo si el usuario mueve el slider)
           if (minDebt > 0 && totalDebt < minDebt) return false;
 
-          // Filtro de Margen de Equidad Mínimo (solo si el usuario mueve el slider)
-          if (minEquity > 0 && marketValue > 0 && equitySpread < minEquity) return false;
+          // 3. Filtro de Margen de Equidad Mínimo: si se exige margen > $0, descartar las que no tienen valor PVA o margen < minEquity
+          if (minEquity > 0) {
+            if (marketValue <= 0 || equitySpread < minEquity) return false;
+          }
 
-          // Filtro Financiero (Buenos Deals vs Bajo el Agua vs Esperando por Deuda)
-          const isGoodDeal = (marketValue > 0 && equitySpread >= Math.max(40000, marketValue * 0.30)) || (totalDebt > 0 && marketValue === 0);
+          // 4. Filtro Financiero (Buenos Deals vs Bajo el Agua vs Esperando por Deuda)
+          const isGoodDeal = (marketValue > 0 && equitySpread >= Math.max(40000, marketValue * 0.30));
           const isUnderwater = marketValue > 0 && equitySpread < 0;
           const isWaitingDebt = totalDebt === 0;
           
           if (financialFilter === 'deals') {
-            if (isWaitingDebt || isUnderwater) return false;
+            if (isWaitingDebt || isUnderwater || marketValue <= 0) return false;
           } else if (financialFilter === 'underwater') {
             if (isWaitingDebt || !isUnderwater) return false;
           } else if (financialFilter === 'unvalued') { // Esperando por Deuda
