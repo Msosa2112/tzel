@@ -2834,11 +2834,48 @@
           </div>
         </div>
 
-        
+        <!-- Group 2: Disaster specific filters -->
+        <div id="disaster-filters-group" style="display: none; margin-top: 12px; border-top: 1px solid var(--border-glass); padding-top: 12px;">
+          <div class="filter-group">
+            <label style="font-size: 0.75rem; font-weight: 600; margin-bottom: 6px; display: block; color: #0891b2;">Eventos y Daños:</label>
+            <div style="display: flex; flex-direction: column; gap: 8px; font-size: 0.75rem;">
+              <label style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
+                <input type="checkbox" id="chk-dis-tornado" checked onchange="renderUI()">
+                <span>🌀 Tornados (NWS DAT)</span>
+              </label>
+              <label style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
+                <input type="checkbox" id="chk-dis-storm" checked onchange="renderUI()">
+                <span>⛈️ Tormentas / Vientos</span>
+              </label>
+              <label style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
+                <input type="checkbox" id="chk-dis-hail" checked onchange="renderUI()">
+                <span>☄️ Granizo Severo</span>
+              </label>
+              <label style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
+                <input type="checkbox" id="chk-dis-violation" checked onchange="renderUI()">
+                <span>🏠 Infracción de Techo (X50)</span>
+              </label>
+            </div>
+          </div>
 
-          
+          <div class="filter-group" style="margin-top: 12px;">
+            <label style="font-size: 0.75rem; font-weight: 600; margin-bottom: 6px; display: block;">Intensidad de Tornado Mínima:</label>
+            <select id="dis-ef-filter" class="filter-select" onchange="renderUI()" style="width: 100%;">
+              <option value="ALL">Todas las Intensidades</option>
+              <option value="EF0">EF-0 o superior</option>
+              <option value="EF1">EF-1 o superior</option>
+              <option value="EF2">EF-2 o superior</option>
+            </select>
+          </div>
 
-          
+          <div class="filter-group" style="margin-top: 12px;">
+            <label style="font-size: 0.75rem; font-weight: 600; margin-bottom: 6px; display: block;">Antigüedad de Reporte:</label>
+            <select id="dis-date-filter" class="filter-select" onchange="renderUI()" style="width: 100%;">
+              <option value="ALL">Historial completo (90 días)</option>
+              <option value="7">Últimos 7 días</option>
+              <option value="30">Últimos 30 días</option>
+            </select>
+          </div>
         </div>
       </div>
 
@@ -2854,14 +2891,14 @@
             </label>
           </div>
           <div>
-            <input type="checkbox" id="pill-physical" class="pill-checkbox" checked>
+            <input type="checkbox" id="pill-physical" class="pill-checkbox">
             <label for="pill-physical" class="pill-label">
               <i data-lucide="flame"></i>
               <span>Físico</span>
             </label>
           </div>
           <div>
-            <input type="checkbox" id="pill-others" class="pill-checkbox" checked>
+            <input type="checkbox" id="pill-others" class="pill-checkbox">
             <label for="pill-others" class="pill-label">
               <i data-lucide="alert-triangle"></i>
               <span>Otros</span>
@@ -3454,8 +3491,7 @@
     let allLeads = [];
     let selectedLead = null;
     let mapMarkers = new Map(); // key -> leaflet marker
-    let financialFilter = 'all';
-    let currentTimelineFilter = 'all'; // 'all', 'deals', 'underwater', 'unvalued'
+    let financialFilter = 'all'; // 'all', 'deals', 'underwater', 'unvalued'
 
     // Favorites & Comparison State
     let favoriteKeys = JSON.parse(localStorage.getItem('tzel_favorites') || '[]');
@@ -4070,62 +4106,145 @@
       const searchVal = document.getElementById('address-search').value.toLowerCase().trim();
       const stateVal = document.getElementById('state-filter').value;
       
-      const showExecution = document.getElementById('pill-execution') ? document.getElementById('pill-execution').checked : true;
-      const showPre = document.getElementById('pill-preforeclosure') ? document.getElementById('pill-preforeclosure').checked : true;
-      const showFavorites = document.getElementById('pill-favorites') ? document.getElementById('pill-favorites').checked : false;
+      if (activeSystemMode === 'disaster') {
+        const showTornado = document.getElementById('chk-dis-tornado').checked;
+        const showStorm = document.getElementById('chk-dis-storm').checked;
+        const showHail = document.getElementById('chk-dis-hail').checked;
+        const showViolation = document.getElementById('chk-dis-violation').checked;
+        const minEfVal = document.getElementById('dis-ef-filter').value;
+        const dateFilterVal = document.getElementById('dis-date-filter').value;
+
+        return allLeads.filter(lead => {
+          const isRoofViol = lead.violations && lead.violations.some(v => (v.violation_type || '').toUpperCase().includes('ROOF') || (v.details || '').toLowerCase().includes('roof'));
+          const disasters = lead.physicalDistress || [];
+          
+          const hasTornado = disasters.some(pd => pd.distress_type === 'Tornado Damage');
+          const hasStorm = disasters.some(pd => pd.distress_type === 'Storm Damage');
+          const hasHail = disasters.some(pd => pd.distress_type === 'Hail Damage');
+
+          // Check event checkboxes
+          let matchesType = false;
+          if (showTornado && hasTornado) matchesType = true;
+          if (showStorm && hasStorm) matchesType = true;
+          if (showHail && hasHail) matchesType = true;
+          if (showViolation && isRoofViol) matchesType = true;
+
+          if (!matchesType) return false;
+
+          // EF Scale Filter
+          if (hasTornado && minEfVal !== 'ALL') {
+            const firstTornado = disasters.find(pd => pd.distress_type === 'Tornado Damage');
+            const scaleStr = firstTornado ? (firstTornado.ef_scale || '') : '';
+            const scaleNum = parseInt(scaleStr.replace(/[^0-9]/g, '')) || 0;
+            const filterNum = parseInt(minEfVal.replace(/[^0-9]/g, '')) || 0;
+            if (scaleNum < filterNum) return false;
+          }
+
+          // Date Filter
+          if (dateFilterVal !== 'ALL') {
+            let dates = [];
+            disasters.forEach(d => { if (d.report_date) dates.push(new Date(d.report_date)); });
+            lead.violations?.forEach(v => { if (v.report_date) dates.push(new Date(v.report_date)); });
+            if (dates.length > 0) {
+              const maxDate = new Date(Math.max(...dates.map(d => d.getTime())));
+              const today = new Date();
+              const diffTime = today.getTime() - maxDate.getTime();
+              const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+              const maxAllowedDays = parseInt(dateFilterVal) || 90;
+              if (diffDays > maxAllowedDays) return false;
+            }
+          }
+
+          // Search text filter
+          const matchesSearch = 
+            lead.displayAddress.toLowerCase().includes(searchVal) ||
+            lead.ownerName.toLowerCase().includes(searchVal);
+          if (!matchesSearch) return false;
+
+          // State filter
+          if (stateVal !== 'ALL' && lead.state !== stateVal) return false;
+
+          return true;
+        });
+      }
+
+      const showExecution = document.getElementById('pill-execution').checked;
+      const showPhysical = document.getElementById('pill-physical').checked;
+      const showOthers = document.getElementById('pill-others').checked;
+      const showStackOnly = document.getElementById('pill-stack').checked;
+      const showFavorites = document.getElementById('pill-favorites').checked;
+      const showRoofing = document.getElementById('pill-roofing').checked;
 
       const minEquity = parseFloat(document.getElementById('equity-spread-filter').value) || 0;
       const minDebt = parseFloat(document.getElementById('active-debt-filter').value) || 0;
 
       return allLeads.filter(lead => {
+        const isRoofingLead = (lead.violations && lead.violations.some(v => (v.violation_type || '').toUpperCase().includes('ROOF') || (v.details || '').toLowerCase().includes('roof'))) || 
+                              (lead.physicalDistress && lead.physicalDistress.some(pd => ['Tornado Damage', 'Storm Damage', 'Hail Damage'].includes(pd.distress_type)));
+
         const totalDebt = (lead.primaryDebt || 0) + (lead.hiddenMortgages || 0) + (lead.hiddenLiensAmount || 0);
         const marketValue = (lead.auctions && lead.auctions.length > 0 && lead.auctions[0].appraisal_value > 0) ? lead.auctions[0].appraisal_value : (lead.mlsValue || 0);
         const equitySpread = marketValue - totalDebt;
 
-        // 1. Descartar si supera $350k
-        if (marketValue > 350000) return false;
+        // Skip financial/debt filters if it's a roofing lead and the roofing filter is active
+        const bypassFinancial = showRoofing && isRoofingLead;
 
-        // 2. Filtro de Deuda Activa Mínima
-        if (minDebt > 0 && totalDebt < minDebt) return false;
+        if (!bypassFinancial) {
+          // Filtro de Deuda Activa Mínima (solo si el usuario mueve el slider)
+          if (minDebt > 0 && totalDebt < minDebt) return false;
 
-        // 3. Filtro de Margen de Equidad Mínimo
-        if (minEquity > 0) {
-          if (marketValue <= 0 || equitySpread < minEquity) return false;
+          // Filtro de Margen de Equidad Mínimo (solo si el usuario mueve el slider)
+          if (minEquity > 0 && marketValue > 0 && equitySpread < minEquity) return false;
+
+          // Filtro Financiero (Buenos Deals vs Bajo el Agua vs Esperando por Deuda)
+          const isGoodDeal = (marketValue > 0 && equitySpread >= Math.max(40000, marketValue * 0.30)) || (totalDebt > 0 && marketValue === 0);
+          const isUnderwater = marketValue > 0 && equitySpread < 0;
+          const isWaitingDebt = totalDebt === 0;
+          
+          if (financialFilter === 'deals') {
+            if (isWaitingDebt || isUnderwater) return false;
+          } else if (financialFilter === 'underwater') {
+            if (isWaitingDebt || !isUnderwater) return false;
+          } else if (financialFilter === 'unvalued') { // Esperando por Deuda
+            if (!isWaitingDebt) return false;
+          }
         }
 
-        // 4. Filtro Financiero
-        const isUnderwater = marketValue > 0 && equitySpread < 0;
-        const isWaitingDebt = totalDebt === 0;
-        
-        if (financialFilter === 'deals') {
-          if (isWaitingDebt || isUnderwater || marketValue <= 0) return false;
-        } else if (financialFilter === 'underwater') {
-          if (isWaitingDebt || !isUnderwater) return false;
-        } else if (financialFilter === 'unvalued') {
-          if (!isWaitingDebt) return false;
-        }
-
-        // Favoritos
+        // Favorites filter
         if (showFavorites && !favoriteKeys.includes(lead.groupingKey)) return false;
 
-        // Búsqueda
+        // Search text filter
         const matchesSearch = 
           lead.displayAddress.toLowerCase().includes(searchVal) ||
           lead.ownerName.toLowerCase().includes(searchVal);
+        
         if (!matchesSearch) return false;
 
-        // Estado
+        // State filter
         if (stateVal !== 'ALL' && lead.state !== stateVal) return false;
 
-        // Subasta vs Pre-Foreclosure
-        const hasAuctions = lead.auctions && lead.auctions.length > 0;
-        const hasPreForeclosures = lead.preForeclosures && lead.preForeclosures.length > 0;
+        // Distress Stacking / Type Filter
+        const hasAuctions = (lead.auctions && lead.auctions.length > 0) || 
+                            (lead.preForeclosures && lead.preForeclosures.length > 0) || 
+                            (lead.taxSales && lead.taxSales.length > 0);
+        const hasPhysical = (lead.physicalDistress && lead.physicalDistress.length > 0) || 
+                            (lead.violations && lead.violations.length > 0);
+        const hasOthers = (lead.financialDistress && lead.financialDistress.length > 0) || 
+                          (lead.lifeEvents && lead.lifeEvents.length > 0) || 
+                          (lead.probates && lead.probates.length > 0) || 
+                          (lead.divorces && lead.divorces.length > 0) || 
+                          (lead.bankruptcies && lead.bankruptcies.length > 0);
 
-        let matchesType = false;
-        if (showExecution && hasAuctions) matchesType = true;
-        if (showPre && hasPreForeclosures) matchesType = true;
+        if (showStackOnly && !lead.isHighMotivation) return false;
+        
+        // Check if it matches any of the active category filters
+        let matchesCategory = false;
+        if (showExecution && hasAuctions) matchesCategory = true;
+        if (showPhysical && hasPhysical) matchesCategory = true;
+        if (showOthers && hasOthers) matchesCategory = true;
+        if (showRoofing && isRoofingLead) matchesCategory = true;
 
-        if (!matchesType && (showExecution || showPre)) return false;
+        if (!matchesCategory) return false;
 
         return true;
       });
@@ -4227,7 +4346,7 @@
           const marker = L.marker([lead.lat, lead.lon], { icon: customIcon })
             .addTo(markersLayer);
 
-          const popupPhotoUrl = lead.photoUrls && validPhotos.length > 0 ? validPhotos[0] : null;
+          const popupPhotoUrl = lead.photoUrls && lead.photoUrls.length > 0 ? lead.photoUrls[0] : null;
           const popupPhotoHtml = popupPhotoUrl
             ? `<img class="popup-photo" src="${popupPhotoUrl}" alt="Foto Propiedad">`
             : '';
@@ -4379,21 +4498,20 @@
         }
 
         // Photos
-        const validPhotos = (lead.photoUrls || []).filter(u => u && !u.includes('.html') && !u.includes('.htm') && !u.includes('realbiz360') && !u.includes('guidedtour.tv') && !u.includes('90phut')).map(u => u.startsWith('http://') ? u.replace('http://', 'https://') : u);
-        const hasPhotos = validPhotos.length > 0;
+        const hasPhotos = lead.photoUrls && lead.photoUrls.length > 0;
         let photoHtml = '';
         if (hasPhotos) {
-          if (validPhotos.length === 1) {
-            photoHtml = `<img class="lead-card-photo" src="${validPhotos[0]}" alt="Foto Propiedad" onerror="this.onerror=null; this.style.display='none';">`;
+          if (lead.photoUrls.length === 1) {
+            photoHtml = `<img class="lead-card-photo" src="${lead.photoUrls[0]}" alt="Foto Propiedad" onerror="this.onerror=null; this.style.display='none';">`;
           } else {
             photoHtml = `
               <div class="lead-card-photo-carousel" onclick="event.stopPropagation()">
-                <div class="lead-card-photo-slider" data-current-index="0" data-photo-count="${validPhotos.length}">
-                  ${validPhotos.map(url => `<img class="lead-card-carousel-photo" src="${url}" alt="Foto Propiedad" draggable="false" onerror="this.onerror=null; this.style.display=\'none\';">`).join('')}
+                <div class="lead-card-photo-slider" data-current-index="0" data-photo-count="${lead.photoUrls.length}">
+                  ${lead.photoUrls.map(url => `<img class="lead-card-carousel-photo" src="${url}" alt="Foto Propiedad" draggable="false" onerror="this.onerror=null; this.style.display=\'none\';">`).join('')}
                 </div>
                 <button class="lead-card-carousel-arrow prev" onclick="navigateCardPhotos(this, -1)">&lsaquo;</button>
                 <button class="lead-card-carousel-arrow next" onclick="navigateCardPhotos(this, 1)">&rsaquo;</button>
-                <div class="lead-card-carousel-indicator">1/${validPhotos.length}</div>
+                <div class="lead-card-carousel-indicator">1/${lead.photoUrls.length}</div>
               </div>
             `;
           }
@@ -4596,7 +4714,8 @@
     // ----------------------------------------------------
     // CHRONOLOGICAL AUCTION TIMELINE (RIGHT BASE PANEL)
     // ----------------------------------------------------
-    
+    let currentTimelineFilter = 'all';
+
     window.toggleAuctionTimeline = function() {
       const timeline = document.getElementById('auction-schedule-drawer');
       const reopenBtn = document.getElementById('btn-reopen-timeline');
@@ -4625,7 +4744,6 @@
     };
 
     function renderAuctionTimeline() {
-      if (typeof currentTimelineFilter === 'undefined') currentTimelineFilter = 'all';
       const container = document.getElementById('timeline-items-container');
       const countBadge = document.getElementById('timeline-auction-count');
       const reopenCountBadge = document.getElementById('reopen-timeline-count');
@@ -5095,20 +5213,20 @@
       let rDistress = `<tr><th>Distress Activo</th>`;
       
       leads.forEach(lead => {
-        const hasPhotos = lead.photoUrls && validPhotos.length > 0;
+        const hasPhotos = lead.photoUrls && lead.photoUrls.length > 0;
         let photoHtml = '';
         if (hasPhotos) {
-          if (validPhotos.length === 1) {
-            photoHtml = `<img class="comp-prop-img" src="${validPhotos[0]}" alt="Foto">`;
+          if (lead.photoUrls.length === 1) {
+            photoHtml = `<img class="comp-prop-img" src="${lead.photoUrls[0]}" alt="Foto">`;
           } else {
             photoHtml = `
               <div class="comp-prop-photo-carousel" onclick="event.stopPropagation()">
-                <div class="comp-prop-photo-slider" data-current-index="0" data-photo-count="${validPhotos.length}">
-                  ${validPhotos.map(url => `<img class="comp-prop-carousel-photo" src="${url}" alt="Foto" draggable="false">`).join('')}
+                <div class="comp-prop-photo-slider" data-current-index="0" data-photo-count="${lead.photoUrls.length}">
+                  ${lead.photoUrls.map(url => `<img class="comp-prop-carousel-photo" src="${url}" alt="Foto" draggable="false">`).join('')}
                 </div>
                 <button class="comp-prop-carousel-arrow prev" onclick="navigateCompPhotos(this, -1)">&lsaquo;</button>
                 <button class="comp-prop-carousel-arrow next" onclick="navigateCompPhotos(this, 1)">&rsaquo;</button>
-                <div class="comp-prop-carousel-indicator">1/${validPhotos.length}</div>
+                <div class="comp-prop-carousel-indicator">1/${lead.photoUrls.length}</div>
               </div>
             `;
           }
@@ -5205,7 +5323,7 @@
 
       // Resetear estado del carrusel deslizable
       currentPhotoIndex = 0;
-      photoUrlsCount = lead.photoUrls ? validPhotos.length : 0;
+      photoUrlsCount = lead.photoUrls ? lead.photoUrls.length : 0;
 
       // Hydrate Photos Carousel
       const photosCard = document.getElementById('drawer-photos-card');
@@ -5219,10 +5337,10 @@
       const prevArrow = document.getElementById('drawer-photos-prev');
       const nextArrow = document.getElementById('drawer-photos-next');
 
-      if (lead.photoUrls && validPhotos.length > 0) {
+      if (lead.photoUrls && lead.photoUrls.length > 0) {
         photosCard.style.display = 'block';
         
-        if (validPhotos.length > 1) {
+        if (lead.photoUrls.length > 1) {
           if (prevArrow) prevArrow.style.display = 'flex';
           if (nextArrow) nextArrow.style.display = 'flex';
         } else {
@@ -5240,7 +5358,7 @@
           img.draggable = false; // Desactivar drag nativo para no interferir con swipe
           photosSlider.appendChild(img);
           
-          if (validPhotos.length > 1) {
+          if (lead.photoUrls.length > 1) {
             const dot = document.createElement('span');
             dot.className = `drawer-photo-dot ${index === 0 ? 'active' : ''}`;
             dot.onclick = () => switchDrawerPhoto(index);
