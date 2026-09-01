@@ -1296,10 +1296,14 @@ app.get("/api/prospectos", async (req, res) => {
         tacticalAction: 'REVISIÓN PRELIMINAR DE EXPEDIENTE'
       };
 
+      const zipMatches = lead.displayAddress ? lead.displayAddress.match(/\b\d{5}\b/g) : null;
+      const zipCode = zipMatches ? zipMatches[zipMatches.length - 1] : (lead.mailingAddress ? (lead.mailingAddress.match(/\b\d{5}\b/)?.[0] || "") : "");
+
       responseData.push({
         groupingKey: lead.groupingKey,
         propertyId: propertyId,
         displayAddress: lead.displayAddress,
+        zipCode: zipCode,
         state: lead.state,
         county: lead.county,
         ownerName: lead.ownerName,

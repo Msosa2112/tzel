@@ -2713,50 +2713,87 @@
       color: var(--text-main);
     }
     
-    /* Modern Premium Mode Switch Toggle */
-    .mode-switch-wrapper {
+    /* Modern Premium Language Switch Toggle */
+    .lang-switch-wrapper {
       position: relative;
-      display: flex;
+      display: inline-flex;
       align-items: center;
-      background: rgba(0, 0, 0, 0.06);
+      background: rgba(0, 0, 0, 0.05);
       padding: 2px;
       border-radius: 20px;
       border: 1px solid var(--border-glass);
       cursor: pointer;
-      width: 160px;
+      width: 80px;
       height: 28px;
       user-select: none;
       box-shadow: var(--shadow-inset);
     }
     
-    .mode-switch-bg-indicator {
+    .lang-switch-bg-indicator {
       position: absolute;
       top: 2px;
       left: 2px;
-      width: 76px;
+      width: 36px;
       height: 22px;
       background: var(--color-radar-green);
       border-radius: 18px;
-      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
       box-shadow: 0 1.5px 4px rgba(0, 0, 0, 0.15);
+      z-index: 1;
     }
     
-    .mode-switch-btn {
+    .lang-switch-btn {
       flex: 1;
       text-align: center;
-      font-size: 0.62rem;
+      font-size: 0.65rem;
       font-weight: 800;
       color: var(--text-muted);
       z-index: 2;
-      transition: color 0.3s;
+      transition: color 0.25s;
       line-height: 22px;
       text-transform: uppercase;
       font-family: 'Orbitron', 'Inter', sans-serif;
       letter-spacing: 0.5px;
+      background: none;
+      border: none;
+      cursor: pointer;
+      padding: 0;
     }
     
-    .mode-switch-btn.active {
+    .lang-switch-btn.active {
       color: #ffffff !important;
+    }
+
+    /* Zip Code Chips */
+    .zip-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      background: var(--color-radar-green-pastel);
+      color: var(--color-radar-green-dark);
+      border: 1px solid var(--color-radar-green-border);
+      font-size: 0.7rem;
+      font-weight: 700;
+      padding: 2px 7px 2px 8px;
+      border-radius: 12px;
+      animation: fadeIn 0.2s ease;
+    }
+    .zip-chip-remove {
+      cursor: pointer;
+      font-weight: 800;
+      font-size: 0.8rem;
+      color: var(--color-radar-green-dark);
+      opacity: 0.7;
+      border: none;
+      background: none;
+      padding: 0 1px;
+      line-height: 1;
+      display: inline-flex;
+      align-items: center;
+    }
+    .zip-chip-remove:hover {
+      opacity: 1;
+      color: #ef4444;
     }
   </style>
 </head>
@@ -2770,13 +2807,22 @@
       </button>
       <div class="brand-container">
         <img src="logo.jpg" alt="TZEL Logo" class="brand-logo">
-        <h1 class="brand-title">TZEL TACTICAL RADAR v1.2</h1>
+        <h1 class="brand-title" id="header-brand-title">TZEL TACTICAL RADAR v1.2</h1>
       </div>
     </div>
     
-    <div class="system-status">
-      <div class="status-dot"></div>
-      <span>Radar Activo - Jurisdicción KY/IN</span>
+    <div style="display: flex; align-items: center; gap: 16px;">
+      <!-- Language Switcher Toggle -->
+      <div class="lang-switch-wrapper" id="lang-switch-wrapper" title="Cambiar Idioma / Switch Language">
+        <div id="lang-switch-bg" class="lang-switch-bg-indicator"></div>
+        <button type="button" class="lang-switch-btn active" id="lang-btn-es" onclick="setLanguage('es')" aria-label="Español">ES</button>
+        <button type="button" class="lang-switch-btn" id="lang-btn-en" onclick="setLanguage('en')" aria-label="English">EN</button>
+      </div>
+
+      <div class="system-status">
+        <div class="status-dot"></div>
+        <span id="header-radar-status" data-i18n="header_radar_status">Radar Activo - Jurisdicción KY/IN</span>
+      </div>
     </div>
   </header>
 
@@ -2791,35 +2837,42 @@
       <div id="sidebar-resizer" class="sidebar-resizer"></div>
       
       <div class="sidebar-header-mobile">
-        <h3>Filtros y Listado</h3>
+        <h3 data-i18n="sidebar_mobile_title">Filtros y Listado</h3>
         <button id="close-sidebar-left-btn" class="close-btn-mobile" aria-label="Close Sidebar Left">&times;</button>
       </div>
-      <!-- Search -->
+      <!-- Search & Filters -->
       <div class="sidebar-section">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; gap: 8px;">
-          <h3 style="margin: 0;">Filtros Operativos</h3>
-          <!-- Toggle Switch -->
-          <div class="mode-switch-wrapper" onclick="toggleSystemMode(event)">
-             <div id="mode-switch-bg" class="mode-switch-bg-indicator"></div>
-             <div class="mode-switch-btn active" id="mode-btn-investment">Inversión</div>
-             <div class="mode-switch-btn" id="mode-btn-disaster">Roofing</div>
-          </div>
+          <h3 style="margin: 0;" data-i18n="filters_title">Filtros Operativos</h3>
         </div>
-        <input type="text" id="address-search" class="search-input" placeholder="Buscar dirección o dueño...">
+        <input type="text" id="address-search" class="search-input" placeholder="Buscar dirección o dueño..." data-i18n-placeholder="search_placeholder">
         
         <div class="filter-group">
           <select id="state-filter" class="filter-select">
-            <option value="ALL">Jurisdicción: Ambos Estados (KY / IN)</option>
-            <option value="KY">Kentucky (KY)</option>
-            <option value="IN">Indiana (IN)</option>
+            <option value="ALL" data-i18n="state_all">Jurisdicción: Ambos Estados (KY / IN)</option>
+            <option value="KY" data-i18n="state_ky">Kentucky (KY)</option>
+            <option value="IN" data-i18n="state_in">Indiana (IN)</option>
           </select>
+        </div>
+
+        <!-- Zip Code Multi-Filter -->
+        <div class="filter-group" style="margin-top: 10px;">
+          <label for="zip-filter" style="font-size: 0.75rem; font-weight: 600; display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+            <span data-i18n="filter_zip_label"><i data-lucide="map-pin" class="inline-icon"></i> Filtrar por ZIP Code(s):</span>
+            <span id="zip-count-badge" style="display: none; font-size: 0.68rem; background: var(--color-radar-green-pastel); color: var(--color-radar-green-dark); padding: 1px 6px; border-radius: 4px; font-weight: 700; border: 1px solid var(--color-radar-green-border);">0 zips</span>
+          </label>
+          <div style="position: relative;">
+            <input type="text" id="zip-filter" class="search-input" style="margin-bottom: 0; padding-right: 28px; font-size: 0.8rem;" placeholder="Ej: 40202, 40203, 47130 (comas o espacios)" data-i18n-placeholder="zip_placeholder">
+            <button id="clear-zip-btn" type="button" onclick="clearZipFilter()" style="display: none; position: absolute; right: 8px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; color: var(--text-muted); font-size: 15px; font-weight: bold; line-height: 1;" title="Limpiar Zip Codes" data-i18n-title="clear_zips">&times;</button>
+          </div>
+          <div id="zip-chips-container" style="display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px;"></div>
         </div>
 
         <!-- Group 1: Investment specific filters -->
         <div id="investment-filters-group">
           <div class="filter-group" style="margin-top: 12px;">
             <label style="font-size: 0.75rem; font-weight: 600; display: flex; justify-content: space-between;">
-              <span>Margen de Equidad Mínimo:</span>
+              <span data-i18n="equity_spread_label">Margen de Equidad Mínimo:</span>
               <span id="equity-spread-val" style="color: var(--color-radar-green-dark); font-weight: bold;">$0</span>
             </label>
             <input type="range" id="equity-spread-filter" min="0" max="100000" step="5000" value="0" style="width: 100%; accent-color: var(--color-radar-green);">
@@ -2827,102 +2880,51 @@
 
           <div class="filter-group" style="margin-top: 12px;">
             <label style="font-size: 0.75rem; font-weight: 600; display: flex; justify-content: space-between;">
-              <span>Deuda Activa Mínima:</span>
+              <span data-i18n="active_debt_label">Deuda Activa Mínima:</span>
               <span id="active-debt-val" style="color: #ef4444; font-weight: bold;">$0</span>
             </label>
             <input type="range" id="active-debt-filter" min="0" max="150000" step="5000" value="0" style="width: 100%; accent-color: #ef4444;">
-          </div>
-        </div>
-
-        <!-- Group 2: Disaster specific filters -->
-        <div id="disaster-filters-group" style="display: none; margin-top: 12px; border-top: 1px solid var(--border-glass); padding-top: 12px;">
-          <div class="filter-group">
-            <label style="font-size: 0.75rem; font-weight: 600; margin-bottom: 6px; display: block; color: #0891b2;">Eventos y Daños:</label>
-            <div style="display: flex; flex-direction: column; gap: 8px; font-size: 0.75rem;">
-              <label style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
-                <input type="checkbox" id="chk-dis-tornado" checked onchange="renderUI()">
-                <span>🌀 Tornados (NWS DAT)</span>
-              </label>
-              <label style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
-                <input type="checkbox" id="chk-dis-storm" checked onchange="renderUI()">
-                <span>⛈️ Tormentas / Vientos</span>
-              </label>
-              <label style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
-                <input type="checkbox" id="chk-dis-hail" checked onchange="renderUI()">
-                <span>☄️ Granizo Severo</span>
-              </label>
-              <label style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
-                <input type="checkbox" id="chk-dis-violation" checked onchange="renderUI()">
-                <span>🏠 Infracción de Techo (X50)</span>
-              </label>
-            </div>
-          </div>
-
-          <div class="filter-group" style="margin-top: 12px;">
-            <label style="font-size: 0.75rem; font-weight: 600; margin-bottom: 6px; display: block;">Intensidad de Tornado Mínima:</label>
-            <select id="dis-ef-filter" class="filter-select" onchange="renderUI()" style="width: 100%;">
-              <option value="ALL">Todas las Intensidades</option>
-              <option value="EF0">EF-0 o superior</option>
-              <option value="EF1">EF-1 o superior</option>
-              <option value="EF2">EF-2 o superior</option>
-            </select>
-          </div>
-
-          <div class="filter-group" style="margin-top: 12px;">
-            <label style="font-size: 0.75rem; font-weight: 600; margin-bottom: 6px; display: block;">Antigüedad de Reporte:</label>
-            <select id="dis-date-filter" class="filter-select" onchange="renderUI()" style="width: 100%;">
-              <option value="ALL">Historial completo (90 días)</option>
-              <option value="7">Últimos 7 días</option>
-              <option value="30">Últimos 30 días</option>
-            </select>
           </div>
         </div>
       </div>
 
       <!-- Distress Multi-select Pills -->
       <div class="sidebar-section" id="investment-distress-section">
-        <h3>Foco de Distress</h3>
+        <h3 data-i18n="distress_focus_title">Foco de Distress</h3>
         <div class="pill-selectors">
           <div>
             <input type="checkbox" id="pill-execution" class="pill-checkbox" checked>
             <label for="pill-execution" class="pill-label">
               <i data-lucide="shield-alert"></i>
-              <span>Ejecución</span>
+              <span data-i18n="pill_execution">Ejecución</span>
             </label>
           </div>
           <div>
             <input type="checkbox" id="pill-physical" class="pill-checkbox">
             <label for="pill-physical" class="pill-label">
               <i data-lucide="flame"></i>
-              <span>Físico</span>
+              <span data-i18n="pill_physical">Físico</span>
             </label>
           </div>
           <div>
             <input type="checkbox" id="pill-others" class="pill-checkbox">
             <label for="pill-others" class="pill-label">
               <i data-lucide="alert-triangle"></i>
-              <span>Otros</span>
+              <span data-i18n="pill_others">Otros</span>
             </label>
           </div>
           <div>
             <input type="checkbox" id="pill-stack" class="pill-checkbox">
             <label for="pill-stack" class="pill-label" title="Propiedades con múltiples problemas acumulados (Subasta + Multas + Deudas)">
               <i data-lucide="zap"></i>
-              <span>Multi-Distress</span>
+              <span data-i18n="pill_multidistress">Multi-Distress</span>
             </label>
           </div>
           <div>
             <input type="checkbox" id="pill-favorites" class="pill-checkbox">
             <label for="pill-favorites" class="pill-label">
               <i data-lucide="star"></i>
-              <span>Favoritos</span>
-            </label>
-          </div>
-          <div>
-            <input type="checkbox" id="pill-roofing" class="pill-checkbox">
-            <label for="pill-roofing" class="pill-label">
-              <i data-lucide="cloud-lightning"></i>
-              <span>Roofing</span>
+              <span data-i18n="pill_favorites">Favoritos</span>
             </label>
           </div>
         </div>
@@ -2930,16 +2932,16 @@
 
       <!-- Estatus Financiero Segment Selector -->
       <div class="sidebar-section" id="investment-financial-section">
-        <h3>Estatus Financiero</h3>
+        <h3 data-i18n="financial_status_title">Estatus Financiero</h3>
         <div class="segment-selector">
           <button id="btn-deals" class="segment-btn" title="Propiedades con margen de ganancia y equidad positiva">
-            <i data-lucide="trending-up"></i> BUENOS DEALS
+            <i data-lucide="trending-up"></i> <span data-i18n="btn_deals">BUENOS DEALS</span>
           </button>
           <button id="btn-underwater" class="segment-btn" title="Propiedades donde la deuda supera el valor de la propiedad">
-            <i data-lucide="trending-down"></i> BAJO EL AGUA
+            <i data-lucide="trending-down"></i> <span data-i18n="btn_underwater">BAJO EL AGUA</span>
           </button>
           <button id="btn-unvalued" class="segment-btn" title="Propiedades recién radicadas cuya deuda aún no se ha publicado en corte">
-            <i data-lucide="clock"></i> ESPERANDO POR DEUDA
+            <i data-lucide="clock"></i> <span data-i18n="btn_unvalued">ESPERANDO POR DEUDA</span>
           </button>
         </div>
       </div>
@@ -2947,23 +2949,23 @@
       <!-- Surplus Funds Action Button -->
       <div class="sidebar-section" id="investment-surplus-section">
         <button id="btn-surplus-vault" class="surplus-vault-btn">
-          <i data-lucide="dollar-sign"></i> Bóveda de Excedentes
+          <i data-lucide="dollar-sign"></i> <span data-i18n="btn_surplus_vault">Bóveda de Excedentes</span>
         </button>
       </div>
 
       <!-- Zero Debt Vault Action Button -->
       <div class="sidebar-section" style="padding-top: 0;" id="investment-zerodebt-section">
         <button id="btn-zero-debt-vault" class="zero-debt-vault-btn">
-          <i data-lucide="shield"></i> Bóveda de Deuda Cero
+          <i data-lucide="shield"></i> <span data-i18n="btn_zerodebt_vault">Bóveda de Deuda Cero</span>
         </button>
       </div>
 
       <!-- Prospect List (Hidden in sidebar, moved to bottom cards carousel) -->
       <div class="sidebar-section" style="flex: 1; display: flex; flex-direction: column; overflow: hidden; padding-bottom: 0; min-height: 300px; flex-shrink: 0; display: none;">
-        <h3>Lista de Objetivos (<span id="sidebar-count-indicator">0</span>)</h3>
+        <h3><span data-i18n="targets_list_title">Lista de Objetivos</span> (<span id="sidebar-count-indicator">0</span>)</h3>
         <div class="leads-list" id="leads-list-container">
           <!-- Dynamically populated via JS -->
-          <div style="text-align: center; color: var(--text-muted); margin-top: 40px; font-size: 0.85rem;">
+          <div style="text-align: center; color: var(--text-muted); margin-top: 40px; font-size: 0.85rem;" data-i18n="loading_targets_db">
             Cargando objetivos de Turso DB...
           </div>
         </div>
@@ -2978,12 +2980,12 @@
       <!-- Horizontal Cards Carousel -->
       <div class="bottom-cards-carousel-wrapper collapsed" id="bottom-cards-wrapper">
         <div class="bottom-cards-header" onclick="toggleBottomCarousel()">
-          <span class="carousel-title"><i data-lucide="list" class="inline-icon"></i> Objetivos en esta Zona (<span id="count-indicator">0</span>)</span>
+          <span class="carousel-title"><i data-lucide="list" class="inline-icon"></i> <span data-i18n="zone_targets_title">Objetivos en esta Zona</span> (<span id="count-indicator">0</span>)</span>
           <i data-lucide="chevron-up" id="carousel-toggle-icon"></i>
         </div>
         <div class="bottom-cards-carousel-inner">
           <div class="bottom-cards-carousel" id="bottom-cards-container">
-            <div style="text-align: center; color: var(--text-muted); width: 100%; padding: 20px; font-size: 0.85rem;">
+            <div style="text-align: center; color: var(--text-muted); width: 100%; padding: 20px; font-size: 0.85rem;" data-i18n="loading_map_targets">
               Cargando objetivos en el mapa...
             </div>
           </div>
@@ -2994,30 +2996,30 @@
       <div class="map-controls-right">
         <!-- Leyenda de Mapa -->
         <div class="map-legend">
-          <div class="map-legend-title">Temperatura de Equidad</div>
+          <div class="map-legend-title" data-i18n="map_legend_title">Temperatura de Equidad</div>
           <div class="map-legend-item">
             <span class="legend-color-dot" style="background-color: #ef4444; box-shadow: 0 0 6px #ef4444"></span>
-            <span class="legend-label"><i data-lucide="shield-alert" class="inline-icon" style="color: #ef4444"></i> <strong>PIN ROJO: Subasta / Ejecución</strong><br>Subasta sheriff programada con deuda judicial activa</span>
+            <span class="legend-label"><i data-lucide="shield-alert" class="inline-icon" style="color: #ef4444"></i> <strong data-i18n="pin_red">PIN ROJO: Subasta / Ejecución</strong><br><span data-i18n="pin_red_desc">Subasta sheriff programada con deuda judicial activa</span></span>
           </div>
           <div class="map-legend-item">
             <span class="legend-color-dot" style="background-color: #f97316; box-shadow: 0 0 6px #f97316"></span>
-            <span class="legend-label"><i data-lucide="shield-alert" class="inline-icon" style="color: #f97316"></i> <strong>PIN NARANJA: Pre-Foreclosure</strong><br>Caso recién radicado en corte (Lis Pendens / Demanda)</span>
+            <span class="legend-label"><i data-lucide="shield-alert" class="inline-icon" style="color: #f97316"></i> <strong data-i18n="pin_orange">PIN NARANJA: Pre-Foreclosure</strong><br><span data-i18n="pin_orange_desc">Caso recién radicado en corte (Lis Pendens / Demanda)</span></span>
           </div>
           <div class="map-legend-item">
             <span class="legend-color-dot" style="background-color: #ca8a04; box-shadow: 0 0 6px #ca8a04"></span>
-            <span class="legend-label"><i data-lucide="flame" class="inline-icon" style="color: #ca8a04"></i> <strong>PIN AMARILLO: Distress Físico</strong><br>Infracciones de código, deterioro y reparaciones</span>
+            <span class="legend-label"><i data-lucide="flame" class="inline-icon" style="color: #ca8a04"></i> <strong data-i18n="pin_yellow_phys">PIN AMARILLO: Distress Físico</strong><br><span data-i18n="pin_yellow_phys_desc">Infracciones de código, deterioro y reparaciones</span></span>
           </div>
           <div class="map-legend-item">
             <span class="legend-color-dot" style="background-color: #0284c7; box-shadow: 0 0 6px #0284c7"></span>
-            <span class="legend-label"><i data-lucide="scale" class="inline-icon" style="color: #0284c7"></i> <strong>PIN AZUL: Otros Leads</strong><br>Sucesiones, divorcios o deudas en seguimiento</span>
+            <span class="legend-label"><i data-lucide="scale" class="inline-icon" style="color: #0284c7"></i> <strong data-i18n="pin_blue">PIN AZUL: Otros Leads</strong><br><span data-i18n="pin_blue_desc">Sucesiones, divorcios o deudas en seguimiento</span></span>
           </div>
           <div class="map-legend-item">
             <span class="legend-color-dot" style="background-color: #64748b; box-shadow: 0 0 6px #64748b"></span>
-            <span class="legend-label"><i data-lucide="clock" class="inline-icon" style="color: #64748b"></i> <strong>PIN RELOJ: Esperando por Deuda</strong><br>Caso radicado pero deuda pendiente de publicación en corte</span>
+            <span class="legend-label"><i data-lucide="clock" class="inline-icon" style="color: #64748b"></i> <strong data-i18n="pin_clock">PIN RELOJ: Esperando por Deuda</strong><br><span data-i18n="pin_clock_desc">Caso radicado pero deuda pendiente de publicación en corte</span></span>
           </div>
           <div class="map-legend-item">
             <span class="legend-color-dot" style="background-color: #fbbf24; box-shadow: 0 0 6px #fbbf24"></span>
-            <span class="legend-label"><i data-lucide="star" class="inline-icon" style="color: #fbbf24"></i> <strong>PIN DORADO: Favorito</strong><br>Propiedad priorizada manualmente</span>
+            <span class="legend-label"><i data-lucide="star" class="inline-icon" style="color: #fbbf24"></i> <strong data-i18n="pin_gold">PIN DORADO: Favorito</strong><br><span data-i18n="pin_gold_desc">Propiedad priorizada manualmente</span></span>
           </div>
         </div>
 
@@ -3025,20 +3027,20 @@
         <div class="map-style-card" onclick="event.stopPropagation()">
           <div class="map-legend-title">
             <i data-lucide="layers" class="inline-icon" style="color: var(--color-radar-green);"></i>
-            Estilo del Mapa
+            <span data-i18n="map_style_title">Estilo del Mapa</span>
           </div>
           <div class="map-style-options">
             <button class="map-style-btn active" onclick="event.stopPropagation(); changeMapStyle('light')" id="btn-style-light" title="Mapa Claro Positron">
               <div class="map-style-preview style-light"></div>
-              <span class="style-label">Mapa Claro</span>
+              <span class="style-label" data-i18n="style_light">Mapa Claro</span>
             </button>
             <button class="map-style-btn" onclick="event.stopPropagation(); changeMapStyle('satellite')" id="btn-style-satellite" title="Satélite Esri World Imagery">
               <div class="map-style-preview style-satellite"></div>
-              <span class="style-label">Satélite</span>
+              <span class="style-label" data-i18n="style_satellite">Satélite</span>
             </button>
             <button class="map-style-btn" onclick="event.stopPropagation(); changeMapStyle('dark')" id="btn-style-dark" title="Modo Oscuro Dark Matter">
               <div class="map-style-preview style-dark"></div>
-              <span class="style-label">Modo Oscuro</span>
+              <span class="style-label" data-i18n="style_dark">Modo Oscuro</span>
             </button>
           </div>
         </div>
@@ -3048,7 +3050,7 @@
     <!-- Floating Button to reopen timeline if minimized -->
     <button class="timeline-floating-reopen-btn" id="btn-reopen-timeline" onclick="toggleAuctionTimeline()" title="Ver Cronograma de Subastas">
       <i data-lucide="calendar" style="color: var(--color-execution-red); width: 16px; height: 16px;"></i>
-      <span>Subastas (<span id="reopen-timeline-count">0</span>)</span>
+      <span><span data-i18n="btn_auctions_floating">Subastas</span> (<span id="reopen-timeline-count">0</span>)</span>
     </button>
 
     <!-- Base Right Panel: Chronological Auction Timeline -->
@@ -3057,7 +3059,7 @@
         <div class="timeline-title-row">
           <div style="display: flex; align-items: center; gap: 8px;">
             <i data-lucide="calendar" style="color: var(--color-execution-red); width: 18px; height: 18px;"></i>
-            <h2 style="font-size: 0.95rem; font-weight: 700; color: var(--text-main); margin: 0;">Próximas Subastas</h2>
+            <h2 style="font-size: 0.95rem; font-weight: 700; color: var(--text-main); margin: 0;" data-i18n="upcoming_auctions_title">Próximas Subastas</h2>
             <span class="timeline-count-badge" id="timeline-auction-count">0</span>
           </div>
           <button class="timeline-collapse-btn" id="btn-toggle-timeline" onclick="toggleAuctionTimeline()" title="Minimizar panel">
@@ -3067,17 +3069,17 @@
         
         <!-- Timeline quick filter tabs -->
         <div class="timeline-filter-tabs">
-          <button class="timeline-tab active" data-filter="all" onclick="filterAuctionTimeline('all', this)">Todas</button>
-          <button class="timeline-tab" data-filter="top" onclick="filterAuctionTimeline('top', this)">🏆 Top Oportunidades</button>
-          <button class="timeline-tab" data-filter="15" onclick="filterAuctionTimeline('15', this)">⚡ &lt;15 Días</button>
-          <button class="timeline-tab" data-filter="30" onclick="filterAuctionTimeline('30', this)">30 Días</button>
-          <button class="timeline-tab" data-filter="pre" onclick="filterAuctionTimeline('pre', this)">🟠 Pre-Foreclosure</button>
+          <button class="timeline-tab active" data-filter="all" onclick="filterAuctionTimeline('all', this)" data-i18n="timeline_tab_all">Todas</button>
+          <button class="timeline-tab" data-filter="top" onclick="filterAuctionTimeline('top', this)" data-i18n="timeline_tab_top">🏆 Top Oportunidades</button>
+          <button class="timeline-tab" data-filter="15" onclick="filterAuctionTimeline('15', this)" data-i18n="timeline_tab_15">⚡ &lt;15 Días</button>
+          <button class="timeline-tab" data-filter="30" onclick="filterAuctionTimeline('30', this)" data-i18n="timeline_tab_30">30 Días</button>
+          <button class="timeline-tab" data-filter="pre" onclick="filterAuctionTimeline('pre', this)" data-i18n="timeline_tab_pre">🟠 Pre-Foreclosure</button>
         </div>
       </div>
 
       <div class="timeline-content" id="timeline-items-container">
         <!-- Rendered dynamically sorted by days remaining ascending -->
-        <div style="text-align: center; color: var(--text-muted); padding: 40px 20px; font-size: 0.85rem;">
+        <div style="text-align: center; color: var(--text-muted); padding: 40px 20px; font-size: 0.85rem;" data-i18n="loading_timeline">
           Cargando cronograma de subastas...
         </div>
       </div>
@@ -3110,13 +3112,13 @@
         <div class="detail-card tactical-opp-card" id="drawer-opp-card" style="background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); border: 1px solid rgba(0, 207, 204, 0.4); color: #ffffff; padding: 16px; border-radius: 16px; box-shadow: 0 4px 20px rgba(0, 207, 204, 0.15);">
           <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
             <div style="display: flex; align-items: center; gap: 6px; font-size: 0.72rem; text-transform: uppercase; font-weight: 800; letter-spacing: 0.5px; color: var(--color-radar-green);">
-              <i data-lucide="zap" style="width: 14px; height: 14px;"></i> TZEL Opportunity Score
+              <i data-lucide="zap" style="width: 14px; height: 14px;"></i> <span data-i18n="opp_score_label">TZEL Opportunity Score</span>
             </div>
             <div id="drawer-opp-score-badge" style="background: var(--color-radar-green); color: #0f172a; font-weight: 900; font-size: 0.85rem; padding: 3px 10px; border-radius: 20px;">
               Score: 88/100
             </div>
           </div>
-          <div style="font-size: 0.72rem; color: #94a3b8; text-transform: uppercase; font-weight: 600; margin-bottom: 4px;">Acción Táctica Recomendada:</div>
+          <div style="font-size: 0.72rem; color: #94a3b8; text-transform: uppercase; font-weight: 600; margin-bottom: 4px;" data-i18n="opp_action_label">Acción Táctica Recomendada:</div>
           <div id="drawer-opp-action" style="font-size: 0.88rem; font-weight: 800; color: #ffffff; line-height: 1.3; background: rgba(255,255,255,0.08); padding: 8px 12px; border-radius: 8px; border-left: 3px solid var(--color-radar-green);">
             LLAMAR DUEÑO: OFERTA COMPRA DIRECTA / SUBJECT-TO
           </div>
@@ -3124,14 +3126,14 @@
 
         <!-- Target Overview -->
         <div class="detail-card">
-          <div class="detail-card-title"><i data-lucide="globe"></i> Resumen del Objetivo</div>
+          <div class="detail-card-title"><i data-lucide="globe"></i> <span data-i18n="target_overview_title">Resumen del Objetivo</span></div>
           <div class="prop-info-grid">
             <div class="prop-info-item">
-              <span class="prop-info-label">Propietario / Demandado</span>
+              <span class="prop-info-label" data-i18n="prop_owner_label">Propietario / Demandado</span>
               <span class="prop-info-value" id="prop-owner">Juan Perez</span>
             </div>
             <div class="prop-info-item">
-              <span class="prop-info-label">Condado</span>
+              <span class="prop-info-label" data-i18n="prop_county_label">Condado</span>
               <span class="prop-info-value" id="prop-county">Jefferson, KY</span>
             </div>
             <div class="prop-info-item">
@@ -3139,7 +3141,7 @@
               <span class="prop-info-value" id="prop-mls-id">N/A</span>
             </div>
             <div class="prop-info-item">
-              <span class="prop-info-label">Tipo de Dueño</span>
+              <span class="prop-info-label" data-i18n="prop_owner_type_label">Tipo de Dueño</span>
               <span class="prop-info-value" id="prop-owner-type">Residente</span>
             </div>
             <div class="prop-info-item">
@@ -3157,21 +3159,21 @@
         <div class="detail-card" style="background: rgba(0,0,0,0.02); border: 1px solid var(--border-glass); padding: 12px 14px;">
           <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
             <span style="font-size: 0.72rem; font-weight: 800; text-transform: uppercase; color: var(--text-main); display: flex; align-items: center; gap: 6px;">
-              <i data-lucide="shield" style="width: 14px; height: 14px; color: var(--color-radar-green);"></i> Radar de Confianza & Auditoría
+              <i data-lucide="shield" style="width: 14px; height: 14px; color: var(--color-radar-green);"></i> <span data-i18n="confidence_radar_title">Radar de Confianza & Auditoría</span>
             </span>
             <span id="forensic-status-badge" class="badge" style="background: rgba(16, 185, 129, 0.15); color: #047857; font-weight: 800; font-size: 0.65rem;">AUTO_VERIFIED</span>
           </div>
           <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; font-size: 0.7rem; text-align: center;">
             <div style="background: rgba(255,255,255,0.04); padding: 6px; border-radius: 6px;">
-              <div style="color: var(--text-muted); font-size: 0.62rem;">Geocodificación</div>
+              <div style="color: var(--text-muted); font-size: 0.62rem;" data-i18n="conf_geocoding">Geocodificación</div>
               <div id="conf-geocode" style="font-weight: 800; color: var(--color-radar-green);">99.2%</div>
             </div>
             <div style="background: rgba(255,255,255,0.04); padding: 6px; border-radius: 6px;">
-              <div style="color: var(--text-muted); font-size: 0.62rem;">Titular Legal</div>
+              <div style="color: var(--text-muted); font-size: 0.62rem;" data-i18n="conf_owner">Titular Legal</div>
               <div id="conf-owner" style="font-weight: 800; color: var(--color-radar-green);">96.0%</div>
             </div>
             <div style="background: rgba(255,255,255,0.04); padding: 6px; border-radius: 6px;">
-              <div style="color: var(--text-muted); font-size: 0.62rem;">Gravámenes</div>
+              <div style="color: var(--text-muted); font-size: 0.62rem;" data-i18n="conf_debt">Gravámenes</div>
               <div id="conf-debt" style="font-weight: 800; color: var(--color-radar-green);">98.4%</div>
             </div>
           </div>
@@ -3179,30 +3181,30 @@
 
         <!-- Metrics de Adquisición As-Is e Institucional -->
         <div class="detail-card" id="investment-metrics-card">
-          <div class="detail-card-title"><i data-lucide="shield-check"></i> Underwriting Multicapa & Precios Objetivo</div>
+          <div class="detail-card-title"><i data-lucide="shield-check"></i> <span data-i18n="underwriting_title">Underwriting Multicapa & Precios Objetivo</span></div>
           <div class="uw-grid">
             <div class="uw-item">
-              <span class="uw-label">ARV Proyectado</span>
+              <span class="uw-label" data-i18n="uw_arv_label">ARV Proyectado</span>
               <span class="uw-value" id="uw-arv-val">$0</span>
             </div>
             <div class="uw-item">
-              <span class="uw-label">Rehab Estimado</span>
+              <span class="uw-label" data-i18n="uw_rehab_label">Rehab Estimado</span>
               <span class="uw-value" id="uw-rehab-val" style="color: #ea580c;">$0</span>
             </div>
             <div class="uw-item" style="background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.4);">
-              <span class="uw-label" style="color: #047857; font-weight: 800;">Target Contract Price</span>
+              <span class="uw-label" style="color: #047857; font-weight: 800;" data-i18n="uw_target_contract_label">Target Contract Price</span>
               <span class="uw-value" id="uw-target-contract" style="color: var(--color-radar-green); font-weight: 900; font-size: 1.15rem;">$0</span>
             </div>
             <div class="uw-item" style="background: rgba(245, 158, 11, 0.1); border: 1px solid rgba(245, 158, 11, 0.3);">
-              <span class="uw-label" style="color: #b45309; font-weight: 800;">Walk-Away Price (Límite)</span>
+              <span class="uw-label" style="color: #b45309; font-weight: 800;" data-i18n="uw_walkaway_label">Walk-Away Price (Límite)</span>
               <span class="uw-value" id="uw-walkaway-price" style="color: #f59e0b; font-weight: 800;">$0</span>
             </div>
             <div class="uw-item">
-              <span class="uw-label">Auction Max Bid</span>
+              <span class="uw-label" data-i18n="uw_auction_maxbid_label">Auction Max Bid</span>
               <span class="uw-value" id="uw-auction-maxbid" style="color: #ef4444; font-weight: 800;">$0</span>
             </div>
             <div class="uw-item">
-              <span class="uw-label">Wholesale Fee Proyectado</span>
+              <span class="uw-label" data-i18n="uw_wholesale_fee_label">Wholesale Fee Proyectado</span>
               <span class="uw-value" id="uw-wholesale-fee" style="color: var(--color-radar-green); font-weight: 800;">+$15,000</span>
             </div>
           </div>
@@ -3211,38 +3213,11 @@
             <span id="uw-alert-text">Alerta Crítica: Propiedad Bajo el Agua</span>
           </div>
           <div id="uw-manual-search" style="display: none; margin-top: 12px; font-size: 0.7rem; color: var(--text-muted); background: rgba(255,255,255,0.02); padding: 8px; border-radius: 4px; border: 1px solid rgba(255,255,255,0.05); justify-content: space-between; align-items: center;">
-            <span><i data-lucide="search" class="inline-icon"></i> Buscar valor comercial:</span>
+            <span><i data-lucide="search" class="inline-icon"></i> <span data-i18n="uw_search_commercial_value">Buscar valor comercial:</span></span>
             <div style="display: flex; gap: 8px;">
               <a id="zillow-link" href="#" target="_blank" style="color: #006aff; font-weight: bold; text-decoration: none;">Zillow <i data-lucide="external-link" class="inline-icon" style="width: 10px; height: 10px; margin-left: 2px;"></i></a>
               <span style="color: rgba(255,255,255,0.1)">|</span>
               <a id="redfin-link" href="#" target="_blank" style="color: #e60000; font-weight: bold; text-decoration: none;">Redfin <i data-lucide="external-link" class="inline-icon" style="width: 10px; height: 10px; margin-left: 2px;"></i></a>
-            </div>
-          </div>
-        </div>
-
-        <!-- Métricas de Desastres / Daños (Modo Desastre) -->
-        <div class="detail-card" id="disaster-damage-card" style="display: none;">
-          <div class="detail-card-title"><i data-lucide="tornado"></i> Detalle de Daño Meteorológico (NOAA / NWS)</div>
-          <div class="uw-grid">
-            <div class="uw-item" style="background: rgba(6, 182, 212, 0.1); border: 1px solid rgba(6, 182, 212, 0.3);">
-              <span class="uw-label" style="color: #0891b2; font-weight: bold;">Tipo de Evento</span>
-              <span class="uw-value" id="uw-disaster-type" style="color: #06b6d4;">-</span>
-            </div>
-            <div class="uw-item">
-              <span class="uw-label">Escala Fujita (EF)</span>
-              <span class="uw-value" id="uw-ef-scale" style="font-weight: bold;">N/A</span>
-            </div>
-            <div class="uw-item">
-              <span class="uw-label">Viento Estimado</span>
-              <span class="uw-value" id="uw-wind-speed">N/A</span>
-            </div>
-            <div class="uw-item">
-              <span class="uw-label">Fecha del Reporte</span>
-              <span class="uw-value" id="uw-disaster-date">-</span>
-            </div>
-            <div class="uw-item" style="grid-column: span 2; background: rgba(255, 255, 255, 0.02); border: 1px solid rgba(255, 255, 255, 0.05); height: auto; display: flex; flex-direction: column; align-items: flex-start; text-align: left;">
-              <span class="uw-label">Notas e Inspección NWS / Código</span>
-              <div id="uw-nws-details" style="font-size: 0.72rem; line-height: 1.4; color: var(--text-main); margin-top: 4px; white-space: pre-wrap;">-</div>
             </div>
           </div>
         </div>
@@ -3277,14 +3252,14 @@
 
         <!-- Market Comparison Analysis (MCA) Comps -->
         <div class="detail-card" id="mca-card" style="display: none;">
-          <div class="detail-card-title"><i data-lucide="trending-up"></i> Comparables de Mercado (MCA)</div>
+          <div class="detail-card-title"><i data-lucide="trending-up"></i> <span data-i18n="mca_comps_title">Comparables de Mercado (MCA)</span></div>
           
           <div style="font-size: 0.75rem; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center;">
-            <div><strong>ARV MCA Sugerido:</strong> <span id="mca-suggested-arv" style="font-weight: bold; color: var(--color-radar-green);">$0</span></div>
+            <div><strong data-i18n="mca_suggested_label">ARV MCA Sugerido:</strong> <span id="mca-suggested-arv" style="font-weight: bold; color: var(--color-radar-green);">$0</span></div>
             <div id="mca-comps-count" style="color: var(--text-muted); font-size: 0.7rem;">(0 comparables)</div>
           </div>
           
-          <div style="font-size: 0.7rem; color: var(--text-muted); background: rgba(0,0,0,0.2); padding: 8px; border-radius: 4px; margin-bottom: 10px; border: 1px solid rgba(255,255,255,0.03); line-height: 1.4;" id="mca-target-profile">
+          <div style="font-size: 0.7rem; color: var(--text-muted); background: rgba(0,0,0,0.2); padding: 8px; border-radius: 4px; margin-bottom: 10px; border: 1px solid rgba(255,255,255,0.03); line-height: 1.4;" id="mca-target-profile" data-i18n="mca_querying">
             Cargando perfil del MLS...
           </div>
 
@@ -3292,10 +3267,10 @@
             <table style="width: 100%; border-collapse: collapse; font-size: 0.7rem; text-align: left;" id="mca-comps-table">
               <thead>
                 <tr style="border-bottom: 1px solid rgba(255,255,255,0.08); color: var(--text-muted); background: rgba(255,255,255,0.02);">
-                  <th style="padding: 6px; font-weight: 600;">Dirección</th>
-                  <th style="padding: 6px; text-align: right; font-weight: 600;">Precio</th>
-                  <th style="padding: 6px; text-align: right; font-weight: 600;">Beds/SqFt</th>
-                  <th style="padding: 6px; text-align: right; font-weight: 600;">Fecha</th>
+                  <th style="padding: 6px; font-weight: 600;" data-i18n="mca_th_address">Dirección</th>
+                  <th style="padding: 6px; text-align: right; font-weight: 600;" data-i18n="mca_th_price">Precio</th>
+                  <th style="padding: 6px; text-align: right; font-weight: 600;" data-i18n="mca_th_beds_sqft">Beds/SqFt</th>
+                  <th style="padding: 6px; text-align: right; font-weight: 600;" data-i18n="mca_th_date">Fecha</th>
                 </tr>
               </thead>
               <tbody id="mca-comps-tbody">
@@ -3307,7 +3282,7 @@
 
         <!-- Distress History / Timeline logs -->
         <div class="detail-card">
-          <div class="detail-card-title"><i data-lucide="file-text"></i> Registro de Distress Coincidentes</div>
+          <div class="detail-card-title"><i data-lucide="file-text"></i> <span data-i18n="distress_logs_title">Registro de Distress Coincidentes</span></div>
           <div id="distress-logs-container">
             <!-- Dynamically populated -->
           </div>
@@ -3315,7 +3290,7 @@
 
         <!-- OSINT Contacts -->
         <div class="detail-card">
-          <div class="detail-card-title"><i data-lucide="phone"></i> Contactos Cruzados Verificados</div>
+          <div class="detail-card-title"><i data-lucide="phone"></i> <span data-i18n="contacts_title">Contactos Cruzados Verificados</span></div>
           <div id="contacts-container">
             <!-- Dynamically populated -->
           </div>
@@ -3323,16 +3298,16 @@
 
         <!-- Call Script Generator -->
         <div class="detail-card">
-          <div class="detail-card-title"><i data-lucide="message-square"></i> Guion Táctico de Llamada</div>
+          <div class="detail-card-title"><i data-lucide="message-square"></i> <span data-i18n="script_title">Guion Táctico de Llamada</span></div>
           <div class="script-tabs" id="script-tabs-container">
             <!-- Tabs added dynamically depending on distress type -->
           </div>
           <div class="script-box">
             <button class="copy-script-btn" onclick="copyCallScript()">
               <i data-lucide="copy" class="inline-icon"></i>
-              Copiar
+              <span id="copy-script-btn-text" data-i18n="copy_btn_label">Copiar</span>
             </button>
-            <div id="call-script-content">
+            <div id="call-script-content" data-i18n="select_script_placeholder">
               Seleccione un guion táctico para iniciar la llamada.
             </div>
           </div>
@@ -3345,19 +3320,19 @@
   <!-- Bottom Metrics bar -->
   <footer class="metrics-bar">
     <div class="metric-card">
-      <span class="metric-label" id="lbl-metric-total">Total Alertas Encontradas</span>
+      <span class="metric-label" id="lbl-metric-total" data-i18n="metric_total_alerts">Total Alertas Encontradas</span>
       <span class="metric-value" id="metric-total">0</span>
     </div>
     <div class="metric-card">
-      <span class="metric-label" id="lbl-metric-high">Alta Motivación (🔥 Stacking)</span>
+      <span class="metric-label" id="lbl-metric-high" data-i18n="metric_high_motivation">Alta Motivación (🔥 Stacking)</span>
       <span class="metric-value red" id="metric-high">0</span>
     </div>
     <div class="metric-card">
-      <span class="metric-label" id="lbl-metric-avg-arv">PVA Promedio de la Zona</span>
+      <span class="metric-label" id="lbl-metric-avg-arv" data-i18n="metric_avg_pva">PVA Promedio de la Zona</span>
       <span class="metric-value" id="metric-avg-arv">$0</span>
     </div>
     <div class="metric-card">
-      <span class="metric-label" id="lbl-metric-avg-roi">Margen de Equidad Promedio</span>
+      <span class="metric-label" id="lbl-metric-avg-roi" data-i18n="metric_avg_equity">Margen de Equidad Promedio</span>
       <span class="metric-value green" id="metric-avg-roi">$0</span>
     </div>
   </footer>
@@ -3368,8 +3343,8 @@
       <div style="display: flex; align-items: center; gap: 15px;">
         <i data-lucide="dollar-sign" style="width: 32px; height: 32px; color: var(--color-radar-green-dark)"></i>
         <div>
-          <h1 style="font-family: 'Inter', sans-serif; font-weight: 800; font-size: 1.8rem; color: var(--text-main); margin: 0;">BÓVEDA DE EXCEDENTES</h1>
-          <p style="color: var(--text-muted); font-size: 0.85rem; margin: 4px 0 0 0;">Auditoría de Fondos Excedentes (Surplus Funds) Post-Subasta</p>
+          <h1 style="font-family: 'Inter', sans-serif; font-weight: 800; font-size: 1.8rem; color: var(--text-main); margin: 0;" data-i18n="surplus_vault_title">BÓVEDA DE EXCEDENTES</h1>
+          <p style="color: var(--text-muted); font-size: 0.85rem; margin: 4px 0 0 0;" data-i18n="surplus_vault_subtitle">Auditoría de Fondos Excedentes (Surplus Funds) Post-Subasta</p>
         </div>
       </div>
       <button id="close-surplus-btn" style="background: rgba(0,0,0,0.03); border: 1px solid var(--border-glass); color: var(--text-main); font-size: 1.5rem; width: 45px; height: 45px; border-radius: 50%; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; justify-content: center; outline: none;">&times;</button>
@@ -3380,21 +3355,21 @@
       <table class="ledger-table" style="width: 100%; border-collapse: collapse; text-align: left; font-size: 0.9rem; color: var(--text-main);">
         <thead>
           <tr style="border-bottom: 2px solid var(--border-glass); color: var(--text-muted); font-family: 'Inter', sans-serif; font-weight: 700; font-size: 0.8rem; letter-spacing: 0.5px;">
-            <th style="padding: 12px 16px;">EX-PROPIETARIO</th>
-            <th style="padding: 12px 16px;">DIRECCIÓN ORIGINAL</th>
-            <th style="padding: 12px 16px; text-align: right;">JUDGMENT AMOUNT</th>
-            <th style="padding: 12px 16px; text-align: right;">WINNING BID</th>
-            <th style="padding: 12px 16px; text-align: right; color: var(--color-radar-green-dark);">EXCEDENTE A RECLAMAR</th>
-            <th style="padding: 12px 16px;">TELÉFONO CELULAR</th>
-            <th style="padding: 12px 16px; text-align: center;">DÍAS DESDE SUBASTA</th>
-            <th style="padding: 12px 16px; text-align: center;">ACCIONES</th>
+            <th style="padding: 12px 16px;" data-i18n="surplus_th_owner">EX-PROPIETARIO</th>
+            <th style="padding: 12px 16px;" data-i18n="surplus_th_address">DIRECCIÓN ORIGINAL</th>
+            <th style="padding: 12px 16px; text-align: right;" data-i18n="surplus_th_judgment">JUDGMENT AMOUNT</th>
+            <th style="padding: 12px 16px; text-align: right;" data-i18n="surplus_th_winning_bid">WINNING BID</th>
+            <th style="padding: 12px 16px; text-align: right; color: var(--color-radar-green-dark);" data-i18n="surplus_th_surplus">EXCEDENTE A RECLAMAR</th>
+            <th style="padding: 12px 16px;" data-i18n="surplus_th_phone">TELÉFONO CELULAR</th>
+            <th style="padding: 12px 16px; text-align: center;" data-i18n="surplus_th_days">DÍAS DESDE SUBASTA</th>
+            <th style="padding: 12px 16px; text-align: center;" data-i18n="surplus_th_actions">ACCIONES</th>
           </tr>
         </thead>
         <tbody id="surplus-tbody">
           <!-- Dynamically populated via JS -->
         </tbody>
       </table>
-      <div id="surplus-empty-state" style="display: none; text-align: center; color: var(--text-muted); padding: 40px; font-size: 1rem;">
+      <div id="surplus-empty-state" style="display: none; text-align: center; color: var(--text-muted); padding: 40px; font-size: 1rem;" data-i18n="surplus_empty">
         No hay registros de fondos excedentes disponibles. Ejecuta el scraper de excedentes para poblar esta base.
       </div>
     </div>
@@ -3406,8 +3381,8 @@
       <div style="display: flex; align-items: center; gap: 15px;">
         <i data-lucide="shield" style="width: 32px; height: 32px; color: var(--color-radar-green-dark)"></i>
         <div>
-          <h1 style="font-family: 'Inter', sans-serif; font-weight: 800; font-size: 1.8rem; color: var(--text-main); margin: 0;">BÓVEDA DE DEUDA CERO</h1>
-          <p style="color: var(--text-muted); font-size: 0.85rem; margin: 4px 0 0 0;">Propiedades sin deudas activas o gravámenes detectados</p>
+          <h1 style="font-family: 'Inter', sans-serif; font-weight: 800; font-size: 1.8rem; color: var(--text-main); margin: 0;" data-i18n="zero_debt_title">BÓVEDA DE DEUDA CERO</h1>
+          <p style="color: var(--text-muted); font-size: 0.85rem; margin: 4px 0 0 0;" data-i18n="zero_debt_subtitle">Propiedades sin deudas activas o gravámenes detectados</p>
         </div>
       </div>
       <button id="close-zero-debt-btn" style="background: rgba(0,0,0,0.03); border: 1px solid var(--border-glass); color: var(--text-main); font-size: 1.5rem; width: 45px; height: 45px; border-radius: 50%; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; justify-content: center; outline: none;">&times;</button>
@@ -3418,20 +3393,20 @@
       <table class="ledger-table" style="width: 100%; border-collapse: collapse; text-align: left; font-size: 0.9rem; color: var(--text-main);">
         <thead>
           <tr style="border-bottom: 2px solid var(--border-glass); color: var(--text-muted); font-family: 'Inter', sans-serif; font-weight: 700; font-size: 0.8rem; letter-spacing: 0.5px;">
-            <th style="padding: 12px 16px;">PROPIETARIO / DEMANDADO</th>
-            <th style="padding: 12px 16px;">DIRECCIÓN</th>
-            <th style="padding: 12px 16px;">CONDADO / ESTADO</th>
-            <th style="padding: 12px 16px;">TIPO DE DEUDOR</th>
-            <th style="padding: 12px 16px;">TIPO REGISTRO</th>
-            <th style="padding: 12px 16px; text-align: center;">ESTATUS AUDITORÍA</th>
-            <th style="padding: 12px 16px; text-align: center;">ACCIONES</th>
+            <th style="padding: 12px 16px;" data-i18n="zero_debt_th_owner">PROPIETARIO / DEMANDADO</th>
+            <th style="padding: 12px 16px;" data-i18n="zero_debt_th_address">DIRECCIÓN</th>
+            <th style="padding: 12px 16px;" data-i18n="zero_debt_th_county_state">CONDADO / ESTADO</th>
+            <th style="padding: 12px 16px;" data-i18n="zero_debt_th_debtor_type">TIPO DE DEUDOR</th>
+            <th style="padding: 12px 16px;" data-i18n="zero_debt_th_record_type">TIPO REGISTRO</th>
+            <th style="padding: 12px 16px; text-align: center;" data-i18n="zero_debt_th_audit_status">ESTATUS AUDITORÍA</th>
+            <th style="padding: 12px 16px; text-align: center;" data-i18n="zero_debt_th_actions">ACCIONES</th>
           </tr>
         </thead>
         <tbody id="zero-debt-tbody">
           <!-- Dynamically populated via JS -->
         </tbody>
       </table>
-      <div id="zero-debt-empty-state" style="display: none; text-align: center; color: var(--text-muted); padding: 40px; font-size: 1rem;">
+      <div id="zero-debt-empty-state" style="display: none; text-align: center; color: var(--text-muted); padding: 40px; font-size: 1rem;" data-i18n="zero_debt_empty">
         No hay registros de propiedades con $0 deudas.
       </div>
     </div>
@@ -3440,11 +3415,11 @@
   <!-- Floating Comparison Bar -->
   <div id="comparison-bar" class="comparison-bar">
     <div class="comparison-info">
-      <span id="comparison-count">0</span> propiedades seleccionadas
+      <span id="comparison-count">0</span> <span data-i18n="comp_bar_selected">propiedades seleccionadas</span>
     </div>
     <div class="comparison-actions">
-      <button class="comp-action-btn-main" onclick="openComparisonModal()">Comparar Ahora</button>
-      <button class="comp-action-btn-sec" onclick="clearComparison()">Limpiar</button>
+      <button class="comp-action-btn-main" onclick="openComparisonModal()" data-i18n="comp_bar_action_compare">Comparar Ahora</button>
+      <button class="comp-action-btn-sec" onclick="clearComparison()" data-i18n="comp_bar_action_clear">Limpiar</button>
     </div>
   </div>
 
@@ -3493,12 +3468,402 @@
     let mapMarkers = new Map(); // key -> leaflet marker
     let financialFilter = 'all'; // 'all', 'deals', 'underwater', 'unvalued'
 
+    // Internationalization (i18n) Dictionary
+    const translations = {
+      es: {
+        header_radar_status: "Radar Activo - Jurisdicción KY/IN",
+        sidebar_mobile_title: "Filtros y Listado",
+        filters_title: "Filtros Operativos",
+        search_placeholder: "Buscar dirección o dueño...",
+        state_all: "Jurisdicción: Ambos Estados (KY / IN)",
+        state_ky: "Kentucky (KY)",
+        state_in: "Indiana (IN)",
+        filter_zip_label: "Filtrar por ZIP Code(s):",
+        zip_placeholder: "Ej: 40202, 40203, 47130 (comas o espacios)",
+        clear_zips: "Limpiar Zip Codes",
+        equity_spread_label: "Margen de Equidad Mínimo:",
+        active_debt_label: "Deuda Activa Mínima:",
+        distress_focus_title: "Foco de Distress",
+        pill_execution: "Ejecución",
+        pill_physical: "Físico",
+        pill_others: "Otros",
+        pill_multidistress: "Multi-Distress",
+        pill_favorites: "Favoritos",
+        financial_status_title: "Estatus Financiero",
+        btn_deals: "BUENOS DEALS",
+        btn_underwater: "BAJO EL AGUA",
+        btn_unvalued: "ESPERANDO POR DEUDA",
+        btn_surplus_vault: "Bóveda de Excedentes",
+        btn_zerodebt_vault: "Bóveda de Deuda Cero",
+        targets_list_title: "Lista de Objetivos",
+        loading_targets_db: "Cargando objetivos de Turso DB...",
+        zone_targets_title: "Objetivos en esta Zona",
+        loading_map_targets: "Cargando objetivos en el mapa...",
+        map_legend_title: "Temperatura de Equidad",
+        pin_red: "PIN ROJO: Subasta / Ejecución",
+        pin_red_desc: "Subasta sheriff programada con deuda judicial activa",
+        pin_orange: "PIN NARANJA: Pre-Foreclosure",
+        pin_orange_desc: "Caso recién radicado en corte (Lis Pendens / Demanda)",
+        pin_yellow_phys: "PIN AMARILLO: Distress Físico",
+        pin_yellow_phys_desc: "Infracciones de código, deterioro y reparaciones",
+        pin_blue: "PIN AZUL: Otros Leads",
+        pin_blue_desc: "Sucesiones, divorcios o deudas en seguimiento",
+        pin_clock: "PIN RELOJ: Esperando por Deuda",
+        pin_clock_desc: "Caso radicado pero deuda pendiente de publicación en corte",
+        pin_gold: "PIN DORADO: Favorito",
+        pin_gold_desc: "Propiedad priorizada manualmente",
+        map_style_title: "Estilo del Mapa",
+        style_light: "Mapa Claro",
+        style_satellite: "Satélite",
+        style_dark: "Modo Oscuro",
+        btn_auctions_floating: "Subastas",
+        upcoming_auctions_title: "Próximas Subastas",
+        timeline_tab_all: "Todas",
+        timeline_tab_top: "🏆 Top Oportunidades",
+        timeline_tab_15: "⚡ <15 Días",
+        timeline_tab_30: "30 Días",
+        timeline_tab_pre: "🟠 Pre-Foreclosure",
+        loading_timeline: "Cargando cronograma de subastas...",
+        opp_score_label: "TZEL Opportunity Score",
+        opp_action_label: "Acción Táctica Recomendada:",
+        target_overview_title: "Resumen del Objetivo",
+        prop_owner_label: "Propietario / Demandado",
+        prop_county_label: "Condado",
+        prop_owner_type_label: "Tipo de Dueño",
+        confidence_radar_title: "Radar de Confianza & Auditoría",
+        conf_geocoding: "Geocodificación",
+        conf_owner: "Titular Legal",
+        conf_debt: "Gravámenes",
+        underwriting_title: "Underwriting Multicapa & Precios Objetivo",
+        uw_arv_label: "ARV Proyectado",
+        uw_rehab_label: "Rehab Estimado",
+        uw_target_contract_label: "Target Contract Price",
+        uw_walkaway_label: "Walk-Away Price (Límite)",
+        uw_auction_maxbid_label: "Auction Max Bid",
+        uw_wholesale_fee_label: "Wholesale Fee Proyectado",
+        uw_search_commercial_value: "Buscar valor comercial:",
+        mca_comps_title: "Comparables de Mercado (MCA)",
+        mca_suggested_label: "ARV MCA Sugerido:",
+        mca_querying: "Cargando perfil del MLS...",
+        mca_th_address: "Dirección",
+        mca_th_price: "Precio",
+        mca_th_beds_sqft: "Beds/SqFt",
+        mca_th_date: "Fecha",
+        distress_logs_title: "Registro de Distress Coincidentes",
+        contacts_title: "Contactos Cruzados Verificados",
+        script_title: "Guion Táctico de Llamada",
+        copy_btn_label: "Copiar",
+        copied_btn_label: "¡Copiado!",
+        select_script_placeholder: "Seleccione un guion táctico para iniciar la llamada.",
+        metric_total_alerts: "Total Alertas Encontradas",
+        metric_high_motivation: "Alta Motivación (🔥 Stacking)",
+        metric_avg_pva: "PVA Promedio de la Zona",
+        metric_avg_equity: "Margen de Equidad Promedio",
+        surplus_vault_title: "BÓVEDA DE EXCEDENTES",
+        surplus_vault_subtitle: "Auditoría de Fondos Excedentes (Surplus Funds) Post-Subasta",
+        surplus_th_owner: "EX-PROPIETARIO",
+        surplus_th_address: "DIRECCIÓN ORIGINAL",
+        surplus_th_judgment: "JUDGMENT AMOUNT",
+        surplus_th_winning_bid: "WINNING BID",
+        surplus_th_surplus: "EXCEDENTE A RECLAMAR",
+        surplus_th_phone: "TELÉFONO CELULAR",
+        surplus_th_days: "DÍAS DESDE SUBASTA",
+        surplus_th_actions: "ACCIONES",
+        surplus_empty: "No hay registros de fondos excedentes disponibles. Ejecuta el scraper de excedentes para poblar esta base.",
+        zero_debt_title: "BÓVEDA DE DEUDA CERO",
+        zero_debt_subtitle: "Propiedades sin deudas activas o gravámenes detectados",
+        zero_debt_th_owner: "PROPIETARIO / DEMANDADO",
+        zero_debt_th_address: "DIRECCIÓN",
+        zero_debt_th_county_state: "CONDADO / ESTADO",
+        zero_debt_th_debtor_type: "TIPO DE DEUDOR",
+        zero_debt_th_record_type: "TIPO REGISTRO",
+        zero_debt_th_audit_status: "ESTATUS AUDITORÍA",
+        zero_debt_th_actions: "ACCIONES",
+        zero_debt_empty: "No hay registros de propiedades con $0 deudas.",
+        comp_bar_selected: "propiedades seleccionadas",
+        comp_bar_action_compare: "Comparar Ahora",
+        comp_bar_action_clear: "Limpiar",
+        no_targets_in_zone: "Ningún objetivo visible en esta zona del mapa.",
+        comp_view_tactical: "Ver Ficha Táctica",
+        card_pva_val: "Valor PVA",
+        card_total_debt: "Deuda Total",
+        card_mpo_offer: "Oferta MPO",
+        card_equity: "Equidad",
+        card_waiting_debt: "Por publicar",
+        card_compare_chk: "Comparar",
+        badge_high_motivation: "ALTA MOTIVACIÓN",
+        badge_absentee: "Absentee",
+        badge_preforeclosure: "PRE-FORECLOSURE",
+        badge_waiting_debt: "ESPERANDO DEUDA",
+        badge_high_equity: "ALTA EQUIDAD",
+        badge_hibernated: "Hibernado",
+        badge_review: "Review"
+      },
+      en: {
+        header_radar_status: "Radar Active - KY/IN Jurisdiction",
+        sidebar_mobile_title: "Filters & Targets",
+        filters_title: "Operational Filters",
+        search_placeholder: "Search address or owner...",
+        state_all: "Jurisdiction: Both States (KY / IN)",
+        state_ky: "Kentucky (KY)",
+        state_in: "Indiana (IN)",
+        filter_zip_label: "Filter by ZIP Code(s):",
+        zip_placeholder: "Ex: 40202, 40203, 47130 (commas or spaces)",
+        clear_zips: "Clear Zip Codes",
+        equity_spread_label: "Minimum Equity Spread:",
+        active_debt_label: "Minimum Active Debt:",
+        distress_focus_title: "Distress Focus",
+        pill_execution: "Foreclosure",
+        pill_physical: "Physical",
+        pill_others: "Others",
+        pill_multidistress: "Multi-Distress",
+        pill_favorites: "Favorites",
+        financial_status_title: "Financial Status",
+        btn_deals: "GOOD DEALS",
+        btn_underwater: "UNDERWATER",
+        btn_unvalued: "WAITING FOR DEBT",
+        btn_surplus_vault: "Surplus Funds Vault",
+        btn_zerodebt_vault: "Zero Debt Vault",
+        targets_list_title: "Target List",
+        loading_targets_db: "Loading targets from Turso DB...",
+        zone_targets_title: "Targets in this Area",
+        loading_map_targets: "Loading targets on map...",
+        map_legend_title: "Equity Temperature",
+        pin_red: "RED PIN: Auction / Foreclosure",
+        pin_red_desc: "Scheduled sheriff auction with active judgment debt",
+        pin_orange: "ORANGE PIN: Pre-Foreclosure",
+        pin_orange_desc: "Fresh court filing (Lis Pendens / Complaint)",
+        pin_yellow_phys: "YELLOW PIN: Physical Distress",
+        pin_yellow_phys_desc: "Code violations, blight, and major repairs",
+        pin_blue: "BLUE PIN: Other Leads",
+        pin_blue_desc: "Probate, divorce, or financial distress",
+        pin_clock: "CLOCK PIN: Waiting for Debt",
+        pin_clock_desc: "Case filed but debt pending court publication",
+        pin_gold: "GOLD PIN: Favorite",
+        pin_gold_desc: "Manually prioritized property",
+        map_style_title: "Map Style",
+        style_light: "Light Map",
+        style_satellite: "Satellite",
+        style_dark: "Dark Mode",
+        btn_auctions_floating: "Auctions",
+        upcoming_auctions_title: "Upcoming Auctions",
+        timeline_tab_all: "All",
+        timeline_tab_top: "🏆 Top Opportunities",
+        timeline_tab_15: "⚡ <15 Days",
+        timeline_tab_30: "30 Days",
+        timeline_tab_pre: "🟠 Pre-Foreclosure",
+        loading_timeline: "Loading auction timeline...",
+        opp_score_label: "TZEL Opportunity Score",
+        opp_action_label: "Recommended Tactical Action:",
+        target_overview_title: "Target Overview",
+        prop_owner_label: "Owner / Defendant",
+        prop_county_label: "County",
+        prop_owner_type_label: "Owner Type",
+        confidence_radar_title: "Confidence Radar & Audit",
+        conf_geocoding: "Geocoding",
+        conf_owner: "Legal Title",
+        conf_debt: "Encumbrances",
+        underwriting_title: "Multilayer Underwriting & Target Pricing",
+        uw_arv_label: "Projected ARV",
+        uw_rehab_label: "Estimated Rehab",
+        uw_target_contract_label: "Target Contract Price",
+        uw_walkaway_label: "Walk-Away Price (Limit)",
+        uw_auction_maxbid_label: "Auction Max Bid",
+        uw_wholesale_fee_label: "Projected Wholesale Fee",
+        uw_search_commercial_value: "Search commercial value:",
+        mca_comps_title: "Market Comparison Analysis (MCA)",
+        mca_suggested_label: "Suggested MCA ARV:",
+        mca_querying: "Loading MLS profile...",
+        mca_th_address: "Address",
+        mca_th_price: "Price",
+        mca_th_beds_sqft: "Beds/SqFt",
+        mca_th_date: "Date",
+        distress_logs_title: "Matching Distress Logs",
+        contacts_title: "Verified Cross Contacts",
+        script_title: "Tactical Call Script",
+        copy_btn_label: "Copy",
+        copied_btn_label: "Copied!",
+        select_script_placeholder: "Select a tactical script to initiate the call.",
+        metric_total_alerts: "Total Alerts Found",
+        metric_high_motivation: "High Motivation (🔥 Stacking)",
+        metric_avg_pva: "Area Average PVA",
+        metric_avg_equity: "Average Equity Spread",
+        surplus_vault_title: "SURPLUS FUNDS VAULT",
+        surplus_vault_subtitle: "Post-Auction Surplus Funds Audit",
+        surplus_th_owner: "FORMER OWNER",
+        surplus_th_address: "ORIGINAL ADDRESS",
+        surplus_th_judgment: "JUDGMENT AMOUNT",
+        surplus_th_winning_bid: "WINNING BID",
+        surplus_th_surplus: "SURPLUS TO CLAIM",
+        surplus_th_phone: "CELL PHONE",
+        surplus_th_days: "DAYS SINCE AUCTION",
+        surplus_th_actions: "ACTIONS",
+        surplus_empty: "No surplus records available. Run the surplus scraper to populate this database.",
+        zero_debt_title: "ZERO DEBT VAULT",
+        zero_debt_subtitle: "Properties with no active debt or encumbrances detected",
+        zero_debt_th_owner: "OWNER / DEFENDANT",
+        zero_debt_th_address: "ADDRESS",
+        zero_debt_th_county_state: "COUNTY / STATE",
+        zero_debt_th_debtor_type: "DEBTOR TYPE",
+        zero_debt_th_record_type: "RECORD TYPE",
+        zero_debt_th_audit_status: "AUDIT STATUS",
+        zero_debt_th_actions: "ACTIONS",
+        zero_debt_empty: "No zero-debt property records found.",
+        comp_bar_selected: "properties selected",
+        comp_bar_action_compare: "Compare Now",
+        comp_bar_action_clear: "Clear",
+        no_targets_in_zone: "No targets visible in this map area.",
+        comp_view_tactical: "View Tactical Card",
+        card_pva_val: "PVA Value",
+        card_total_debt: "Total Debt",
+        card_mpo_offer: "MPO Offer",
+        card_equity: "Equity",
+        card_waiting_debt: "Pending publication",
+        card_compare_chk: "Compare",
+        badge_high_motivation: "HIGH MOTIVATION",
+        badge_absentee: "Absentee",
+        badge_preforeclosure: "PRE-FORECLOSURE",
+        badge_waiting_debt: "WAITING FOR DEBT",
+        badge_high_equity: "HIGH EQUITY",
+        badge_hibernated: "Hibernated",
+        badge_review: "Review"
+      }
+    };
+
+    let currentLang = localStorage.getItem('tzel_lang') || 'es';
+
+    function setLanguage(lang) {
+      currentLang = lang;
+      localStorage.setItem('tzel_lang', lang);
+
+      const bg = document.getElementById('lang-switch-bg');
+      const btnEs = document.getElementById('lang-btn-es');
+      const btnEn = document.getElementById('lang-btn-en');
+
+      if (bg && btnEs && btnEn) {
+        if (lang === 'en') {
+          bg.style.left = '42px';
+          btnEn.classList.add('active');
+          btnEs.classList.remove('active');
+        } else {
+          bg.style.left = '2px';
+          btnEs.classList.add('active');
+          btnEn.classList.remove('active');
+        }
+      }
+
+      // Translate all DOM elements with data-i18n attributes
+      const dict = translations[lang] || translations.es;
+      document.querySelectorAll('[data-i18n]').forEach(el => {
+        const key = el.getAttribute('data-i18n');
+        if (dict[key]) {
+          el.textContent = dict[key];
+        }
+      });
+
+      // Translate placeholder attributes
+      document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
+        const key = el.getAttribute('data-i18n-placeholder');
+        if (dict[key]) {
+          el.setAttribute('placeholder', dict[key]);
+        }
+      });
+
+      // Translate title attributes
+      document.querySelectorAll('[data-i18n-title]').forEach(el => {
+        const key = el.getAttribute('data-i18n-title');
+        if (dict[key]) {
+          el.setAttribute('title', dict[key]);
+        }
+      });
+
+      // Re-render UI elements that generate dynamic text
+      if (allLeads && allLeads.length > 0) {
+        renderUI();
+        if (selectedLead) {
+          hydrateDrawer(selectedLead);
+        }
+      }
+    }
+
     // Favorites & Comparison State
     let favoriteKeys = JSON.parse(localStorage.getItem('tzel_favorites') || '[]');
     let comparedKeys = [];
     
-    // System Mode: 'investment' or 'disaster'
-    let activeSystemMode = 'investment';
+    // Multi-Zip Code Filter State
+    let activeZipCodes = [];
+
+    function initZipFilter() {
+      const zipInput = document.getElementById('zip-filter');
+      if (!zipInput) return;
+
+      zipInput.addEventListener('input', () => {
+        handleZipInput(zipInput.value);
+      });
+    }
+
+    function handleZipInput(val) {
+      // Extract 5-digit zip codes
+      const matches = val.match(/\b\d{5}\b/g);
+      if (matches) {
+        activeZipCodes = Array.from(new Set(matches));
+      } else {
+        const rawTokens = val.split(/[,;\s]+/).map(t => t.trim()).filter(t => t.length > 0);
+        activeZipCodes = Array.from(new Set(rawTokens));
+      }
+      renderZipChips();
+      applyFilters();
+    }
+
+    function renderZipChips() {
+      const container = document.getElementById('zip-chips-container');
+      const countBadge = document.getElementById('zip-count-badge');
+      const clearBtn = document.getElementById('clear-zip-btn');
+      
+      if (!container) return;
+      container.innerHTML = '';
+
+      if (activeZipCodes.length > 0) {
+        if (countBadge) {
+          countBadge.style.display = 'inline-block';
+          countBadge.textContent = `${activeZipCodes.length} zip${activeZipCodes.length > 1 ? 's' : ''}`;
+        }
+        if (clearBtn) clearBtn.style.display = 'block';
+
+        activeZipCodes.forEach(zip => {
+          const chip = document.createElement('span');
+          chip.className = 'zip-chip';
+          chip.innerHTML = `
+            <span>${zip}</span>
+            <button type="button" class="zip-chip-remove" onclick="removeZipChip('${zip}')" title="Quitar">&times;</button>
+          `;
+          container.appendChild(chip);
+        });
+      } else {
+        if (countBadge) countBadge.style.display = 'none';
+        if (clearBtn) clearBtn.style.display = 'none';
+      }
+    }
+
+    window.removeZipChip = function(zipToRemove) {
+      activeZipCodes = activeZipCodes.filter(z => z !== zipToRemove);
+      const zipInput = document.getElementById('zip-filter');
+      if (zipInput) {
+        zipInput.value = activeZipCodes.join(', ');
+      }
+      renderZipChips();
+      applyFilters();
+    };
+
+    window.clearZipFilter = function() {
+      activeZipCodes = [];
+      const zipInput = document.getElementById('zip-filter');
+      if (zipInput) {
+        zipInput.value = '';
+      }
+      renderZipChips();
+      applyFilters();
+    };
 
     // Variables para el arrastre / swipe del carrusel de fotos
     let isDraggingPhoto = false;
@@ -3513,6 +3878,8 @@
     // Initialize Map on load
     window.addEventListener('DOMContentLoaded', () => {
       initMap();
+      initZipFilter();
+      setLanguage(currentLang);
       fetchLeads();
       
       // Wire up event listeners
@@ -3523,7 +3890,6 @@
       document.getElementById('pill-others').addEventListener('change', applyFilters);
       document.getElementById('pill-stack').addEventListener('change', applyFilters);
       document.getElementById('pill-favorites').addEventListener('change', applyFilters);
-      document.getElementById('pill-roofing').addEventListener('change', applyFilters);
       document.getElementById('btn-surplus-vault').addEventListener('click', openSurplusVault);
       document.getElementById('close-surplus-btn').addEventListener('click', closeSurplusVault);
       document.getElementById('btn-zero-debt-vault').addEventListener('click', openZeroDebtVault);
@@ -3820,71 +4186,6 @@
       }
     };
 
-    function toggleSystemMode(event) {
-      if (event) event.stopPropagation();
-      const nextMode = (activeSystemMode === 'investment') ? 'disaster' : 'investment';
-      setSystemMode(nextMode);
-    }
-
-    function setSystemMode(mode) {
-      activeSystemMode = mode;
-      
-      const bg = document.getElementById('mode-switch-bg');
-      const btnInv = document.getElementById('mode-btn-investment');
-      const btnDis = document.getElementById('mode-btn-disaster');
-      
-      if (!bg || !btnInv || !btnDis) return;
-
-      if (mode === 'investment') {
-        bg.style.left = '2px';
-        bg.style.background = 'var(--color-radar-green)';
-        btnInv.classList.add('active');
-        btnDis.classList.remove('active');
-        
-        // Show investment elements
-        document.getElementById('investment-filters-group').style.display = 'block';
-        document.getElementById('disaster-filters-group').style.display = 'none';
-        
-        document.getElementById('investment-distress-section').style.display = 'block';
-        document.getElementById('investment-financial-section').style.display = 'block';
-        document.getElementById('investment-surplus-section').style.display = 'block';
-        document.getElementById('investment-zerodebt-section').style.display = 'block';
-      } else {
-        bg.style.left = '82px'; // Adjust nicely for 160px width
-        bg.style.background = '#06b6d4'; // Cyan color for storm mode
-        btnInv.classList.remove('active');
-        btnDis.classList.add('active');
-        
-        // Hide investment elements, show disaster elements
-        document.getElementById('investment-filters-group').style.display = 'none';
-        document.getElementById('disaster-filters-group').style.display = 'block';
-        
-        document.getElementById('investment-distress-section').style.display = 'none';
-        document.getElementById('investment-financial-section').style.display = 'none';
-        document.getElementById('investment-surplus-section').style.display = 'none';
-        document.getElementById('investment-zerodebt-section').style.display = 'none';
-      }
-      
-      // Close drawer if selected lead does not match the active mode
-      if (selectedLead) {
-        const matchesMode = (mode === 'disaster') ? isRoofingLeadCheck(selectedLead) : true;
-        if (!matchesMode) {
-          closeDrawer();
-        } else {
-          hydrateDrawer(selectedLead);
-        }
-      }
-      
-      renderUI();
-      lucide.createIcons();
-    }
-    
-    function isRoofingLeadCheck(lead) {
-      const isViol = lead.violations && lead.violations.some(v => (v.violation_type || '').toUpperCase().includes('ROOF') || (v.details || '').toLowerCase().includes('roof'));
-      const isDis = lead.physicalDistress && lead.physicalDistress.some(pd => ['Tornado Damage', 'Storm Damage', 'Hail Damage'].includes(pd.distress_type));
-      return isViol || isDis;
-    }
-
     function initMap() {
       // Coordinates default to Louisville, KY area (middle of KY & IN border)
       map = L.map('map', {
@@ -3992,59 +4293,42 @@
     function calculateFooterMetrics() {
       const filtered = getFilteredLeads();
       const totalCount = filtered.length;
+      const dict = translations[currentLang] || translations.es;
 
-      if (activeSystemMode === 'disaster') {
-        const tornadoCount = filtered.filter(l => l.physicalDistress && l.physicalDistress.some(pd => pd.distress_type === 'Tornado Damage')).length;
-        const stormHailCount = filtered.filter(l => l.physicalDistress && l.physicalDistress.some(pd => ['Storm Damage', 'Hail Damage'].includes(pd.distress_type))).length;
-        const roofViolCount = filtered.filter(l => l.violations && l.violations.some(v => (v.violation_type || '').toUpperCase().includes('ROOF') || (v.details || '').toLowerCase().includes('roof'))).length;
+      const highMotivationCount = filtered.filter(l => l.isHighMotivation).length;
+      
+      let totalPva = 0;
+      let validPvaCount = 0;
+      let totalSpread = 0;
+      let validSpreadCount = 0;
 
-        document.getElementById('lbl-metric-total').textContent = 'Total Daños y Reportes';
-        document.getElementById('metric-total').textContent = totalCount;
+      filtered.forEach(lead => {
+        const totalDebt = (lead.primaryDebt || 0) + (lead.hiddenMortgages || 0) + (lead.hiddenLiensAmount || 0);
+        const marketValue = (lead.auctions && lead.auctions.length > 0 && lead.auctions[0].appraisal_value > 0) ? lead.auctions[0].appraisal_value : (lead.mlsValue || 0);
+        const spread = marketValue - totalDebt;
 
-        document.getElementById('lbl-metric-high').textContent = 'Tornados Registrados (🌀)';
-        document.getElementById('metric-high').textContent = tornadoCount;
+        if (marketValue > 0) {
+          totalPva += marketValue;
+          validPvaCount++;
+        }
+        totalSpread += spread;
+        validSpreadCount++;
+      });
 
-        document.getElementById('lbl-metric-avg-arv').textContent = 'Tormentas / Vientos (⛈️)';
-        document.getElementById('metric-avg-arv').textContent = stormHailCount;
+      const avgPva = validPvaCount > 0 ? Math.round(totalPva / validPvaCount) : 0;
+      const avgSpread = validSpreadCount > 0 ? Math.round(totalSpread / validSpreadCount) : 0;
 
-        document.getElementById('lbl-metric-avg-roi').textContent = 'Infracciones de Techo (🏠)';
-        document.getElementById('metric-avg-roi').textContent = roofViolCount;
-      } else {
-        const highMotivationCount = filtered.filter(l => l.isHighMotivation).length;
-        
-        let totalPva = 0;
-        let validPvaCount = 0;
-        let totalSpread = 0;
-        let validSpreadCount = 0;
+      document.getElementById('lbl-metric-total').textContent = dict.metric_total_alerts;
+      document.getElementById('metric-total').textContent = totalCount;
 
-        filtered.forEach(lead => {
-          const totalDebt = (lead.primaryDebt || 0) + (lead.hiddenMortgages || 0) + (lead.hiddenLiensAmount || 0);
-          const marketValue = (lead.auctions && lead.auctions.length > 0 && lead.auctions[0].appraisal_value > 0) ? lead.auctions[0].appraisal_value : (lead.mlsValue || 0);
-          const spread = marketValue - totalDebt;
+      document.getElementById('lbl-metric-high').textContent = dict.metric_high_motivation;
+      document.getElementById('metric-high').textContent = highMotivationCount;
 
-          if (marketValue > 0) {
-            totalPva += marketValue;
-            validPvaCount++;
-          }
-          totalSpread += spread;
-          validSpreadCount++;
-        });
+      document.getElementById('lbl-metric-avg-arv').textContent = dict.metric_avg_pva;
+      document.getElementById('metric-avg-arv').textContent = `$${avgPva.toLocaleString()}`;
 
-        const avgPva = validPvaCount > 0 ? Math.round(totalPva / validPvaCount) : 0;
-        const avgSpread = validSpreadCount > 0 ? Math.round(totalSpread / validSpreadCount) : 0;
-
-        document.getElementById('lbl-metric-total').textContent = 'Total Alertas Encontradas';
-        document.getElementById('metric-total').textContent = totalCount;
-
-        document.getElementById('lbl-metric-high').textContent = 'Alta Urgencia (🔥 Multi-Distress)';
-        document.getElementById('metric-high').textContent = highMotivationCount;
-
-        document.getElementById('lbl-metric-avg-arv').textContent = 'PVA Promedio de la Zona';
-        document.getElementById('metric-avg-arv').textContent = `$${avgPva.toLocaleString()}`;
-
-        document.getElementById('lbl-metric-avg-roi').textContent = 'Margen de Equidad Promedio';
-        document.getElementById('metric-avg-roi').textContent = `$${avgSpread.toLocaleString()}`;
-      }
+      document.getElementById('lbl-metric-avg-roi').textContent = dict.metric_avg_equity;
+      document.getElementById('metric-avg-roi').textContent = `$${avgSpread.toLocaleString()}`;
     }
 
     function getDaysRemaining(dateStr) {
@@ -4106,108 +4390,50 @@
       const searchVal = document.getElementById('address-search').value.toLowerCase().trim();
       const stateVal = document.getElementById('state-filter').value;
       
-      if (activeSystemMode === 'disaster') {
-        const showTornado = document.getElementById('chk-dis-tornado').checked;
-        const showStorm = document.getElementById('chk-dis-storm').checked;
-        const showHail = document.getElementById('chk-dis-hail').checked;
-        const showViolation = document.getElementById('chk-dis-violation').checked;
-        const minEfVal = document.getElementById('dis-ef-filter').value;
-        const dateFilterVal = document.getElementById('dis-date-filter').value;
-
-        return allLeads.filter(lead => {
-          const isRoofViol = lead.violations && lead.violations.some(v => (v.violation_type || '').toUpperCase().includes('ROOF') || (v.details || '').toLowerCase().includes('roof'));
-          const disasters = lead.physicalDistress || [];
-          
-          const hasTornado = disasters.some(pd => pd.distress_type === 'Tornado Damage');
-          const hasStorm = disasters.some(pd => pd.distress_type === 'Storm Damage');
-          const hasHail = disasters.some(pd => pd.distress_type === 'Hail Damage');
-
-          // Check event checkboxes
-          let matchesType = false;
-          if (showTornado && hasTornado) matchesType = true;
-          if (showStorm && hasStorm) matchesType = true;
-          if (showHail && hasHail) matchesType = true;
-          if (showViolation && isRoofViol) matchesType = true;
-
-          if (!matchesType) return false;
-
-          // EF Scale Filter
-          if (hasTornado && minEfVal !== 'ALL') {
-            const firstTornado = disasters.find(pd => pd.distress_type === 'Tornado Damage');
-            const scaleStr = firstTornado ? (firstTornado.ef_scale || '') : '';
-            const scaleNum = parseInt(scaleStr.replace(/[^0-9]/g, '')) || 0;
-            const filterNum = parseInt(minEfVal.replace(/[^0-9]/g, '')) || 0;
-            if (scaleNum < filterNum) return false;
-          }
-
-          // Date Filter
-          if (dateFilterVal !== 'ALL') {
-            let dates = [];
-            disasters.forEach(d => { if (d.report_date) dates.push(new Date(d.report_date)); });
-            lead.violations?.forEach(v => { if (v.report_date) dates.push(new Date(v.report_date)); });
-            if (dates.length > 0) {
-              const maxDate = new Date(Math.max(...dates.map(d => d.getTime())));
-              const today = new Date();
-              const diffTime = today.getTime() - maxDate.getTime();
-              const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-              const maxAllowedDays = parseInt(dateFilterVal) || 90;
-              if (diffDays > maxAllowedDays) return false;
-            }
-          }
-
-          // Search text filter
-          const matchesSearch = 
-            lead.displayAddress.toLowerCase().includes(searchVal) ||
-            lead.ownerName.toLowerCase().includes(searchVal);
-          if (!matchesSearch) return false;
-
-          // State filter
-          if (stateVal !== 'ALL' && lead.state !== stateVal) return false;
-
-          return true;
-        });
-      }
-
       const showExecution = document.getElementById('pill-execution').checked;
       const showPhysical = document.getElementById('pill-physical').checked;
       const showOthers = document.getElementById('pill-others').checked;
       const showStackOnly = document.getElementById('pill-stack').checked;
       const showFavorites = document.getElementById('pill-favorites').checked;
-      const showRoofing = document.getElementById('pill-roofing').checked;
 
       const minEquity = parseFloat(document.getElementById('equity-spread-filter').value) || 0;
       const minDebt = parseFloat(document.getElementById('active-debt-filter').value) || 0;
 
       return allLeads.filter(lead => {
-        const isRoofingLead = (lead.violations && lead.violations.some(v => (v.violation_type || '').toUpperCase().includes('ROOF') || (v.details || '').toLowerCase().includes('roof'))) || 
-                              (lead.physicalDistress && lead.physicalDistress.some(pd => ['Tornado Damage', 'Storm Damage', 'Hail Damage'].includes(pd.distress_type)));
+        // 1. Strict Multi-Zip Code Filter
+        if (activeZipCodes.length > 0) {
+          const leadZip = (lead.zipCode || '').trim();
+          const fullAddr = (lead.displayAddress + ' ' + (lead.mailingAddress || '')).toLowerCase();
+          const matchesZip = activeZipCodes.some(z => {
+            const zClean = z.trim();
+            if (!zClean) return false;
+            if (leadZip && leadZip === zClean) return true;
+            return fullAddr.includes(zClean.toLowerCase());
+          });
+          if (!matchesZip) return false;
+        }
 
         const totalDebt = (lead.primaryDebt || 0) + (lead.hiddenMortgages || 0) + (lead.hiddenLiensAmount || 0);
         const marketValue = (lead.auctions && lead.auctions.length > 0 && lead.auctions[0].appraisal_value > 0) ? lead.auctions[0].appraisal_value : (lead.mlsValue || 0);
         const equitySpread = marketValue - totalDebt;
 
-        // Skip financial/debt filters if it's a roofing lead and the roofing filter is active
-        const bypassFinancial = showRoofing && isRoofingLead;
+        // Filtro de Deuda Activa Mínima (solo si el usuario mueve el slider)
+        if (minDebt > 0 && totalDebt < minDebt) return false;
 
-        if (!bypassFinancial) {
-          // Filtro de Deuda Activa Mínima (solo si el usuario mueve el slider)
-          if (minDebt > 0 && totalDebt < minDebt) return false;
+        // Filtro de Margen de Equidad Mínimo (solo si el usuario mueve el slider)
+        if (minEquity > 0 && marketValue > 0 && equitySpread < minEquity) return false;
 
-          // Filtro de Margen de Equidad Mínimo (solo si el usuario mueve el slider)
-          if (minEquity > 0 && marketValue > 0 && equitySpread < minEquity) return false;
-
-          // Filtro Financiero (Buenos Deals vs Bajo el Agua vs Esperando por Deuda)
-          const isGoodDeal = (marketValue > 0 && equitySpread >= Math.max(40000, marketValue * 0.30)) || (totalDebt > 0 && marketValue === 0);
-          const isUnderwater = marketValue > 0 && equitySpread < 0;
-          const isWaitingDebt = totalDebt === 0;
-          
-          if (financialFilter === 'deals') {
-            if (isWaitingDebt || isUnderwater) return false;
-          } else if (financialFilter === 'underwater') {
-            if (isWaitingDebt || !isUnderwater) return false;
-          } else if (financialFilter === 'unvalued') { // Esperando por Deuda
-            if (!isWaitingDebt) return false;
-          }
+        // Filtro Financiero (Buenos Deals vs Bajo el Agua vs Esperando por Deuda)
+        const isGoodDeal = (marketValue > 0 && equitySpread >= Math.max(40000, marketValue * 0.30)) || (totalDebt > 0 && marketValue === 0);
+        const isUnderwater = marketValue > 0 && equitySpread < 0;
+        const isWaitingDebt = totalDebt === 0;
+        
+        if (financialFilter === 'deals') {
+          if (isWaitingDebt || isUnderwater) return false;
+        } else if (financialFilter === 'underwater') {
+          if (isWaitingDebt || !isUnderwater) return false;
+        } else if (financialFilter === 'unvalued') { // Esperando por Deuda
+          if (!isWaitingDebt) return false;
         }
 
         // Favorites filter
@@ -4242,7 +4468,6 @@
         if (showExecution && hasAuctions) matchesCategory = true;
         if (showPhysical && hasPhysical) matchesCategory = true;
         if (showOthers && hasOthers) matchesCategory = true;
-        if (showRoofing && isRoofingLead) matchesCategory = true;
 
         if (!matchesCategory) return false;
 
@@ -4255,6 +4480,7 @@
       mapMarkers.clear();
       
       const filtered = getFilteredLeads();
+      const dict = translations[currentLang] || translations.es;
       
       // Order filtered leads by High Motivation (descending)
       filtered.sort((a, b) => (b.isHighMotivation ? 1 : 0) - (a.isHighMotivation ? 1 : 0));
@@ -4278,23 +4504,12 @@
           const hasAuctions = lead.auctions && lead.auctions.length > 0;
           const hasScheduledAuction = hasAuctions && lead.auctions.some(auc => getDaysRemaining(auc.auction_date) !== null);
           const hasPhysical = (lead.physicalDistress && lead.physicalDistress.length > 0) || (lead.violations && lead.violations.length > 0);
-
           const isFav = favoriteKeys.includes(lead.groupingKey);
-          const isDisaster = lead.physicalDistress && lead.physicalDistress.some(pd => ['Tornado Damage', 'Storm Damage', 'Hail Damage'].includes(pd.distress_type));
-          const isRoofViolation = lead.violations && lead.violations.some(v => (v.violation_type || '').toUpperCase().includes('ROOF') || (v.details || '').toLowerCase().includes('roof'));
 
           if (isFav) {
             markerColor = '#fbbf24';
             svgIconKey = 'star';
             markerClass = 'favorite-marker';
-          } else if (isDisaster) {
-            markerColor = '#06b6d4'; // Cyan
-            svgIconKey = 'tornado';
-            markerClass = 'disaster-storm';
-          } else if (isRoofViolation) {
-            markerColor = '#0891b2'; // Blue-Cyan
-            svgIconKey = 'cloudLightning';
-            markerClass = 'roofing-violation';
           } else if (hasScheduledAuction || (hasAuctions && totalDebt > 0)) {
             // SUBASTA SHERIFF / EJECUCIÓN (PIN ROJO)
             markerColor = '#ef4444';
@@ -4358,34 +4573,34 @@
               <div class="popup-body">
                 ${popupPhotoHtml}
                 <div class="popup-row">
-                  <span class="popup-row-label">Dueño:</span>
+                  <span class="popup-row-label">${dict.prop_owner_label}:</span>
                   <span class="popup-row-value">${lead.ownerName}</span>
                 </div>
                 <div class="popup-row">
-                  <span class="popup-row-label">Valor PVA:</span>
-                  <span class="popup-row-value">${marketValue > 0 ? '$' + marketValue.toLocaleString() : '<span style="color: var(--text-muted); font-style: italic;">Sin PVA registrado</span>'}</span>
+                  <span class="popup-row-label">${dict.card_pva_val}:</span>
+                  <span class="popup-row-value">${marketValue > 0 ? '$' + marketValue.toLocaleString() : '<span style="color: var(--text-muted); font-style: italic;">N/A</span>'}</span>
                 </div>
                 <div class="popup-row">
-                  <span class="popup-row-label">Deuda Total:</span>
-                  <span class="popup-row-value" style="color: ${totalDebt > 0 ? '#ef4444' : '#64748b'}; font-weight: bold;">${totalDebt > 0 ? '$' + totalDebt.toLocaleString() : '<span style="color: #64748b; font-style: italic;">🕒 Esperando por deuda</span>'}</span>
+                  <span class="popup-row-label">${dict.card_total_debt}:</span>
+                  <span class="popup-row-value" style="color: ${totalDebt > 0 ? '#ef4444' : '#64748b'}; font-weight: bold;">${totalDebt > 0 ? '$' + totalDebt.toLocaleString() : '<span style="color: #64748b; font-style: italic;">🕒 ' + dict.card_waiting_debt + '</span>'}</span>
                 </div>
                 <div class="popup-row">
-                  <span class="popup-row-label">Equidad Spread:</span>
-                  <span class="popup-row-value" style="color: ${marketValue > 0 ? (equitySpread > 40000 ? 'var(--color-radar-green)' : (equitySpread < 0 ? '#ef4444' : 'var(--text-main)')) : 'var(--text-muted)'}">${marketValue > 0 ? '$' + equitySpread.toLocaleString() : (totalDebt > 0 ? 'Deuda $' + totalDebt.toLocaleString() : 'Por calcular')}</span>
+                  <span class="popup-row-label">${dict.card_equity}:</span>
+                  <span class="popup-row-value" style="color: ${marketValue > 0 ? (equitySpread > 40000 ? 'var(--color-radar-green)' : (equitySpread < 0 ? '#ef4444' : 'var(--text-main)')) : 'var(--text-muted)'}">${marketValue > 0 ? '$' + equitySpread.toLocaleString() : (totalDebt > 0 ? '$' + totalDebt.toLocaleString() : '-')}</span>
                 </div>
                 <div class="popup-row">
-                  <span class="popup-row-label">Oferta MPO:</span>
-                  <span class="popup-row-value" style="color: ${mpo > 0 ? 'var(--color-radar-green)' : 'var(--text-muted)'}; font-weight: bold;">${mpo > 0 ? '$' + mpo.toLocaleString() : (totalDebt > 0 ? '$' + totalDebt.toLocaleString() : 'Por calcular')}</span>
+                  <span class="popup-row-label">${dict.card_mpo_offer}:</span>
+                  <span class="popup-row-value" style="color: ${mpo > 0 ? 'var(--color-radar-green)' : 'var(--text-muted)'}; font-weight: bold;">${mpo > 0 ? '$' + mpo.toLocaleString() : (totalDebt > 0 ? '$' + totalDebt.toLocaleString() : '-')}</span>
                 </div>
-                <button class="popup-btn" onclick="openLeadDrawer('${lead.groupingKey}')">Ver Ficha Táctica</button>
+                <button class="popup-btn" onclick="openLeadDrawer('${lead.groupingKey}')">${dict.comp_view_tactical}</button>
               </div>
               
-              <!-- Floating Zillow Button outside the card (stacked above Street View) -->
-              <a href="https://www.zillow.com/homes/${encodeURIComponent(lead.displayAddress)}" target="_blank" class="popup-zillow-floating-btn" title="Ver en Zillow" onclick="event.stopPropagation()">
+              <!-- Floating Zillow Button outside the card -->
+              <a href="https://www.zillow.com/homes/${encodeURIComponent(lead.displayAddress)}" target="_blank" class="popup-zillow-floating-btn" title="Zillow" onclick="event.stopPropagation()">
                 <img src="zillow-icon.png" style="width: 22px; height: 22px; object-fit: contain;" alt="Zillow">
               </a>
 
-              <!-- Floating Street View Button outside the card in the lower right corner -->
+              <!-- Floating Street View Button outside the card -->
               <a href="https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${lead.lat},${lead.lon}" target="_blank" class="popup-streetview-floating-btn" title="Street View" onclick="event.stopPropagation()">
                 <img src="street-view-icon.png" style="width: 22px; height: 22px; object-fit: contain;" alt="Street View">
               </a>
@@ -4408,6 +4623,8 @@
     }
 
     function updateCardsList() {
+      const dict = translations[currentLang] || translations.es;
+
       // 1. Get leads that match the sidebar filters
       const sidebarFiltered = getFilteredLeads();
       
@@ -4437,7 +4654,7 @@
       if (visibleLeads.length === 0) {
         container.innerHTML = `
           <div style="text-align: center; color: var(--text-muted); width: 100%; padding: 30px; font-size: 0.9rem; background: rgba(255,255,255,0.85); border-radius: 12px; border: 1px dashed var(--border-glass);">
-            Ningún objetivo visible en esta zona del mapa.
+            ${dict.no_targets_in_zone}
           </div>
         `;
         return;
@@ -4469,32 +4686,17 @@
         
         // Badges
         let badgesHtml = '';
-        if (isHigh) badgesHtml += `<span class="badge badge-high"><i data-lucide="flame" class="inline-icon"></i> ALTA MOTIVACIÓN</span>`;
-        if (isAbsentee) badgesHtml += `<span class="badge badge-absentee"><i data-lucide="user" class="inline-icon"></i> Absentee</span>`;
-        if (hasHibernated) badgesHtml += `<span class="badge" style="background: rgba(139, 92, 246, 0.15); color: #c084fc; border: 1px solid rgba(139, 92, 246, 0.3)"><i data-lucide="bot" class="inline-icon"></i> Hibernado</span>`;
-        if (hasManualReview) badgesHtml += `<span class="badge" style="background: rgba(239, 68, 68, 0.15); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.3)"><i data-lucide="alert-triangle" class="inline-icon"></i> Review</span>`;
+        if (isHigh) badgesHtml += `<span class="badge badge-high"><i data-lucide="flame" class="inline-icon"></i> ${dict.badge_high_motivation}</span>`;
+        if (isAbsentee) badgesHtml += `<span class="badge badge-absentee"><i data-lucide="user" class="inline-icon"></i> ${dict.badge_absentee}</span>`;
+        if (hasHibernated) badgesHtml += `<span class="badge" style="background: rgba(139, 92, 246, 0.15); color: #c084fc; border: 1px solid rgba(139, 92, 246, 0.3)"><i data-lucide="bot" class="inline-icon"></i> ${dict.badge_hibernated}</span>`;
+        if (hasManualReview) badgesHtml += `<span class="badge" style="background: rgba(239, 68, 68, 0.15); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.3)"><i data-lucide="alert-triangle" class="inline-icon"></i> ${dict.badge_review}</span>`;
         
-        if (activeSystemMode === 'investment') {
-          if (lead.preForeclosures && lead.preForeclosures.length > 0) {
-            badgesHtml += `<span class="badge" style="background: rgba(249, 115, 22, 0.15); color: #ea580c; border: 1px solid rgba(249, 115, 22, 0.3);"><i data-lucide="shield-alert" class="inline-icon"></i> PRE-FORECLOSURE</span>`;
-          } else if (totalDebt === 0) {
-            badgesHtml += `<span class="badge" style="background: rgba(100, 116, 139, 0.15); color: #64748b; border: 1px solid rgba(100, 116, 139, 0.3);"><i data-lucide="clock" class="inline-icon"></i> ESPERANDO DEUDA</span>`;
-          } else if (equitySpread > 40000) {
-            badgesHtml += `<span class="badge badge-equity-high" style="background: rgba(16, 185, 129, 0.15); color: var(--color-radar-green-dark); border: 1px solid var(--color-radar-green-border);"><i data-lucide="trending-up" class="inline-icon"></i> ALTA EQUIDAD</span>`;
-          }
-        } else {
-          // Disaster mode badges: Tornado or storm damage type
-          const disasters = lead.physicalDistress || [];
-          const isTornado = disasters.some(pd => pd.distress_type === 'Tornado Damage');
-          const isStorm = disasters.some(pd => pd.distress_type === 'Storm Damage');
-          const isHail = disasters.some(pd => pd.distress_type === 'Hail Damage');
-          const isViol = lead.violations && lead.violations.some(v => (v.violation_type || '').toUpperCase().includes('ROOF') || (v.details || '').toLowerCase().includes('roof'));
-          
-          if (isTornado) badgesHtml += `<span class="badge" style="background: rgba(6, 182, 212, 0.15); color: #0891b2; border: 1px solid rgba(6, 182, 212, 0.3);"><i data-lucide="tornado" class="inline-icon"></i> TORNADO</span>`;
-          else if (isStorm) badgesHtml += `<span class="badge" style="background: rgba(14, 116, 144, 0.15); color: #0e7490; border: 1px solid rgba(14, 116, 144, 0.3);"><i data-lucide="cloud-lightning" class="inline-icon"></i> TORMENTA</span>`;
-          else if (isHail) badgesHtml += `<span class="badge" style="background: rgba(3, 105, 161, 0.15); color: #0369a1; border: 1px solid rgba(3, 105, 161, 0.3);"><i data-lucide="cloud-drizzle" class="inline-icon"></i> GRANIZO</span>`;
-          
-          if (isViol) badgesHtml += `<span class="badge" style="background: rgba(180, 83, 9, 0.15); color: #b45309; border: 1px solid rgba(180, 83, 9, 0.3);"><i data-lucide="alert-circle" class="inline-icon"></i> MULTA TECHO</span>`;
+        if (lead.preForeclosures && lead.preForeclosures.length > 0) {
+          badgesHtml += `<span class="badge" style="background: rgba(249, 115, 22, 0.15); color: #ea580c; border: 1px solid rgba(249, 115, 22, 0.3);"><i data-lucide="shield-alert" class="inline-icon"></i> ${dict.badge_preforeclosure}</span>`;
+        } else if (totalDebt === 0) {
+          badgesHtml += `<span class="badge" style="background: rgba(100, 116, 139, 0.15); color: #64748b; border: 1px solid rgba(100, 116, 139, 0.3);"><i data-lucide="clock" class="inline-icon"></i> ${dict.badge_waiting_debt}</span>`;
+        } else if (equitySpread > 40000) {
+          badgesHtml += `<span class="badge badge-equity-high" style="background: rgba(16, 185, 129, 0.15); color: var(--color-radar-green-dark); border: 1px solid var(--color-radar-green-border);"><i data-lucide="trending-up" class="inline-icon"></i> ${dict.badge_high_equity}</span>`;
         }
 
         // Photos
@@ -4536,79 +4738,26 @@
           </a>
         `;
 
-        let compsHtml = '';
-        if (activeSystemMode === 'investment') {
-          compsHtml = `
-            <div class="lead-comps">
-              <div class="comp-item">
-                <span class="comp-label">Valor PVA</span>
-                <span class="comp-val">${marketValue > 0 ? '$' + marketValue.toLocaleString() : '<span style="color: var(--text-muted); font-size: 0.72rem;">N/A</span>'}</span>
-              </div>
-              <div class="comp-item">
-                <span class="comp-label">Deuda Total</span>
-                <span class="comp-val" style="color: ${totalDebt > 0 ? '#ef4444' : '#64748b'}">${totalDebt > 0 ? '$' + totalDebt.toLocaleString() : '<span style="color: #64748b; font-size: 0.7rem; font-style: italic;">Por publicar</span>'}</span>
-              </div>
-              <div class="comp-item">
-                <span class="comp-label">Oferta MPO</span>
-                <span class="comp-val" style="color: ${mpo > 0 ? 'var(--color-radar-green)' : 'var(--text-muted)'}; font-weight: bold;">${mpo > 0 ? '$' + mpo.toLocaleString() : (totalDebt > 0 ? '$' + totalDebt.toLocaleString() : '<span style="color: var(--text-muted); font-size: 0.7rem;">-</span>')}</span>
-              </div>
-              <div class="comp-item">
-                <span class="comp-label">Equidad</span>
-                <span class="comp-val" style="color: ${marketValue > 0 ? (equitySpread > 40000 ? 'var(--color-radar-green)' : (equitySpread < 0 ? '#ef4444' : 'var(--text-main)')) : 'var(--text-muted)'}">${marketValue > 0 ? '$' + equitySpread.toLocaleString() : '<span style="color: var(--text-muted); font-size: 0.7rem;">-</span>'}</span>
-              </div>
+        const compsHtml = `
+          <div class="lead-comps">
+            <div class="comp-item">
+              <span class="comp-label">${dict.card_pva_val}</span>
+              <span class="comp-val">${marketValue > 0 ? '$' + marketValue.toLocaleString() : '<span style="color: var(--text-muted); font-size: 0.72rem;">N/A</span>'}</span>
             </div>
-          `;
-        } else {
-          let eventType = "Desastre / Daño";
-          let intensity = "N/A";
-          let dateStr = "N/A";
-          let detailsSnippet = "Sin descripción de daño registrada.";
-
-          const disaster = lead.physicalDistress && lead.physicalDistress.find(pd => ['Tornado Damage', 'Storm Damage', 'Hail Damage'].includes(pd.distress_type));
-          const violation = lead.violations && lead.violations.find(v => (v.violation_type || '').toUpperCase().includes('ROOF') || (v.details || '').toLowerCase().includes('roof'));
-
-          if (disaster) {
-            eventType = disaster.distress_type === 'Tornado Damage' ? 'Tornado' : (disaster.distress_type === 'Hail Damage' ? 'Granizo' : 'Tormenta / Viento');
-            intensity = disaster.distress_type === 'Tornado Damage' ? (disaster.ef_scale || 'EF-N/A') : (disaster.wind_speed_est ? `${disaster.wind_speed_est} mph` : 'Viento');
-            dateStr = disaster.report_date || 'N/A';
-            detailsSnippet = disaster.nws_survey_details || disaster.details || 'Ver detalles del reporte NWS...';
-            if (detailsSnippet.includes('\n')) {
-              const lines = detailsSnippet.split('\n');
-              const cleanLines = lines.filter(l => !l.startsWith('[NOAA DAT ID:') && !l.startsWith('Estructura:') && !l.startsWith('Daño:') && !l.startsWith('Escala:'));
-              if (cleanLines.length > 0) {
-                detailsSnippet = cleanLines.join(' ');
-              }
-            }
-          } else if (violation) {
-            eventType = "Infracción Techo";
-            intensity = violation.violation_type || "X50-ROOF";
-            dateStr = violation.report_date || 'N/A';
-            detailsSnippet = violation.details || 'Violación de código municipal por estado del tejado.';
-          }
-
-          compsHtml = `
-            <div class="lead-comps">
-              <div class="comp-item">
-                <span class="comp-label">Evento</span>
-                <span class="comp-val" style="color: #06b6d4; font-weight: bold; text-transform: uppercase;">${eventType}</span>
-              </div>
-              <div class="comp-item">
-                <span class="comp-label">Intensidad</span>
-                <span class="comp-val" style="font-weight: bold;">${intensity}</span>
-              </div>
-              <div class="comp-item">
-                <span class="comp-label">Fecha</span>
-                <span class="comp-val" style="color: var(--text-muted); font-size: 0.68rem;">${dateStr}</span>
-              </div>
-              <div class="comp-item" style="grid-column: span 2; display: flex; flex-direction: column; align-items: flex-start; text-align: left; height: auto;">
-                <span class="comp-label" style="margin-bottom: 2px;">Detalle de Daño</span>
-                <span class="comp-val" style="font-size: 0.7rem; font-weight: normal; line-height: 1.25; max-height: 38px; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; color: var(--text-main);">
-                  ${detailsSnippet}
-                </span>
-              </div>
+            <div class="comp-item">
+              <span class="comp-label">${dict.card_total_debt}</span>
+              <span class="comp-val" style="color: ${totalDebt > 0 ? '#ef4444' : '#64748b'}">${totalDebt > 0 ? '$' + totalDebt.toLocaleString() : '<span style="color: #64748b; font-size: 0.7rem; font-style: italic;">' + dict.card_waiting_debt + '</span>'}</span>
             </div>
-          `;
-        }
+            <div class="comp-item">
+              <span class="comp-label">${dict.card_mpo_offer}</span>
+              <span class="comp-val" style="color: ${mpo > 0 ? 'var(--color-radar-green)' : 'var(--text-muted)'}; font-weight: bold;">${mpo > 0 ? '$' + mpo.toLocaleString() : (totalDebt > 0 ? '$' + totalDebt.toLocaleString() : '<span style="color: var(--text-muted); font-size: 0.7rem;">-</span>')}</span>
+            </div>
+            <div class="comp-item">
+              <span class="comp-label">${dict.card_equity}</span>
+              <span class="comp-val" style="color: ${marketValue > 0 ? (equitySpread > 40000 ? 'var(--color-radar-green)' : (equitySpread < 0 ? '#ef4444' : 'var(--text-main)')) : 'var(--text-muted)'}">${marketValue > 0 ? '$' + equitySpread.toLocaleString() : '<span style="color: var(--text-muted); font-size: 0.7rem;">-</span>'}</span>
+            </div>
+          </div>
+        `;
 
         card.innerHTML = `
           <div style="position: relative; width: 100%; height: 150px;">
@@ -4616,11 +4765,11 @@
             <div class="card-actions-wrapper" onclick="event.stopPropagation()">
               ${zillowHtml}
               ${streetViewHtml}
-              <label class="compare-check-label" title="Seleccionar para comparar">
+              <label class="compare-check-label" title="${dict.card_compare_chk}">
                 <input type="checkbox" class="compare-check-input" data-key="${lead.groupingKey}" onchange="handleCompareCheckbox(this)" ${comparedKeys.includes(lead.groupingKey) ? 'checked' : ''}>
-                <span>Comparar</span>
+                <span>${dict.card_compare_chk}</span>
               </label>
-              <button class="fav-btn ${favoriteKeys.includes(lead.groupingKey) ? 'fav-active' : ''}" onclick="toggleFavoriteCard(this, '${lead.groupingKey}')" title="Favorito">
+              <button class="fav-btn ${favoriteKeys.includes(lead.groupingKey) ? 'fav-active' : ''}" onclick="toggleFavoriteCard(this, '${lead.groupingKey}')" title="${dict.pill_favorites}">
                 <i data-lucide="star"></i>
               </button>
             </div>
@@ -5377,14 +5526,16 @@
         `;
       }
 
+      const dict = translations[currentLang] || translations.es;
+
       document.getElementById('prop-owner').textContent = lead.ownerName;
       document.getElementById('prop-county').textContent = `${lead.county}, ${lead.state}`;
       document.getElementById('prop-mls-id').textContent = lead.mlsId || 'N/A';
-      document.getElementById('prop-owner-type').textContent = lead.isAbsentee ? 'Propietario Ausente (Absentee)' : 'Residente';
+      document.getElementById('prop-owner-type').textContent = lead.isAbsentee ? dict.prop_owner_absentee : dict.prop_owner_resident;
       
       const beds = lead.beds || 'N/A';
       const baths = lead.baths || 'N/A';
-      document.getElementById('prop-beds-baths').textContent = (beds !== 'N/A' || baths !== 'N/A') ? `${beds} hab / ${baths} baños` : 'N/A';
+      document.getElementById('prop-beds-baths').textContent = (beds !== 'N/A' || baths !== 'N/A') ? `${beds} ${dict.lbl_beds} / ${baths} ${dict.lbl_baths}` : 'N/A';
       document.getElementById('prop-sqft').textContent = lead.sqft ? `${lead.sqft.toLocaleString()} SqFt` : 'N/A';
 
       // Confidence Radar & Forensic Verification Status
@@ -5458,53 +5609,10 @@
         if (alertBanner) {
           alertBanner.style.display = 'flex';
           const alertText = document.getElementById('uw-alert-text');
-          if (alertText) alertText.textContent = `Alerta Crítica: Propiedad Bajo el Agua (Deuda Total $${totalDebt.toLocaleString()} > Valor PVA $${pvaVal.toLocaleString()})`;
+          if (alertText) alertText.textContent = dict.uw_alert_underwater.replace('{debt}', totalDebt.toLocaleString()).replace('{pva}', pvaVal.toLocaleString());
         }
       } else {
         if (alertBanner) alertBanner.style.display = 'none';
-      }
-
-      // Toggle drawer cards based on Mode (Investment vs Disaster)
-      const investmentMetricsCard = document.getElementById('investment-metrics-card');
-      const disasterDamageCard = document.getElementById('disaster-damage-card');
-
-      if (activeSystemMode === 'disaster') {
-        if (investmentMetricsCard) investmentMetricsCard.style.display = 'none';
-        if (disasterDamageCard) {
-          disasterDamageCard.style.display = 'block';
-          
-          let eventType = "Desastre / Tormenta";
-          let efScale = "N/A";
-          let windSpeed = "N/A";
-          let dateStr = "N/A";
-          let notesStr = "No hay notas adicionales.";
-
-          const disaster = lead.physicalDistress && lead.physicalDistress.find(pd => ['Tornado Damage', 'Storm Damage', 'Hail Damage'].includes(pd.distress_type));
-          const violation = lead.violations && lead.violations.find(v => (v.violation_type || '').toUpperCase().includes('ROOF') || (v.details || '').toLowerCase().includes('roof'));
-
-          if (disaster) {
-            eventType = disaster.distress_type === 'Tornado Damage' ? 'Tornado' : (disaster.distress_type === 'Hail Damage' ? 'Granizo' : 'Tormenta / Viento');
-            efScale = disaster.ef_scale || 'N/A';
-            windSpeed = disaster.wind_speed_est ? `${disaster.wind_speed_est} mph` : 'N/A';
-            dateStr = disaster.report_date || 'N/A';
-            notesStr = disaster.nws_survey_details || disaster.details || 'Sin comentarios en el reporte del Servicio Meteorológico.';
-          } else if (violation) {
-            eventType = "Violación de Código de Techo";
-            efScale = "N/A";
-            windSpeed = "N/A";
-            dateStr = violation.report_date || 'N/A';
-            notesStr = `[VIOLACIÓN DE TECHO MUNICIPAL]\nCódigo: ${violation.violation_type || 'X50-ROOF'}\nDetalles del Código: ${violation.details || 'Falta de mantenimiento o daño visible en tejado.'}`;
-          }
-
-          document.getElementById('uw-disaster-type').textContent = eventType;
-          document.getElementById('uw-ef-scale').textContent = efScale;
-          document.getElementById('uw-wind-speed').textContent = windSpeed;
-          document.getElementById('uw-disaster-date').textContent = dateStr;
-          document.getElementById('uw-nws-details').textContent = notesStr;
-        }
-      } else {
-        if (investmentMetricsCard) investmentMetricsCard.style.display = 'block';
-        if (disasterDamageCard) disasterDamageCard.style.display = 'none';
       }
 
       // Fetch MCA dynamic comps
@@ -5514,11 +5622,11 @@
       const mcaCompsCount = document.getElementById('mca-comps-count');
       const mcaTargetProfile = document.getElementById('mca-target-profile');
 
-      if (activeSystemMode === 'investment') {
+      if (mcaCard) {
         mcaCard.style.display = 'block';
-        mcaTargetProfile.innerHTML = 'Consultando perfil en el MLS...';
-        mcaTbody.innerHTML = `<tr><td colspan="4" style="text-align: center; padding: 10px; color: var(--text-muted);">Consultando MLS...</td></tr>`;
-        mcaSuggestedArv.textContent = 'Calculando...';
+        mcaTargetProfile.innerHTML = dict.comp_loading_comps || 'Consultando perfil en el MLS...';
+        mcaTbody.innerHTML = `<tr><td colspan="4" style="text-align: center; padding: 10px; color: var(--text-muted);">${dict.comp_loading_comps || 'Consultando MLS...'}</td></tr>`;
+        mcaSuggestedArv.textContent = dict.comp_calculating || 'Calculando...';
         mcaCompsCount.textContent = '';
 
       fetch(`/api/mca?address=${encodeURIComponent(lead.displayAddress)}&state=${lead.state}`)
@@ -5526,7 +5634,7 @@
         .then(res => {
           if (res.status === 'success') {
             mcaSuggestedArv.textContent = `$${res.mcaArv.toLocaleString()}`;
-            mcaCompsCount.textContent = `(${res.compsCount} comparables)`;
+            mcaCompsCount.textContent = `(${res.compsCount} ${dict.comp_comparables_count || 'comparables'})`;
             
             document.getElementById('uw-mca-crudo').textContent = `$${res.mcaArv.toLocaleString()}`;
 
@@ -5554,7 +5662,7 @@
               const alertBanner = document.getElementById('uw-alert');
               if (isUnderwater) {
                 alertBanner.style.display = 'flex';
-                document.getElementById('uw-alert-text').textContent = `Alerta Crítica: Propiedad Bajo el Agua (Deuda Total $${totalDebt.toLocaleString()} > Valor $${pvaOrMca.toLocaleString()})`;
+                document.getElementById('uw-alert-text').textContent = dict.uw_alert_underwater.replace('{debt}', totalDebt.toLocaleString()).replace('{pva}', pvaOrMca.toLocaleString());
               } else {
                 alertBanner.style.display = 'none';
               }
@@ -5563,13 +5671,13 @@
             const t = res.target;
             let lastClosedText = t.lastClosedPrice ? `$${t.lastClosedPrice.toLocaleString()} (${t.lastClosedDate})` : 'Sin registros de cierre';
             mcaTargetProfile.innerHTML = `
-              <strong>Perfil MLS:</strong> ${t.beds} hab, ${t.baths} baños, ${t.sqft} SqFt | Zip: ${t.zip}<br>
-              <strong>Estatus Estándar:</strong> <span style="text-transform: uppercase; color: var(--color-radar-green);">${t.status}</span> | <strong>Última venta:</strong> ${lastClosedText}
+              <strong>Perfil MLS:</strong> ${t.beds} ${dict.lbl_beds}, ${t.baths} ${dict.lbl_baths}, ${t.sqft} SqFt | Zip: ${t.zip}<br>
+              <strong>Estatus:</strong> <span style="text-transform: uppercase; color: var(--color-radar-green);">${t.status}</span> | <strong>Última venta:</strong> ${lastClosedText}
             `;
 
             mcaTbody.innerHTML = '';
             if (res.comps.length === 0) {
-              mcaTbody.innerHTML = `<tr><td colspan="4" style="text-align: center; padding: 10px; color: var(--text-muted);">No se encontraron comparables en 365 días.</td></tr>`;
+              mcaTbody.innerHTML = `<tr><td colspan="4" style="text-align: center; padding: 10px; color: var(--text-muted);">${dict.comp_no_comps_found || 'No se encontraron comparables en 365 días.'}</td></tr>`;
             } else {
               res.comps.forEach(comp => {
                 const tr = document.createElement('tr');
@@ -5595,8 +5703,6 @@
           mcaTbody.innerHTML = `<tr><td colspan="4" style="text-align: center; padding: 10px; color: var(--text-muted);">Error del servidor.</td></tr>`;
           mcaSuggestedArv.textContent = 'Error';
         });
-      } else {
-        if (mcaCard) mcaCard.style.display = 'none';
       }
 
       // OSINT LLC/Owner Unmasking & OSM Auditor rendering
@@ -5974,11 +6080,12 @@ osintOsmCard.style.display = 'block';
 
       const scripts = {};
       const t = telephonyScripts || {};
+      const isEn = currentLang === 'en';
 
-      function addScript(key, defaultName, defaultIcon, defaultTemplate, condition) {
+      function addScript(key, defaultName, defaultIcon, defaultTemplateEs, defaultTemplateEn, condition) {
         if (!condition) return;
         const item = t[key] || {};
-        const template = item.template || defaultTemplate;
+        const template = item.template || (isEn ? defaultTemplateEn : defaultTemplateEs);
         
         let fscale = 'N/A';
         if (lead.physicalDistress) {
@@ -5987,10 +6094,10 @@ osintOsmCard.style.display = 'block';
         }
         
         let auctionDate = 'N/A';
-        let plaintiff = 'el banco';
+        let plaintiff = isEn ? 'the lender' : 'el banco';
         if (lead.auctions && lead.auctions.length > 0) {
           auctionDate = lead.auctions[0].auction_date || 'N/A';
-          plaintiff = lead.auctions[0].plaintiff || 'el banco';
+          plaintiff = lead.auctions[0].plaintiff || (isEn ? 'the lender' : 'el banco');
         }
         
         let violationType = 'N/A';
@@ -6015,129 +6122,103 @@ osintOsmCard.style.display = 'block';
         };
       }
 
-      // 1. Disaster Mode Roofing
-      const isDisaster = lead.physicalDistress && lead.physicalDistress.some(pd => ['Tornado Damage', 'Storm Damage', 'Hail Damage'].includes(pd.distress_type));
-      
-      addScript(
-        'roofing_clima', 
-        'Roofing Clima', 
-        'tornado', 
-        "[GUION DE RECONSTRUCCIÓN POR TORMENTA]\nHola, buenas tardes. ¿Hablo con {ownerName}? Le llamo respecto a la propiedad en {displayAddress}.\nEstaba revisando los reportes meteorológicos y de daños del Servicio Meteorológico Nacional (NWS) para su área y noté un registro de inspección de daños por tormenta/tornado ({fscale}) asociado a su dirección.\n¿Usted y su familia se encuentran bien? Quería comentarle que trabajamos directamente con propietarios en su zona ayudándoles con la reconstrucción y reparación urgente del techo.\nNosotros nos encargamos de documentar los daños estructurales y gestionar todo el reclamo directamente con su compañía de seguros para que usted no tenga que desembolsar dinero de su bolsillo para las reparaciones de emergencia.\n¿Estaría interesado en que hagamos una inspección gratuita del tejado esta semana para evaluar los daños y coordinar con su seguro?",
-        activeSystemMode === 'disaster' && categories.includes('roofing') && isDisaster
-      );
-
-      addScript(
-        'roofing_violacion', 
-        'Roofing Violación', 
-        'cloud-lightning', 
-        "[GUION DE VIOLACIÓN DE TECHO - ROOFING]\nHola, buenas tardes. ¿Hablo con {ownerName}? Le llamo en relación a su propiedad en {displayAddress}.\nRevisando los registros del departamento de obras y cumplimiento de códigos de la ciudad, noté una notificación activa de violación relacionada específicamente con el estado del techo (código X50-ROOF o similar).\nComo contratistas de tejados de servicio completo, ayudamos a propietarios a resolver estas multas de forma rápida y limpia. Ofrecemos financiamiento flexible y trabajamos directamente para subsanar la violación ante los inspectores municipales para que no siga acumulando cargos.\n¿Le interesaría recibir un presupuesto gratuito y sin compromiso para reparar el tejado y cerrar este caso municipal?",
-        activeSystemMode === 'disaster' && categories.includes('roofing') && !isDisaster
-      );
-
-      // 2. High Motivation (Investment mode)
+      // 1. High Motivation (Urgent)
       addScript(
         'alta_motivacion',
-        'Alta Mot.',
+        isEn ? 'High Motivation' : 'Alta Mot.',
         'flame',
         "[GUION ALTA MOTIVACIÓN - URGENTE]\nHola, buenas tardes. ¿Hablo con {ownerName}? Le llamo en relación con la propiedad en {displayAddress}.\nVi que tiene programada una subasta hipotecaria muy pronto y además cuenta con algunos reportes pendientes con la municipalidad.\nEntiendo perfectamente que esta situación es estresante. Represento a un fondo de inversión local. Nos especializamos en detener subastas de ejecución hipotecaria antes de la fecha límite cubriendo la deuda judicial de ${primaryDebt} directamente y absorbiendo las multas y reparaciones de inmediato, dejándole a usted con liquidez en mano y salvando su historial de crédito.\n¿Le interesaría revisar una propuesta de compra directa en efectivo hoy mismo antes de que la propiedad vaya a subasta pública?",
-        lead.isHighMotivation && activeSystemMode !== 'disaster'
+        "[HIGH MOTIVATION SCRIPT - URGENT]\nHello, good afternoon. Am I speaking with {ownerName}? I am calling regarding your property at {displayAddress}.\nI noticed there is a scheduled foreclosure auction coming up shortly as well as some municipal records.\nI completely understand that this situation can be stressful. I represent a local private real estate fund. We specialize in stopping foreclosure auctions before the cutoff deadline by paying off the court-ordered debt of ${primaryDebt} directly and absorbing all repairs and municipal fines, leaving you with cash in hand and protecting your credit.\nWould you be open to reviewing a direct, all-cash purchase proposal today before the property goes to public auction?",
+        lead.isHighMotivation
       );
 
-      // 3. Subasta
+      // 2. Foreclosure Auction
       addScript(
         'subasta',
-        'Subasta',
+        isEn ? 'Auction' : 'Subasta',
         'shield-alert',
         "[GUION DE SUBASTA HIPOTECARIA]\nHola, buenas tardes. ¿Hablo con {ownerName}? Le llamo respecto a la propiedad en {displayAddress}.\nVi en los registros de la corte del condado que tienen programada una subasta de ejecución hipotecaria para el {auctionDate} por la demanda presentada por {plaintiff}.\n¿Está enterado de esta fecha? Quería poner a su disposición nuestra ayuda. Nosotros podemos liquidar la deuda pendiente de ${primaryDebt} con el juzgado de forma directa para cancelar la subasta de inmediato. Esto le evita perder todo su capital acumulado y protege su récord crediticio de una ejecución formal.\n¿Le gustaría evaluar una oferta de rescate de capital hoy?",
-        categories.includes('auction') && activeSystemMode !== 'disaster'
+        "[FORECLOSURE AUCTION RESCUE SCRIPT]\nHello, good afternoon. Am I speaking with {ownerName}? I'm calling regarding the property at {displayAddress}.\nI reviewed the county court records and noticed a scheduled master commissioner auction set for {auctionDate} in the case filed by {plaintiff}.\nAre you aware of this upcoming date? We assist property owners by paying off the pending debt of ${primaryDebt} directly to the court to halt the auction immediately. This protects your remaining equity and shields your credit report from a formal foreclosure judgment.\nWould you like to review an equity buyout offer today?",
+        categories.includes('auction')
       );
 
-      // 4. Violación
+      // 3. Code Violation
       addScript(
         'violacion',
-        'Violación',
+        isEn ? 'Violation' : 'Violación',
         'alert-triangle',
         "[GUION DE VIOLACIÓN DE CÓDIGO]\nHola, buenas tardes. ¿Hablo con {ownerName}? Le llamo en relación a su propiedad ubicada en {displayAddress}.\nEstaba revisando los registros del departamento de cumplimiento de códigos y noté que tiene un caso activo abierto ({violationType}) y entiendo que las multas de la ciudad pueden acumularse con mucha rapidez.\nCompramos propiedades en su zona exactamente en el estado en que se encuentran (as-is), haciéndonos cargo de todas las reparaciones mayores necesarias y liquidando todas las multas acumuladas con la municipalidad en el momento del cierre. Así usted se desentiende de este problema sin gastar un solo dólar de su bolsillo.\n¿Estaría dispuesto a recibir una oferta de compra en efectivo por la propiedad?",
-        categories.includes('violation') && activeSystemMode !== 'disaster'
+        "[CODE VIOLATION RELIEF SCRIPT]\nHello, good afternoon. Am I speaking with {ownerName}? I'm reaching out regarding your property at {displayAddress}.\nI was reviewing municipal code enforcement records and noticed an active open violation ({violationType}). City fines can accumulate very quickly.\nWe purchase properties strictly as-is in your area, handling all necessary structural repairs and clearing municipal liens and fines at closing. You walk away with zero out-of-pocket expenses.\nWould you be open to receiving a direct cash offer on the property?",
+        categories.includes('violation')
       );
 
-      // 5. Probate
+      // 4. Probate
       addScript(
         'probate',
-        'Probate',
+        isEn ? 'Probate' : 'Probate',
         'file-text',
         "[GUION DE SUCESIONES - SENSIBLE]\nHola, buenas tardes. ¿Hablo con {ownerName}? Ante todo, mi más sincero pésame por la pérdida familiar.\nLe contacto con mucho respeto en relación con la sucesión del inmueble en {displayAddress}.\nSabemos que administrar una sucesión y una propiedad heredada a menudo implica trámites legales complejos, mantenimiento costoso o deudas atrasadas. Nosotros compramos propiedades heredadas directamente al contado, absorbiendo los costos del proceso de legalización que falten y nos encargamos de vaciar o limpiar la casa tal como esté.\n¿Tiene planes de conservar la propiedad o consideraría una oferta en efectivo sin compromiso de su parte?",
-        categories.includes('probate') && activeSystemMode !== 'disaster'
+        "[PROBATE / ESTATE SETTLEMENT SCRIPT]\nHello, good afternoon. Am I speaking with {ownerName}? Please accept my sincere condolences for your family loss.\nI am reaching out respectfully regarding the estate property at {displayAddress}.\nWe know managing an inherited property often brings legal complexities, back taxes, or costly maintenance. We buy inherited homes for cash, covering remaining probate closing costs and taking care of cleanout and repairs as-is.\nDo you have plans to keep the property, or would you consider a no-obligation cash offer?",
+        categories.includes('probate')
       );
 
-      // 6. Divorce
+      // 5. Divorce
       addScript(
         'divorce',
-        'Divorcio',
+        isEn ? 'Divorce' : 'Divorcio',
         'heart-off',
         "[GUION DE LIQUIDACIÓN RÁPIDA - NEUTRAL]\nHola, buenas tardes. ¿Hablo con {ownerName}? Le llamo de forma directa respecto a la propiedad en {displayAddress}.\nSomos un grupo de inversión local y compramos casas al contado en esta zona. Vi que esta propiedad podría estar disponible para una venta de liquidación rápida.\nNosotros nos encargamos de vaciar el inmueble, resolver problemas estructurales y liquidar adeudos de servicios municipales. Usted recibe su pago en efectivo sin tener que invertir dinero ni tiempo en reparaciones.\n¿Consideraría evaluar una oferta en efectivo en las condiciones actuales de la casa?",
-        categories.includes('divorce') && activeSystemMode !== 'disaster'
+        "[FAST LIQUIDATION / ASSET DIVISION SCRIPT]\nHello, good afternoon. Am I speaking with {ownerName}? I am reaching out regarding the property at {displayAddress}.\nWe are a local investment group purchasing properties directly for cash. We facilitate fast asset liquidations where both parties receive cash at closing without any agent commissions or repair expenses.\nWould you be open to exploring a clean cash offer on the house as-is?",
+        categories.includes('divorce')
       );
 
-      // 7. Bankruptcy
+      // 6. Bankruptcy
       addScript(
         'bankruptcy',
-        'Bancarrota',
+        isEn ? 'Bankruptcy' : 'Bancarrota',
         'trending-down',
         "[GUION DE BANCARROTA / REESTRUCTURACIÓN]\nHola, buenas tardes. ¿Hablo con {ownerName}? Le contacto respecto a la propiedad en {displayAddress}.\nTrabajamos frecuentemente con propietarios en procesos de reestructuración financiera. Podemos formular una oferta de compra formal en efectivo lista para ser sometida a la aprobación del juez de quiebras.\nEsto le permite liquidar a sus acreedores garantizados de forma rápida, deteniendo acumulaciones de intereses y liberando su capital restante de forma limpia antes de que finalice el proceso judicial.\n¿Podríamos coordinar esta propuesta con usted o con su abogado de bancarrotas?",
-        categories.includes('bankruptcy') && activeSystemMode !== 'disaster'
+        "[BANKRUPTCY COURT SALE SCRIPT]\nHello, good afternoon. Am I speaking with {ownerName}? I am contacting you regarding your property at {displayAddress}.\nWe work with homeowners undergoing financial restructuring. We can submit a formal cash purchase agreement tailored for bankruptcy trustee/court approval.\nThis enables you to satisfy secured claims rapidly, halt interest penalties, and extract your exempt equity cleanly.\nCould we coordinate a proposal with you or your bankruptcy attorney?",
+        categories.includes('bankruptcy')
       );
 
-      // 8. Physical
+      // 7. Physical Distress
       addScript(
         'physical',
-        'Físico',
+        isEn ? 'Physical Distress' : 'Físico',
         'hammer',
         "[GUION DE ESTRÉS FÍSICO / DAÑO SEVERO]\nHola, buenas tardes. ¿Hablo con {ownerName}? Le contacto respecto a la propiedad en {displayAddress}.\nRevisando los registros de seguridad e inspección urbana, notamos reportes por daños o suspensión de servicios. Nos especializamos en adquirir propiedades con problemas de mantenimiento severos en efectivo.\nNosotros nos encargamos de vaciar el inmueble, resolver problemas estructurales y liquidar adeudos de servicios municipales. Usted recibe su pago en efectivo sin tener que invertir dinero ni tiempo en reparaciones.\n¿Consideraría evaluar una oferta en efectivo en las condiciones actuales de la casa?",
-        categories.includes('physical') && activeSystemMode !== 'disaster'
+        "[HEAVY REHAB / PHYSICAL DISTRESS SCRIPT]\nHello, good afternoon. Am I speaking with {ownerName}? I am calling regarding your property at {displayAddress}.\nOur team specializes in buying homes with heavy physical distress or deferred maintenance. We purchase strictly as-is with all cleanout and structural rehabilitation covered by our fund.\nWould you be open to an all-cash offer in the home's present condition without making any repairs?",
+        categories.includes('physical')
       );
 
-      // 9. Financial
+      // 8. Financial Liens
       addScript(
         'financial',
-        'Finanzas',
+        isEn ? 'Financial Liens' : 'Finanzas',
         'scale',
         "[GUION DE ESTRÉS FINANCIERO / GRAVAMENES]\nHola, buenas tardes. ¿Hablo con {ownerName}? Le llamo en relación a la propiedad en {displayAddress}.\nRevisando los registros del condado, notamos algunos gravámenes pendientes o reclamaciones comerciales. Nuestro fondo adquiere propiedades directamente haciéndose cargo de saldar estas deudas pendientes en el momento de la compra.\nEsto le permite liberar el título de la casa de inmediato, detener recargos y recuperar una parte sustancial de su dinero en efectivo.\n¿Le interesaría recibir una oferta para liquidar la propiedad y saldar estos saldos pendientes de forma directa?",
-        categories.includes('financial') && activeSystemMode !== 'disaster'
+        "[FINANCIAL DISTRESS & LIEN CLEARANCE SCRIPT]\nHello, good afternoon. Am I speaking with {ownerName}? I am calling regarding the property at {displayAddress}.\nWe noticed recorded liens on title and want to offer a direct cash solution. We settle outstanding secondary encumbrances at closing so you walk away with clear title and cash in hand.\nWould you be interested in reviewing a direct buyout offer?",
+        categories.includes('financial')
       );
 
-      // 10. Life Event
+      // 9. Life Events
       addScript(
         'life_event',
-        'Evento Vida',
+        isEn ? 'Life Event' : 'Evento Vida',
         'alert-circle',
         "[GUION DE EVENTOS DE VIDA CRÍTICOS]\nHola, buenas tardes. ¿Hablo con {ownerName}? Le contacto en relación al inmueble en {displayAddress}.\nCompramos propiedades al contado de forma rápida y confidencial en su condado. Sabemos que a veces surgen situaciones imprevistas o cambios familiares que requieren liquidez de forma inmediata.\nPodemos formalizar un contrato de compra en 24 horas y cerrar la transacción en pocos días sin intermediarios, comisiones, ni visitas públicas al inmueble.\n¿Le gustaría evaluar una propuesta de compra rápida en efectivo hoy de forma totalmente privada?",
-        categories.includes('life-event') && activeSystemMode !== 'disaster'
+        "[MOTIVATED SELLER / LIFE TRANSITION SCRIPT]\nHello, good afternoon. Am I speaking with {ownerName}? I am calling regarding the property at {displayAddress}.\nWe buy properties for cash quickly and confidentially. If you're going through a relocation or major life transition and need prompt liquidity, we can execute a purchase contract in 24 hours with no realtor fees.\nWould you like to receive a private cash offer today?",
+        categories.includes('life-event')
       );
 
-      // 11. Roofing (non-disaster mode)
-      addScript(
-        'roofing_clima',
-        'Roofing Clima',
-        'tornado',
-        "[GUION DE RECONSTRUCCIÓN POR TORMENTA]\nHola, buenas tardes. ¿Hablo con {ownerName}? Le llamo respecto a la propiedad en {displayAddress}.\nEstaba revisando los reportes meteorológicos y de daños del Servicio Meteorológico Nacional (NWS) para su área y noté un registro de inspección de daños por tormenta/tornado ({fscale}) asociado a su dirección.\n¿Usted y su familia se encuentran bien? Quería comentarle que trabajamos directamente con propietarios en su zona ayudándoles con la reconstrucción y reparación urgente del techo.\nNosotros nos encargamos de documentar los daños estructurales y gestionar todo el reclamo directamente con su compañía de seguros para que usted no tenga que desembolsar dinero de su bolsillo para las reparaciones de emergencia.\n¿Estaría interesado en que hagamos una inspección gratuita del tejado esta semana para evaluar los daños y coordinar con su seguro?",
-        categories.includes('roofing') && activeSystemMode !== 'disaster' && isDisaster
-      );
-
-      addScript(
-        'roofing_violacion',
-        'Roofing Violación',
-        'cloud-lightning',
-        "[GUION DE VIOLACIÓN DE TECHO - ROOFING]\nHola, buenas tardes. ¿Hablo con {ownerName}? Le llamo en relación a su propiedad en {displayAddress}.\nRevisando los registros del departamento de obras y cumplimiento de códigos de la ciudad, noté una notificación activa de violación relacionada específicamente con el estado del techo (código X50-ROOF o similar).\nComo contratistas de tejados de servicio completo, ayudamos a propietarios a resolver estas multas de forma rápida y limpia. Ofrecemos financiamiento flexible y trabajamos directamente para subsanar la violación ante los inspectores municipales para que no siga acumulando cargos.\n¿Le interesaría recibir un presupuesto gratuito y sin compromiso para reparar el tejado y cerrar este caso municipal?",
-        categories.includes('roofing') && activeSystemMode !== 'disaster' && !isDisaster
-      );
-
-      // 12. General (Always available)
+      // 10. General (Always available)
       addScript(
         'general',
-        'General',
+        isEn ? 'General Purchase' : 'General',
         'phone',
         "[GUION GENERAL DE COMPRA DIRECTA]\nHola, buenas tardes. ¿Hablo con {ownerName}? Le llamo respecto a la propiedad en {displayAddress}.\nSomos inversionistas locales y compramos casas al contado en esta zona. No cobramos comisiones de intermediarios y compramos la casa en cualquier condición física.\n¿Ha considerado vender la propiedad o recibir una propuesta de compra en efectivo sin ningún compromiso de su parte?\nEstaremos listos para enviar una cotización formal en menos de 24 horas.",
+        "[GENERAL ALL-CASH PURCHASE SCRIPT]\nHello, good afternoon. Am I speaking with {ownerName}? I'm calling regarding your property at {displayAddress}.\nWe are local cash home buyers in this area. We buy homes as-is with zero closing fees or realtor commissions.\nHave you considered selling or receiving an all-cash offer on the property with no obligation?\nWe can have a formal offer delivered within 24 hours.",
         true
       );
 
@@ -6228,7 +6309,7 @@ osintOsmCard.style.display = 'block';
               <td style="text-align: center; color: var(--text-muted); padding: 14px 16px;">${daysStr}</td>
               <td style="text-align: center; padding: 14px 16px;">
                 <button class="copy-surplus-script-btn" onclick="copySurplusScript('${item.owner_name.replace(/'/g, "\\'")}', '${item.address.replace(/'/g, "\\'")}', '${item.county ? item.county.replace(/'/g, "\\'") : 'Jefferson'}', ${winningBid}, ${judgmentAmt}, ${surplusVal}, this)" style="background: var(--color-radar-green-pastel); border: 1px solid var(--color-radar-green-border); color: var(--color-radar-green-dark); padding: 6px 12px; border-radius: 30px; font-size: 0.75rem; cursor: pointer; transition: all 0.2s; font-family: 'Inter', sans-serif; font-weight: bold; outline: none;">
-                  Copiar Guión
+                  ${(translations[currentLang] || translations.es).surplus_col_action || 'Copiar Guión'}
                 </button>
               </td>
             `;
@@ -6250,7 +6331,13 @@ osintOsmCard.style.display = 'block';
     }
 
     window.copySurplusScript = function(ownerName, address, county, winningBid, judgmentAmt, surplusVal, btn) {
-      const script = `[GUION DE RECLAMACIÓN DE EXCEDENTES]
+      const isEn = currentLang === 'en';
+      const script = isEn ? `[SURPLUS FUNDS RECOVERY SCRIPT]
+Hello, good afternoon. Am I speaking with ${ownerName}? I am calling regarding the property you owned at ${address}.
+My name is with TZEL. We performed a surplus funds audit in ${county} County and discovered that the foreclosure auction of your property concluded at $${winningBid.toLocaleString('en-US', { minimumFractionDigits: 2 })}, which exceeded the court-ordered judgment amount of $${judgmentAmt.toLocaleString('en-US', { minimumFractionDigits: 2 })}. This generated an excess surplus of $${surplusVal.toLocaleString('en-US', { minimumFractionDigits: 2 })} currently held in the court registry.
+This money legally belongs to you, but if unclaimed within the statutory deadline it will permanently escheat to the state. We assist owners in recovering 100% of these funds with zero upfront costs on a pure contingency basis.
+Would you be open to having us initiate your claim today?`
+      : `[GUION DE RECLAMACIÓN DE EXCEDENTES]
 Hola, buenas tardes. ¿Hablo con ${ownerName}? Le llamo en relación a la propiedad que tenía en ${address}.
 Mi nombre es de TZEL. Hemos realizado una auditoría de fondos excedentes en el condado de ${county} y descubrimos que la subasta de su propiedad se cerró por un valor de $${winningBid.toLocaleString('en-US', { minimumFractionDigits: 2 })} dólares, lo cual superó la deuda reclamada por el juzgado de $${judgmentAmt.toLocaleString('en-US', { minimumFractionDigits: 2 })} dólares. Esto generó un excedente a su favor por $${surplusVal.toLocaleString('en-US', { minimumFractionDigits: 2 })} dólares que se encuentra actualmente retenido en la tesorería del juzgado.
 Este dinero le pertenece legalmente a usted, pero si no se reclama a tiempo puede pasar al estado de forma definitiva (caducidad). Nosotros le ayudamos a tramitar y recuperar el 100% de estos fondos sin costo inicial, cobrando solo a contra-resultado.
@@ -6258,7 +6345,7 @@ Este dinero le pertenece legalmente a usted, pero si no se reclama a tiempo pued
 
       navigator.clipboard.writeText(script).then(() => {
         const originalText = btn.innerHTML;
-        btn.innerHTML = '¡Copiado!';
+        btn.innerHTML = isEn ? 'Copied!' : '¡Copiado!';
         btn.style.background = 'var(--color-radar-green)';
         btn.style.color = '#ffffff';
         setTimeout(() => {
@@ -6319,6 +6406,7 @@ Este dinero le pertenece legalmente a usted, pero si no se reclama a tiempo pued
     function populateZeroDebtVault() {
       const tbody = document.getElementById('zero-debt-tbody');
       const emptyState = document.getElementById('zero-debt-empty-state');
+      const dict = translations[currentLang] || translations.es;
       
       tbody.innerHTML = '';
       
@@ -6341,19 +6429,19 @@ Este dinero le pertenece legalmente a usted, pero si no se reclama a tiempo pued
         let typeColor = 'var(--text-muted)';
         
         if (lead.auctions && lead.auctions.length > 0) {
-          typeText = 'Subasta judicial';
+          typeText = currentLang === 'en' ? 'Judicial Auction' : 'Subasta judicial';
           typeColor = 'var(--color-execution-orange)';
         } else if (lead.violations && lead.violations.length > 0) {
-          typeText = 'Violación de código';
+          typeText = currentLang === 'en' ? 'Code Violation' : 'Violación de código';
           typeColor = 'var(--color-physical-amber)';
         } else if (lead.financialDistress && lead.financialDistress.length > 0) {
-          typeText = 'Estrés financiero';
+          typeText = currentLang === 'en' ? 'Financial Distress' : 'Estrés financiero';
           typeColor = 'var(--color-financial-yellow)';
         }
         
         const tcStatus = lead.titleCheckStatus || 'pending';
         const tcColor = tcStatus === 'success' ? 'var(--color-radar-green)' : (tcStatus === 'failed' ? 'var(--color-execution-red)' : 'var(--text-muted)');
-        const tcText = tcStatus === 'success' ? 'VERIFICADO $0' : (tcStatus === 'failed' ? 'FALLIDO' : 'PENDIENTE');
+        const tcText = tcStatus === 'success' ? (currentLang === 'en' ? 'VERIFIED $0' : 'VERIFICADO $0') : (tcStatus === 'failed' ? (currentLang === 'en' ? 'FAILED' : 'FALLIDO') : (currentLang === 'en' ? 'PENDING' : 'PENDIENTE'));
 
         const searchEscaped = encodeURIComponent(lead.displayAddress);
         const zillowUrl = `https://www.zillow.com/homes/${searchEscaped}`;
@@ -6363,14 +6451,14 @@ Este dinero le pertenece legalmente a usted, pero si no se reclama a tiempo pued
           <td style="padding: 12px 16px; font-weight: bold; color: var(--text-main);">${lead.ownerName}</td>
           <td style="padding: 12px 16px; color: var(--text-main);">${lead.displayAddress}</td>
           <td style="padding: 12px 16px; color: var(--text-muted);">${lead.county}, ${lead.state}</td>
-          <td style="padding: 12px 16px; color: var(--text-main);">${lead.isAbsentee ? 'Ausente' : 'Residente'}</td>
+          <td style="padding: 12px 16px; color: var(--text-main);">${lead.isAbsentee ? dict.prop_owner_absentee : dict.prop_owner_resident}</td>
           <td style="padding: 12px 16px;"><span class="badge" style="background: var(--bg-darker); color: ${typeColor}; border: 1px solid ${typeColor};">${typeText}</span></td>
           <td style="padding: 12px 16px; text-align: center;"><span class="badge" style="background: var(--bg-darker); color: ${tcColor}; border: 1px solid ${tcColor};">${tcText}</span></td>
           <td style="padding: 12px 16px; text-align: center;">
             <div style="display: flex; gap: 8px; justify-content: center;">
               <a href="${zillowUrl}" target="_blank" class="contact-action-btn" style="background: rgba(0, 106, 255, 0.08); border-color: rgba(0, 106, 255, 0.2); color: #2563eb; text-decoration: none; display: inline-flex; align-items: center;">Zillow <i data-lucide="external-link" class="inline-icon" style="width: 10px; height: 10px; margin-left: 2px;"></i></a>
               <a href="${redfinUrl}" target="_blank" class="contact-action-btn" style="background: rgba(220, 38, 38, 0.08); border-color: rgba(220, 38, 38, 0.2); color: #dc2626; text-decoration: none; display: inline-flex; align-items: center;">Redfin <i data-lucide="external-link" class="inline-icon" style="width: 10px; height: 10px; margin-left: 2px;"></i></a>
-              <button onclick="closeZeroDebtVault(); window.openLeadDrawer('${lead.groupingKey}')" class="contact-action-btn" style="background: var(--color-radar-green-pastel); border-color: var(--color-radar-green-border); color: var(--color-radar-green-dark); cursor: pointer;">Ficha Táctica</button>
+              <button onclick="closeZeroDebtVault(); window.openLeadDrawer('${lead.groupingKey}')" class="contact-action-btn" style="background: var(--color-radar-green-pastel); border-color: var(--color-radar-green-border); color: var(--color-radar-green-dark); cursor: pointer;">${dict.comp_view_tactical || 'Ficha Táctica'}</button>
             </div>
           </td>
         `;
