@@ -1,4 +1,5 @@
 import axios from "axios";
+import { isValidReachableUSPhone, formatPhoneUs, normalizePhoneNumber } from "../intelligence/phone_classifier";
 import * as dotenv from "dotenv";
 
 dotenv.config();
@@ -340,13 +341,27 @@ export class BatchDataClient {
         const apiPhones = person.phoneNumbers || [];
         const apiEmails = person.emails || [];
 
-        for (const p of apiPhones) {
-          phones.push({
-            number: p.number || p.phone,
-            type: p.type || "Unknown",
-            isDNC: p.dnc || p.tcpa || false,
-            carrier: p.carrier
-          });
+        // Ordenar: Móviles primero, luego por score de confianza descendente
+        const sortedApiPhones = [...apiPhones].sort((a, b) => {
+          const aIsMobile = (a.type || "").toLowerCase().includes("mobile") || (a.type || "").toLowerCase().includes("cell");
+          const bIsMobile = (b.type || "").toLowerCase().includes("mobile") || (b.type || "").toLowerCase().includes("cell");
+          const aScore = (a.score || 50) + (aIsMobile ? 100 : 0) + (a.reachable ? 20 : 0);
+          const bScore = (b.score || 50) + (bIsMobile ? 100 : 0) + (b.reachable ? 20 : 0);
+          return bScore - aScore;
+        });
+
+        for (const p of sortedApiPhones) {
+          const rawNum = String(p.number || p.phone || "").replace(/\D/g, "");
+          if (isValidReachableUSPhone(rawNum)) {
+            const formatted = formatPhoneUs(normalizePhoneNumber(rawNum));
+            const isMobile = (p.type || "").toLowerCase().includes("mobile") || (p.type || "").toLowerCase().includes("cell");
+            phones.push({
+              number: formatted,
+              type: isMobile ? "Mobile" : "Landline",
+              isDNC: p.dnc || p.tcpa || false,
+              carrier: p.carrier
+            });
+          }
         }
 
         for (const e of apiEmails) {

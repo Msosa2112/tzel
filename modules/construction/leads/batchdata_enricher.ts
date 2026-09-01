@@ -1,4 +1,5 @@
 import axios from "axios";
+import { isValidReachableUSPhone, formatPhoneUs, normalizePhoneNumber } from "../../../intelligence/phone_classifier";
 import * as dotenv from "dotenv";
 
 dotenv.config();
@@ -79,13 +80,23 @@ export async function enrichPropertyWithBatchData(
 
     const phoneNumbers: string[] = [];
     if (Array.isArray(person.phoneNumbers)) {
-      for (const p of person.phoneNumbers) {
+      // Ordenar: Móviles primero, luego por score de confianza descendente
+      const sortedPhones = [...person.phoneNumbers].sort((a, b) => {
+        const aIsMobile = (a.type || "").toLowerCase().includes("mobile") || (a.type || "").toLowerCase().includes("cell");
+        const bIsMobile = (b.type || "").toLowerCase().includes("mobile") || (b.type || "").toLowerCase().includes("cell");
+        const aScore = (a.score || 50) + (aIsMobile ? 100 : 0) + (a.reachable ? 20 : 0);
+        const bScore = (b.score || 50) + (bIsMobile ? 100 : 0) + (b.reachable ? 20 : 0);
+        return bScore - aScore;
+      });
+
+      for (const p of sortedPhones) {
         if (p.number) {
           const raw = String(p.number).replace(/\D/g, "");
-          if (raw.length === 10) {
-            phoneNumbers.push(`(${raw.slice(0, 3)}) ${raw.slice(3, 6)}-${raw.slice(6)}`);
-          } else if (raw.length === 11 && raw.startsWith("1")) {
-            phoneNumbers.push(`(${raw.slice(1, 4)}) ${raw.slice(4, 7)}-${raw.slice(7)}`);
+          if (isValidReachableUSPhone(raw)) {
+            const formatted = formatPhoneUs(normalizePhoneNumber(raw));
+            if (!phoneNumbers.includes(formatted)) {
+              phoneNumbers.push(formatted);
+            }
           }
         }
       }

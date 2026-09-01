@@ -1,6 +1,8 @@
 import axios from "axios";
 import { createClient } from "@supabase/supabase-js";
 import { enrichPropertyWithBatchData } from "./batchdata_enricher";
+import { isValidReachableUSPhone, formatPhoneUs, normalizePhoneNumber } from "../../../intelligence/phone_classifier";
+import * as crypto from "crypto";
 import dotenv from "dotenv";
 
 dotenv.config();
@@ -69,58 +71,85 @@ export async function collectLouisvilleCodeViolations(limit: number = 25) {
     const features = response.data?.features || [];
     console.log(`📡 Infracciones exteriores detectadas en Louisville Metro: ${features.length}`);
 
+    // Agrupar infracciones por dirección física normalizada para evitar tarjetas duplicadas
+    const addressGroups = new Map<string, any[]>();
     for (const f of features) {
       const a = f.attributes;
       if (!a || !a.FullAddress) continue;
+      const cleanAddr = a.FullAddress.trim().toUpperCase();
+      if (!addressGroups.has(cleanAddr)) {
+        addressGroups.set(cleanAddr, []);
+      }
+      addressGroups.get(cleanAddr)!.push(a);
+    }
 
-      const address = a.FullAddress.trim();
-      const code = (a.VIOLATION_CODE || "X19").trim();
-      const rawDesc = a.GUIDE_ITEM_TEXT || "Infracción de mantenimiento exterior requerida por el ayuntamiento.";
-      const citationAmount = a.CitationAmount ? `$${a.CitationAmount} USD` : "Citación / Plazo de corrección";
-      const leadRef = `LEAD_METRO_CODE_${a.ObjectId || a.PARCEL_ID || Buffer.from(address).toString("base64").slice(0, 16)}`;
+    console.log(`🏠 Inmuebles únicos consolidados: ${addressGroups.size}`);
+
+    for (const [cleanAddr, violations] of addressGroups.entries()) {
+      const first = violations[0];
+      const address = first.FullAddress.trim();
+      const addrHash = crypto.createHash("md5").update(cleanAddr).digest("hex").slice(0, 12);
+      const leadRef = `LEAD_METRO_CODE_${addrHash}`;
+
+      // Recopilar todos los códigos y descripciones de esta propiedad
+      const codes = Array.from(new Set(violations.map((v: any) => (v.VIOLATION_CODE || "X19").trim()))).join(", ");
+      const rawDesc = violations.map((v: any) => `• [${v.VIOLATION_CODE || "Código"}]: ${v.GUIDE_ITEM_TEXT || "Requerimiento municipal"}`).join("\n");
+      const citationAmounts = violations.map((v: any) => v.CitationAmount ? `$${v.CitationAmount}` : "Plazo de corrección").join(" / ");
 
       // 🛡️ PROTECCIÓN DE SALDO: Verificar en Supabase ANTES de consultar BatchData
       const { data: existing } = await supabase
         .from("contacts")
-        .select("id, phone, first_name, last_name")
-        .eq("external_ref", leadRef)
+        .select("id, phone, first_name, last_name, address")
+        .or(`external_ref.eq.${leadRef},address.eq.${address}`)
         .maybeSingle();
 
-      if (existing && existing.phone) {
-        console.log(`  ⚡ [SALDO PROTEGIDO] Lead ya enriquecido en BD (${existing.first_name} | ${existing.phone}). Omitiendo consulta de pago.`);
-        qualifiedLeads.push(existing);
-        continue;
+      let validPhone: string | null = null;
+      if (existing && existing.phone && isValidReachableUSPhone(existing.phone)) {
+        validPhone = existing.phone;
+        console.log(`  ⚡ [SALDO PROTEGIDO] Lead ya enriquecido en BD (${existing.first_name} | ${validPhone}).`);
       }
 
       let category = "RENOVATION_REMODEL";
       let estimatedValue = 6500;
-      if (code.includes("X50") || rawDesc.toLowerCase().includes("roof")) {
+      if (codes.includes("X50") || rawDesc.toLowerCase().includes("roof")) {
         category = "ROOFING_SIDING_GUTTERS";
-        estimatedValue = 11500;
-      } else if (code.includes("X19") || rawDesc.toLowerCase().includes("siding")) {
+        estimatedValue = 12500;
+      } else if (codes.includes("X19") || rawDesc.toLowerCase().includes("siding")) {
         category = "ROOFING_SIDING_GUTTERS";
         estimatedValue = 8500;
-      } else if (code.includes("X40")) {
+      } else if (codes.includes("X40")) {
         category = "PORCH_DECK_PATIO";
         estimatedValue = 5500;
       }
 
-      // Solo consultar BatchData si es un lead 100% nuevo y el saldo está habilitado
-      console.log(`🔍 [BATCHDATA] Skip-Tracing nuevo para: ${address}...`);
-      const enriched = await enrichPropertyWithBatchData(address);
+      let ownerName = (existing?.first_name && existing.first_name !== "Propietario") 
+        ? `${existing.first_name} ${existing.last_name || ""}`.trim()
+        : "Propietario Inmueble";
+      let email: string | null = null;
+      let ownerTypeStr = "🏠 Propietario Residente";
 
-      const ownerName = enriched?.ownerName || "Propietario Inmueble";
-      const phone = enriched?.primaryPhone || null;
-      const email = enriched?.primaryEmail || null;
-      const ownerTypeStr = enriched?.isAbsenteeOwner 
-        ? `🏢 Inversionista / Propietario No Residente (Mailing: ${enriched.mailingAddress})`
-        : `🏠 Propietario Residente`;
+      if (!validPhone) {
+        console.log(`🔍 [BATCHDATA] Skip-Tracing nuevo para: ${address}...`);
+        const enriched = await enrichPropertyWithBatchData(address);
+        if (enriched) {
+          if (enriched.ownerName && enriched.ownerName !== "Propietario") {
+            ownerName = enriched.ownerName;
+          }
+          if (enriched.primaryPhone && isValidReachableUSPhone(enriched.primaryPhone)) {
+            validPhone = formatPhoneUs(normalizePhoneNumber(enriched.primaryPhone));
+          }
+          email = enriched.primaryEmail || null;
+          if (enriched.isAbsenteeOwner) {
+            ownerTypeStr = `🏢 Inversionista / Propietario No Residente (Mailing: ${enriched.mailingAddress})`;
+          }
+        }
+      }
 
-      const aiAnalysis = await classifyViolationWithGemini(address, ownerName, code, rawDesc);
+      const aiAnalysis = await classifyViolationWithGemini(address, ownerName, codes, rawDesc);
       const finalCategory = aiAnalysis?.serviceCategory || category;
       const finalValue = aiAnalysis?.estimatedBudget || estimatedValue;
-      const summary = aiAnalysis?.summarySpanish || `Citación municipal ${code}: Reparación obligatoria de fachada/techo. Multa potencial: ${citationAmount}`;
-      const pitch = aiAnalysis?.salesSpeech || `Hola ${ownerName}, le contactamos de Barba Construction en Louisville. Brindamos servicios autorizados para corregir citaciones del código municipal ${code} con garantía y precios justos.`;
+      const summary = aiAnalysis?.summarySpanish || `Citación municipal (${codes}): Reparación obligatoria de fachada/techo. Multa potencial: ${citationAmounts}`;
+      const pitch = aiAnalysis?.salesSpeech || `Hola ${ownerName}, le contactamos de Barba Construction en Louisville. Brindamos servicios autorizados para corregir citaciones del código municipal (${codes}) con garantía y precios justos antes de que se venzan los plazos.`;
 
       const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`;
       const cleanStreet = address.split(",")[0].trim();
@@ -128,12 +157,12 @@ export async function collectLouisvilleCodeViolations(limit: number = 25) {
 
       const nameParts = ownerName.split(/\s+/);
       const firstName = nameParts[0] || "Propietario";
-      const lastName = nameParts.slice(1).join(" ") || `(Infracción Ciudad: ${code})`;
+      const lastName = nameParts.slice(1).join(" ") || `(Citación: ${codes})`;
 
       const leadObj = {
         first_name: firstName,
         last_name: lastName,
-        phone: phone,
+        phone: validPhone || null,
         email: email,
         address: address,
         city: "Louisville",
@@ -142,17 +171,17 @@ export async function collectLouisvilleCodeViolations(limit: number = 25) {
         pipeline_status: "new_lead",
         lead_quality: "hot",
         external_ref: leadRef,
-        notes: `🚨 INFRACCIÓN MUNICIPAL DE FACHADA/TECHO (Louisville Code Enforcement):\n📌 Citación: Código ${code} | Estado: ${a.GUIDE_ITEM_STATUS || "No Compliance"} | Multa: ${citationAmount}\n👤 Propietario Registrado: ${ownerName} (${ownerTypeStr})\n🏠 Inmueble: ${address}\n🎯 NECESIDAD: ${finalCategory}\n💰 VALOR ESTIMADO: $${finalValue} USD\n🔥 URGENCIA: HIGH\n📋 Requerimiento: ${summary}\n\n🔍 REGISTROS PÚBLICOS: ${truePeopleSearchUrl}\n🗺️ VER UBICACIÓN EN MAPS: ${mapsUrl}\n\n=========================================\n💬 SPEECH DE VENTA RECOMENDADO (ESPAÑOL - DM / WHATSAPP):\n"${pitch}"\n\n💬 SALES PITCH (ENGLISH):\n"Hi ${ownerName}, we are contacting you from Barba Construction regarding city code citation ${code} for your property at ${cleanStreet}. We specialize in fast, licensed exterior repairs to resolve citations before deadlines."\n\n📞 APERTURA TELEFÓNICA:\n"Hola ${ownerName}, le llamo de Barba Construction en Louisville con respecto a los servicios de reparación de fachada y techo para su propiedad en ${cleanStreet}."`
+        notes: `🚨 INFRACCIÓN MUNICIPAL DE FACHADA/TECHO (Louisville Code Enforcement):\n📌 Citaciones Activas: Códigos ${codes} | Multa estimada: ${citationAmounts}\n👤 Propietario Registrado: ${ownerName} (${ownerTypeStr})\n🏠 Inmueble: ${address}\n🎯 NECESIDAD: ${finalCategory}\n💰 VALOR ESTIMADO: $${finalValue} USD\n🔥 URGENCIA: HIGH\n📋 Requerimiento:\n${rawDesc}\n\n🔍 REGISTROS PÚBLICOS: ${truePeopleSearchUrl}\n🗺️ VER UBICACIÓN EN MAPS: ${mapsUrl}\n\n=========================================\n💬 SPEECH DE VENTA RECOMENDADO (ESPAÑOL - DM / WHATSAPP):\n"${pitch}"\n\n💬 SALES PITCH (ENGLISH):\n"Hi ${ownerName}, we are contacting you from Barba Construction regarding city code citation ${codes} for your property at ${cleanStreet}. We specialize in fast, licensed exterior repairs to resolve citations before deadlines."\n\n📞 APERTURA TELEFÓNICA:\n"Hola ${ownerName}, le llamo de Barba Construction en Louisville con respecto a los servicios de reparación de fachada y techo para su propiedad en ${cleanStreet}."`
       };
 
       if (existing) {
         await supabase.from("contacts").update(leadObj).eq("id", existing.id);
-        console.log(`  🔄 [ENRIQUECIDO ACTUALIZADO] ${ownerName} | Tel: ${phone || "Buscador manual"} | ${address}`);
+        console.log(`  🔄 [ENRIQUECIDO ACTUALIZADO/UNIFICADO] ${ownerName} | Tel: ${validPhone || "Buscador manual"} | ${address}`);
         qualifiedLeads.push(leadObj);
       } else {
         const { error: insertErr } = await supabase.from("contacts").insert(leadObj);
         if (!insertErr) {
-          console.log(`  🎉 [NUEVO LEAD ENRIQUECIDO] ${ownerName} | Tel: ${phone || "Buscador manual"} | ${address}`);
+          console.log(`  🎉 [NUEVO LEAD ENRIQUECIDO] ${ownerName} | Tel: ${validPhone || "Buscador manual"} | ${address}`);
           qualifiedLeads.push(leadObj);
         } else {
           console.warn(`  ⚠️ Error insertando en Supabase:`, insertErr.message);

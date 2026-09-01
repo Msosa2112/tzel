@@ -4,7 +4,7 @@ import { ConstructionLead } from "../types";
 import { syncLeadToBarbaPro } from "../integrations/barbapro_bridge";
 import { queryLojicArcGIS } from "../../../services/lojic_gis_client";
 import { searchOSINTContacts } from "../../../intelligence/osint_scraper";
-import { classifyPhone } from "../../../intelligence/phone_classifier";
+import { classifyPhone, isValidReachableUSPhone } from "../../../intelligence/phone_classifier";
 import { chromium } from "playwright-extra";
 import stealthPlugin from "puppeteer-extra-plugin-stealth";
 import * as path from "path";
@@ -191,9 +191,10 @@ export async function runDeepAddressOwnerEnricher(limit: number = 30) {
     }
 
     // --- ACTUALIZAR EN TURSO DB Y BARBAPRO CRM SI SE ENCONTRÓ INFORMACIÓN ---
-    if (resolvedName || resolvedPhones.length > 0) {
+    const validPhones = resolvedPhones.filter(isValidReachableUSPhone);
+    if (resolvedName || validPhones.length > 0) {
       enrichedCount++;
-      const classifiedPhones = resolvedPhones.map(p => {
+      const classifiedPhones = validPhones.map(p => {
         const c = classifyPhone(p);
         return `${c.type === "MOBILE" ? "📱" : "☎️"} ${c.formatted || p}`;
       });
@@ -206,7 +207,7 @@ export async function runDeepAddressOwnerEnricher(limit: number = 30) {
       const updatedLead: ConstructionLead = {
         leadId: String(row.lead_id),
         category: (row.category || "ROOFING_SIDING_GUTTERS") as any,
-        triggerEvent: String(row.trigger_event || "CODE_VIOLATION_ROOF_DAMAGE"),
+        triggerEvent: String(row.trigger_event || "CODE_VIOLATION_ROOF_DAMAGE") as any,
         address: rawAddr,
         county: String(row.county || "Jefferson"),
         state: String(row.state || "KY"),

@@ -171,11 +171,35 @@ export function isJuniorLien(plaintiff: string | null, caseNumber: string | null
 }
 
 /**
- * Determina si una propiedad es de Alta Rentabilidad (High Yield).
- * Criterio Real: El Equity Neto respecto al Avalúo Judicial Oficial (MCA / Appraisal Value) debe ser de al menos el 20%.
- * Margen: (MCA - Deuda Primaria - Deudas Ocultas) >= MCA * 0.20
- * Esto equivale a que la Deuda Total no supere el 80% del valor del avalúo pericial.
+ * Determina si una propiedad es de Alta Rentabilidad para Inversión / Wholesaling Rápido.
+ * REGLAS DE NEGOCIO:
+ * 1. Techo de Valor (Fast-Moving): ARV <= $350,000 USD (propiedades de rotación rápida).
+ * 2. Margen Bruto Mínimo: (Valor Real - Deuda Total) >= $50,000 USD.
+ * Si no cumple estas dos condiciones, se desestima para ahorrar tiempo y saldo de skip-tracing.
  */
+export function isHighYieldProperty(
+  arv: number,
+  primaryDebt: number,
+  hiddenMortgages: number = 0,
+  hiddenLiensAmount: number = 0,
+  minSpread: number = 50000,
+  maxArv: number = 350000
+): boolean {
+  if (arv <= 0 || primaryDebt <= 0) return false;
+  
+  // 1. Descartar si el valor de la propiedad supera los $350k (mercado lento)
+  if (arv > maxArv) return false;
+
+  // 2. Calcular deuda total
+  const totalDebt = primaryDebt + (hiddenMortgages || 0) + (hiddenLiensAmount || 0);
+
+  // 3. Margen bruto directo (Valor Real - Deuda Total)
+  const spread = arv - totalDebt;
+
+  // 4. Debe tener al menos $50,000 de margen
+  return spread >= minSpread;
+}
+
 export interface InstitutionalUnderwriting {
   arv: number;
   rehab: number;

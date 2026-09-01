@@ -2,6 +2,7 @@ import { createClient } from "@supabase/supabase-js";
 import axios from "axios";
 import { db } from "../../../db";
 import { ConstructionLead } from "../types";
+import { isValidReachableUSPhone, formatPhoneUs, normalizePhoneNumber } from "../../../intelligence/phone_classifier";
 import * as dotenv from "dotenv";
 
 dotenv.config();
@@ -123,9 +124,10 @@ ${lead.rawDetails}`;
     else if (lead.sourcePortal.toLowerCase().includes('google')) sourceId = 'google';
     else sourceId = 'other';
 
-    // Limpiar teléfono y email
+    // Limpiar y validar teléfono y email
     const rawPhone = lead.ownerPhones?.[0] || "";
-    const cleanPhone = rawPhone.replace(/^(OSINT:|BatchData \(Mobile\):|BatchData \(Landline\):|BatchData \(Landline \[DNC\]\):|📱|☎️)\s*/i, "").trim();
+    const unmaskedPhone = rawPhone.replace(/^(OSINT:|BatchData \(Mobile\):|BatchData \(Landline\):|BatchData \(Landline \[DNC\]\):|📱|☎️)\s*/i, "").trim();
+    const validPhone = isValidReachableUSPhone(unmaskedPhone) ? formatPhoneUs(normalizePhoneNumber(unmaskedPhone)) : null;
     
     const rawEmail = lead.ownerEmails?.[0] || "";
     const cleanEmail = rawEmail.replace(/^(OSINT:|BatchData:)\s*/i, "").trim();
@@ -135,7 +137,7 @@ ${lead.rawDetails}`;
       first_name: firstName,
       last_name: lastName,
       email: cleanEmail || null,
-      phone: cleanPhone || null,
+      phone: validPhone || null,
       address: lead.address || 'Louisville Metro',
       city: lead.address.includes('Clarksville') ? 'Clarksville' : lead.address.includes('New Albany') ? 'New Albany' : (lead.address.includes('Shelbyville') ? 'Shelbyville' : 'Louisville'),
       state: lead.state || 'KY',
@@ -146,19 +148,39 @@ ${lead.rawDetails}`;
       notes: fullNotes
     };
 
-    // 5. Comprobar si ya existe para evitar duplicados
-    const { data: existing } = await supabaseBarba
-      .from('contacts')
-      .select('id')
-      .or(`external_ref.eq.${lead.leadId},first_name.eq.${firstName}`)
-      .limit(1);
+    // 5. Comprobar si ya existe para evitar duplicados (por external_ref o por dirección exacta si no es genérica)
+    let existingContact = null;
+    
+    if (lead.leadId) {
+      const { data: byRef } = await supabaseBarba
+        .from('contacts')
+        .select('id')
+        .eq('external_ref', lead.leadId)
+        .limit(1);
+      if (byRef && byRef.length > 0) existingContact = byRef[0];
+    }
 
-    if (existing && existing.length > 0) {
+    if (!existingContact && lead.address && lead.address.length > 6 && !lead.address.startsWith("Grupo:")) {
+      const { data: byAddr } = await supabaseBarba
+        .from('contacts')
+        .select('id')
+        .eq('address', lead.address)
+        .limit(1);
+      if (byAddr && byAddr.length > 0) existingContact = byAddr[0];
+    }
+
+    if (existingContact) {
+      const updateData: any = { notes: fullNotes, lead_quality: contactPayload.lead_quality };
+      if (validPhone) updateData.phone = validPhone;
+      if (firstName !== "Propietario") {
+        updateData.first_name = firstName;
+        updateData.last_name = lastName;
+      }
       await supabaseBarba
         .from('contacts')
-        .update({ notes: fullNotes, lead_quality: contactPayload.lead_quality })
-        .eq('id', existing[0].id);
-      console.log(`  🔄 [BARBAPRO ACTUALIZADO] Contacto ya existente actualizado: "${firstName} ${lastName}"`);
+        .update(updateData)
+        .eq('id', existingContact.id);
+      console.log(`  🔄 [BARBAPRO ACTUALIZADO] Contacto ya existente unificado: "${firstName} ${lastName}" (${lead.address})`);
       return true;
     }
 

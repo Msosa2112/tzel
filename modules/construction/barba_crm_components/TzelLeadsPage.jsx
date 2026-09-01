@@ -1697,6 +1697,7 @@ export default function TzelLeadsPage() {
   const [leads, setLeads] = useState(INITIAL_VERIFIED_LEADS);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState('');
+  const [channelFilter, setChannelFilter] = useState('ALL'); // 'ALL' | 'BARBA_CONSTRUCTION' | 'PRE_FORECLOSURE'
   const [selectedLocation, setSelectedLocation] = useState('ALL');
   const [selectedQuality, setSelectedQuality] = useState('ALL');
   const [contactStatusFilter, setContactStatusFilter] = useState('ALL');
@@ -1923,8 +1924,26 @@ export default function TzelLeadsPage() {
     }
   };
 
+  // Validador estricto de teléfonos de EE.UU. (NANP) para el Frontend
+  const isValidPhone = (p) => {
+    if (!p) return false;
+    const digits = p.replace(/\D/g, '');
+    if (digits.length !== 10) return false;
+    const area = digits.slice(0, 3);
+    const exch = digits.slice(3, 6);
+    if (area.startsWith('0') || area.startsWith('1')) return false;
+    if (exch.startsWith('0') || exch.startsWith('1')) return false;
+    if (['800', '888', '877', '866', '855', '844', '833', '900'].includes(area)) return false;
+    if (exch === '555' || digits === '5025643490' || digits.startsWith('502564') || digits.startsWith('502574')) return false;
+    if (digits === '4020840208' || digits === '4021240212' || digits === '4020340203' || digits === '4020440204' || digits === '4029140291' || digits === '4021540215') return false;
+    return true;
+  };
+
   const parseNotes = (notesText, lead) => {
-    if (!notesText) {
+    const rawNotes = notesText || lead?.notes || '';
+    let validPhone = lead?.phone && isValidPhone(lead.phone) ? lead.phone : '';
+
+    if (!rawNotes) {
       return {
         need: 'Cliente solicita cotización para trabajos de construcción o reparación.',
         speeches: {
@@ -1933,7 +1952,7 @@ export default function TzelLeadsPage() {
           englishDM: 'Hi, saw your post looking for local contractors in Louisville. We offer free on-site estimates. Let us know when works best for you!'
         },
         originalUrl: '',
-        phone: lead?.phone || '',
+        phone: validPhone,
         resolvedName: lead?.first_name || 'Cliente Potencial'
       };
     }
@@ -1946,11 +1965,11 @@ export default function TzelLeadsPage() {
         englishDM: ''
       },
       originalUrl: '',
-      phone: lead?.phone || '',
+      phone: validPhone,
       resolvedName: ''
     };
 
-    const lines = notesText.split('\n');
+    const lines = rawNotes.split('\n');
     let currentSection = '';
 
     for (let i = 0; i < lines.length; i++) {
@@ -1962,11 +1981,11 @@ export default function TzelLeadsPage() {
         if (urlMatch && !result.originalUrl) {
           result.originalUrl = urlMatch[0];
         }
-      } else if (line.includes('SPEECH DE VENTA RECOMENDADO (ESPAÑOL - DM):') || line.includes('SPEECH DE VENTA RECOMENDADO (ESPAÑOL - DM / WHATSAPP):')) {
+      } else if (line.includes('SPEECH DE VENTA RECOMENDADO (ESPAÑOL - DM):') || line.includes('SPEECH DE VENTA RECOMENDADO (ESPAÑOL - DM / WHATSAPP):') || line.includes('💬 SPEECH DE VENTA RECOMENDADO')) {
         currentSection = 'spanishDM';
-      } else if (line.includes('COMENTARIO PÚBLICO SUGERIDO:')) {
+      } else if (line.includes('COMENTARIO PÚBLICO SUGERIDO:') || line.includes('COMENTARIO PÚBLICO RECOMENDADO') || line.includes('💬 COMENTARIO PÚBLICO')) {
         currentSection = 'spanishComment';
-      } else if (line.includes('SALES PITCH (ENGLISH):')) {
+      } else if (line.includes('SALES PITCH (ENGLISH):') || line.includes('💬 SALES PITCH (ENGLISH):')) {
         currentSection = 'englishDM';
       } else if (line.includes('APERTURA TELEFÓNICA:') || line.includes('DETALLES ORIGINALES:') || line.includes('📝 NOTAS DE SEGUIMIENTO')) {
         currentSection = '';
@@ -1980,24 +1999,25 @@ export default function TzelLeadsPage() {
     }
 
     if (!result.phone) {
-      const phoneMatch = notesText.match(/\(?\b[0-9]{3}\)?[-. ]?[0-9]{3}[-. ]?[0-9]{4}\b/);
-      if (phoneMatch) result.phone = phoneMatch[0];
+      const phoneMatches = rawNotes.match(/\(?\b[0-9]{3}\)?[-. ]?[0-9]{3}[-. ]?[0-9]{4}\b/g) || [];
+      const foundValid = phoneMatches.find(isValidPhone);
+      if (foundValid) result.phone = foundValid;
     }
 
-    let displayName = lead.first_name || '';
-    if (lead.last_name && lead.last_name !== 'Potencial') {
+    let displayName = lead?.first_name || '';
+    if (lead?.last_name && lead.last_name !== 'Potencial') {
       displayName += ` ${lead.last_name}`;
     }
 
-    if (displayName.includes('Vecino de Facebook') || displayName.includes('Vecino del Grupo') || displayName === 'Propietario Inmueble') {
-      if (lead.address && !lead.address.startsWith('Grupo:')) {
+    if (displayName.includes('Vecino de Facebook') || displayName.includes('Vecino del Grupo') || displayName === 'Propietario Inmueble' || !displayName) {
+      if (lead?.address && !lead.address.startsWith('Grupo:')) {
         displayName = `Dueño en ${lead.address.split(',')[0]}`;
       } else {
-        const groupMatch = notesText.match(/Grupo:\s*"?([^"\n]+)"?/);
+        const groupMatch = rawNotes.match(/Grupo:\s*"?([^"\n]+)"?/);
         if (groupMatch) {
           displayName = `Solicitud en ${groupMatch[1]}`;
         } else {
-          displayName = `Cliente en ${lead.city || 'Louisville'}`;
+          displayName = `Cliente en ${lead?.city || 'Louisville'}`;
         }
       }
     }
@@ -2116,6 +2136,16 @@ export default function TzelLeadsPage() {
         (contactStatusFilter === 'closed_won' && l.pipeline_status === 'closed_won') ||
         (contactStatusFilter === 'closed_lost' && l.pipeline_status === 'closed_lost');
 
+      const isCodeViolationRepair = (l.external_ref || '').includes('BARBA_REPAIR') || (l.notes || '').includes('INFRACCIÓN') || (l.notes || '').includes('FACHADA') || (l.notes || '').includes('Louisville Code Enforcement');
+      const isRoofingEmergency = (l.notes || '').toLowerCase().includes('roof') || (l.notes || '').toLowerCase().includes('techo') || (l.notes || '').toLowerCase().includes('gotera');
+      const isRemodelSubcontract = (l.notes || '').toLowerCase().includes('remodel') || (l.notes || '').toLowerCase().includes('subcontract') || (l.notes || '').toLowerCase().includes('renovation');
+
+      const matchesChannel =
+        channelFilter === 'ALL' ||
+        (channelFilter === 'CODE_REPAIRS' && isCodeViolationRepair) ||
+        (channelFilter === 'ROOFING' && isRoofingEmergency) ||
+        (channelFilter === 'REMODELING' && isRemodelSubcontract);
+
       let matchesDate = true;
       if (dateFilter !== 'ALL' && l.created_at) {
         const leadDate = new Date(l.created_at);
@@ -2130,8 +2160,30 @@ export default function TzelLeadsPage() {
         }
       }
 
-      return matchesSearch && matchesLocation && matchesQuality && matchesContactStatus && matchesDate;
+      return matchesSearch && matchesLocation && matchesQuality && matchesContactStatus && matchesDate && matchesChannel;
     });
+
+    // Deduplicación en UI para asegurar que nunca se muestren tarjetas repetidas
+    const seenAddresses = new Set();
+    const seenPhones = new Set();
+    const deduplicated = [];
+
+    for (const l of result) {
+      const cleanAddr = (l.address || '').toUpperCase().split(',')[0].replace(/[.#,]/g, '').trim();
+      const isPhysical = cleanAddr.length > 5 && !l.address.startsWith('Grupo:') && !l.address.startsWith('Vecindario') && !l.address.startsWith('Comunidad') && !l.address.startsWith('Área') && !l.address.startsWith('Sur de Indiana');
+      const cleanPhone = l.phone ? l.phone.replace(/\D/g, '') : null;
+
+      if (isPhysical) {
+        if (seenAddresses.has(cleanAddr)) continue;
+        seenAddresses.add(cleanAddr);
+      }
+      if (cleanPhone && cleanPhone.length === 10) {
+        if (seenPhones.has(cleanPhone)) continue;
+        seenPhones.add(cleanPhone);
+      }
+      deduplicated.push(l);
+    }
+    result = deduplicated;
 
     result.sort((a, b) => {
       if (sortBy === 'newest') {
@@ -2154,7 +2206,7 @@ export default function TzelLeadsPage() {
     });
 
     return result;
-  }, [leads, search, selectedLocation, selectedQuality, contactStatusFilter, dateFilter, sortBy]);
+  }, [leads, search, channelFilter, selectedLocation, selectedQuality, contactStatusFilter, dateFilter, sortBy]);
 
   const bookedAppointmentsCount = useMemo(() => {
     return leads.filter(l => l.pipeline_status === 'appointment_set').length;
@@ -2418,6 +2470,51 @@ export default function TzelLeadsPage() {
         </div>
       </div>
 
+      {/* Selector de Canales de Construcción (Barba Construction) */}
+      <div className="bg-[#141414] p-3 rounded-2xl border border-[#242424] shadow-sm flex flex-wrap items-center gap-3">
+        <span className="text-xs font-bold text-[#888] uppercase tracking-wider pl-2">Servicios de Obra:</span>
+        <button
+          onClick={() => setChannelFilter('ALL')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl font-bold text-xs transition-all cursor-pointer ${
+            channelFilter === 'ALL'
+              ? 'bg-[#F5C518] text-black shadow-md shadow-[#F5C518]/20'
+              : 'bg-[#1a1a1a] text-[#AAA] border border-[#2a2a2a] hover:text-white hover:border-[#444]'
+          }`}
+        >
+          🌟 Todos los Trabajos ({leads.length})
+        </button>
+        <button
+          onClick={() => setChannelFilter('CODE_REPAIRS')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl font-bold text-xs transition-all cursor-pointer ${
+            channelFilter === 'CODE_REPAIRS'
+              ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30'
+              : 'bg-[#1a1a1a] text-[#AAA] border border-[#2a2a2a] hover:text-blue-400 hover:border-blue-500/40'
+          }`}
+        >
+          🏠 Reparación de Infracciones Municipales (Vía B)
+        </button>
+        <button
+          onClick={() => setChannelFilter('ROOFING')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl font-bold text-xs transition-all cursor-pointer ${
+            channelFilter === 'ROOFING'
+              ? 'bg-amber-600 text-white shadow-md shadow-amber-600/30'
+              : 'bg-[#1a1a1a] text-[#AAA] border border-[#2a2a2a] hover:text-amber-400 hover:border-amber-500/40'
+          }`}
+        >
+          🌧️ Techos & Goteras
+        </button>
+        <button
+          onClick={() => setChannelFilter('REMODELING')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl font-bold text-xs transition-all cursor-pointer ${
+            channelFilter === 'REMODELING'
+              ? 'bg-purple-600 text-white shadow-md shadow-purple-600/30'
+              : 'bg-[#1a1a1a] text-[#AAA] border border-[#2a2a2a] hover:text-purple-400 hover:border-purple-500/40'
+          }`}
+        >
+          🔨 Remodelaciones & Subcontratos
+        </button>
+      </div>
+
       {/* Barra de Filtros, Fechas, Ordenamiento y Búsqueda */}
       <div className="bg-[#141414] p-4 rounded-2xl border border-[#242424] shadow-sm space-y-3">
         <div className="flex flex-col md:flex-row gap-3 items-center justify-between">
@@ -2559,9 +2656,23 @@ export default function TzelLeadsPage() {
                       <span className="text-[10px] font-semibold text-[#777] bg-[#1a1a1a] px-1.5 py-0.5 rounded">
                         {dateInfo.relative}
                       </span>
-                      <span className="text-[11px] font-bold bg-[#222] text-[#AAA] px-2 py-0.5 rounded-full border border-[#333]">
-                        {lead.source || 'Facebook'}
-                      </span>
+                      {(lead.external_ref?.includes('BARBA_REPAIR') || lead.notes?.includes('INFRACCIÓN') || lead.notes?.includes('FACHADA')) ? (
+                        <span className="flex items-center gap-1 text-[11px] font-bold bg-blue-500/20 text-blue-300 px-2.5 py-0.5 rounded-full border border-blue-500/40">
+                          🏠 Reparación Infracción (Vía B)
+                        </span>
+                      ) : (lead.notes?.toLowerCase().includes('roof') || lead.notes?.toLowerCase().includes('techo') || lead.notes?.toLowerCase().includes('gotera')) ? (
+                        <span className="flex items-center gap-1 text-[11px] font-bold bg-amber-500/20 text-amber-300 px-2.5 py-0.5 rounded-full border border-amber-500/40">
+                          🌧️ Techos / Goteras
+                        </span>
+                      ) : (lead.notes?.toLowerCase().includes('remodel') || lead.notes?.toLowerCase().includes('subcontract')) ? (
+                        <span className="flex items-center gap-1 text-[11px] font-bold bg-purple-500/20 text-purple-300 px-2.5 py-0.5 rounded-full border border-purple-500/40">
+                          🔨 Remodelación / Obra
+                        </span>
+                      ) : (
+                        <span className="text-[11px] font-bold bg-[#222] text-[#AAA] px-2 py-0.5 rounded-full border border-[#333]">
+                          {lead.source || 'Directo'}
+                        </span>
+                      )}
                       {lead.lead_quality === 'hot' && (
                         <span className="flex items-center gap-1 text-[11px] font-bold bg-red-500/15 text-red-400 px-2 py-0.5 rounded-full border border-red-500/30">
                           <Flame size={12} /> Hot Lead

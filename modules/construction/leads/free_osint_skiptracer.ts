@@ -5,9 +5,7 @@ import * as path from "path";
 import * as fs from "fs";
 import * as dotenv from "dotenv";
 
-dotenv.config();
-
-chromium.use(stealthPlugin());
+import { isValidReachableUSPhone } from "../../../intelligence/phone_classifier";
 
 const url = "https://ddwyutisxymuvofkjhpz.supabase.co";
 const serviceKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRkd3l1dGlzeHltdXZvZmtqaHB6Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NzA1MzM5NSwiZXhwIjoyMDkyNjI5Mzk1fQ.cJQgzQsy1TUa4Yk01qkBedrmM8HxYqnH3VqzVLKpUDY";
@@ -187,7 +185,12 @@ export async function runFreeSkipTracer(limit: number = 20) {
       }
 
       if (!detectedPhone && pageData.rawPhones.length > 0) {
-        detectedPhone = pageData.rawPhones[0];
+        const validRaw = pageData.rawPhones.find(p => isValidReachableUSPhone(p));
+        if (validRaw) detectedPhone = validRaw;
+      }
+
+      if (detectedPhone && !isValidReachableUSPhone(detectedPhone)) {
+        detectedPhone = "";
       }
 
       if (detectedPhone || (detectedName && detectedName !== "Propietario")) {
@@ -213,7 +216,7 @@ export async function runFreeSkipTracer(limit: number = 20) {
           }
         }
       } else {
-        console.log(`  ℹ️ No se detectó teléfono automático inmediato para este inmueble.`);
+        console.log(`  ℹ️ No se detectó teléfono válido inmediato para este inmueble.`);
       }
 
     } catch (err: any) {

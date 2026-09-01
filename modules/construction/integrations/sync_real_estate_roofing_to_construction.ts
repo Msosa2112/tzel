@@ -7,10 +7,39 @@ import * as dotenv from "dotenv";
 
 dotenv.config();
 
+import { isValidReachableUSPhone, formatPhoneUs, normalizePhoneNumber } from "../../../intelligence/phone_classifier";
+
 /**
- * Extrae y normaliza teléfonos y emails desde strings crudos (OSINT / BatchData / JSON)
+ * Extrae y normaliza teléfonos válidos de EE.UU. desde strings crudos (OSINT / BatchData / JSON)
  */
-function parseContactList(raw: any): string[] {
+function parsePhoneList(raw: any): string[] {
+  if (!raw) return [];
+  let candidates: string[] = [];
+  if (Array.isArray(raw)) candidates = raw.filter(Boolean);
+  else if (typeof raw === "string") {
+    try {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) candidates = parsed.filter(Boolean);
+    } catch {}
+    if (!candidates.length) {
+      candidates = raw.split(",").map(s => s.trim()).filter(s => s.length > 3);
+    }
+  }
+
+  const validPhones: string[] = [];
+  for (const c of candidates) {
+    const unmasked = c.replace(/^(OSINT:|BatchData \(Mobile\):|BatchData \(Landline\):|BatchData \(Landline \[DNC\]\):|📱|☎️)\s*/i, "").trim();
+    if (isValidReachableUSPhone(unmasked)) {
+      const formatted = formatPhoneUs(normalizePhoneNumber(unmasked));
+      if (!validPhones.includes(formatted)) {
+        validPhones.push(formatted);
+      }
+    }
+  }
+  return validPhones;
+}
+
+function parseEmailList(raw: any): string[] {
   if (!raw) return [];
   if (Array.isArray(raw)) return raw.filter(Boolean);
   if (typeof raw === "string") {
@@ -18,7 +47,7 @@ function parseContactList(raw: any): string[] {
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed)) return parsed.filter(Boolean);
     } catch {}
-    return raw.split(",").map(s => s.trim()).filter(s => s.length > 3);
+    return raw.split(",").map(s => s.trim()).filter(s => s.includes("@"));
   }
   return [];
 }
@@ -49,14 +78,14 @@ export async function syncRealEstateRoofingToConstruction() {
     if (!addr || seenAddresses.has(addr.toLowerCase())) continue;
     seenAddresses.add(addr.toLowerCase());
 
-    const phones = parseContactList(r.defendant_phones);
-    const emails = parseContactList(r.defendant_emails);
+    const phones = parsePhoneList(r.defendant_phones);
+    const emails = parseEmailList(r.defendant_emails);
     const leadId = `LEAD_RE_ROOF_${crypto.createHash("md5").update(addr).digest("hex").substring(0, 12)}`;
 
     const lead: ConstructionLead = {
       leadId,
       category: "ROOFING_SIDING_GUTTERS",
-      triggerEvent: "CODE_VIOLATION_ROOF_DAMAGE",
+      triggerEvent: "CODE_VIOLATION_ROOF_DAMAGE" as any,
       address: addr,
       county: "Jefferson",
       state: "KY",
@@ -95,14 +124,14 @@ export async function syncRealEstateRoofingToConstruction() {
     if (!addr || seenAddresses.has(addr.toLowerCase())) continue;
     seenAddresses.add(addr.toLowerCase());
 
-    const phones = parseContactList(r.defendant_phones);
-    const emails = parseContactList(r.defendant_emails);
+    const phones = parsePhoneList(r.defendant_phones);
+    const emails = parseEmailList(r.defendant_emails);
     const leadId = `LEAD_RE_ROOF_${crypto.createHash("md5").update(addr).digest("hex").substring(0, 12)}`;
 
     const lead: ConstructionLead = {
       leadId,
       category: "ROOFING_SIDING_GUTTERS",
-      triggerEvent: "STORM_HAIL_DAMAGE",
+      triggerEvent: "STORM_HAIL_DAMAGE" as any,
       address: addr,
       county: String(r.county || "Jefferson"),
       state: String(r.state || "KY"),

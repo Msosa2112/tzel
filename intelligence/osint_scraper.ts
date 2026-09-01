@@ -17,36 +17,18 @@ export interface OSINTContactResult {
   emails: string[];
 }
 
+import { isValidReachableUSPhone, formatPhoneUs } from "./phone_classifier";
+
 /**
- * Normalizes a phone number to (XXX) XXX-XXXX format.
+ * Normalizes a phone number to (XXX) XXX-XXXX format, validating strictly.
  */
 function normalizePhone(phone: string): string | null {
+  if (!isValidReachableUSPhone(phone)) {
+    return null;
+  }
   const digits = phone.replace(/\D/g, "");
-  // Standard US phone number (10 digits)
-  if (digits.length === 10) {
-    const prefix = digits.slice(0, 3);
-    const exchange = digits.slice(3, 6);
-    if (["800", "888", "877", "866", "855", "844", "833"].includes(prefix)) {
-      return null;
-    }
-    if (exchange === "555") {
-      return null;
-    }
-    return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
-  }
-  // US phone number with country code 1 (11 digits)
-  if (digits.length === 11 && digits.startsWith("1")) {
-    const prefix = digits.slice(1, 4);
-    const exchange = digits.slice(4, 7);
-    if (["800", "888", "877", "866", "855", "844", "833"].includes(prefix)) {
-      return null;
-    }
-    if (exchange === "555") {
-      return null;
-    }
-    return `(${digits.slice(1, 4)}) ${digits.slice(4, 7)}-${digits.slice(7)}`;
-  }
-  return null;
+  const clean10 = digits.length === 11 && digits.startsWith("1") ? digits.slice(1) : digits;
+  return formatPhoneUs(clean10);
 }
 
 /**
