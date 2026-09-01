@@ -2820,9 +2820,9 @@
           <div class="filter-group" style="margin-top: 12px;">
             <label style="font-size: 0.75rem; font-weight: 600; display: flex; justify-content: space-between;">
               <span>Margen de Equidad Mínimo:</span>
-              <span id="equity-spread-val" style="color: var(--color-radar-green-dark); font-weight: bold;">$20,000</span>
+              <span id="equity-spread-val" style="color: var(--color-radar-green-dark); font-weight: bold;">$0</span>
             </label>
-            <input type="range" id="equity-spread-filter" min="0" max="100000" step="5000" value="20000" style="width: 100%; accent-color: var(--color-radar-green);">
+            <input type="range" id="equity-spread-filter" min="0" max="100000" step="5000" value="0" style="width: 100%; accent-color: var(--color-radar-green);">
           </div>
 
           <div class="filter-group" style="margin-top: 12px;">
@@ -2834,48 +2834,11 @@
           </div>
         </div>
 
-        <!-- Group 2: Disaster specific filters -->
-        <div id="disaster-filters-group" style="display: none; margin-top: 12px; border-top: 1px solid var(--border-glass); padding-top: 12px;">
-          <div class="filter-group">
-            <label style="font-size: 0.75rem; font-weight: 600; margin-bottom: 6px; display: block; color: #0891b2;">Eventos y Daños:</label>
-            <div style="display: flex; flex-direction: column; gap: 8px; font-size: 0.75rem;">
-              <label style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
-                <input type="checkbox" id="chk-dis-tornado" checked onchange="renderUI()">
-                <span>🌀 Tornados (NWS DAT)</span>
-              </label>
-              <label style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
-                <input type="checkbox" id="chk-dis-storm" checked onchange="renderUI()">
-                <span>⛈️ Tormentas / Vientos</span>
-              </label>
-              <label style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
-                <input type="checkbox" id="chk-dis-hail" checked onchange="renderUI()">
-                <span>☄️ Granizo Severo</span>
-              </label>
-              <label style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
-                <input type="checkbox" id="chk-dis-violation" checked onchange="renderUI()">
-                <span>🏠 Infracción de Techo (X50)</span>
-              </label>
-            </div>
-          </div>
+        
 
-          <div class="filter-group" style="margin-top: 12px;">
-            <label style="font-size: 0.75rem; font-weight: 600; margin-bottom: 6px; display: block;">Intensidad de Tornado Mínima:</label>
-            <select id="dis-ef-filter" class="filter-select" onchange="renderUI()" style="width: 100%;">
-              <option value="ALL">Todas las Intensidades</option>
-              <option value="EF0">EF-0 o superior</option>
-              <option value="EF1">EF-1 o superior</option>
-              <option value="EF2">EF-2 o superior</option>
-            </select>
-          </div>
+          
 
-          <div class="filter-group" style="margin-top: 12px;">
-            <label style="font-size: 0.75rem; font-weight: 600; margin-bottom: 6px; display: block;">Antigüedad de Reporte:</label>
-            <select id="dis-date-filter" class="filter-select" onchange="renderUI()" style="width: 100%;">
-              <option value="ALL">Historial completo (90 días)</option>
-              <option value="7">Últimos 7 días</option>
-              <option value="30">Últimos 30 días</option>
-            </select>
-          </div>
+          
         </div>
       </div>
 
