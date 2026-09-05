@@ -2885,6 +2885,14 @@
             </label>
             <input type="range" id="active-debt-filter" min="0" max="150000" step="5000" value="0" style="width: 100%; accent-color: #ef4444;">
           </div>
+
+          <div class="filter-group" style="margin-top: 12px;">
+            <label style="font-size: 0.75rem; font-weight: 600; display: flex; justify-content: space-between;">
+              <span data-i18n="max_pva_label">Tope Valor PVA Máximo:</span>
+              <span id="max-pva-val" style="color: #0284c7; font-weight: bold;">$350,000</span>
+            </label>
+            <input type="range" id="max-pva-filter" min="150000" max="600000" step="25000" value="350000" style="width: 100%; accent-color: #0284c7;">
+          </div>
         </div>
       </div>
 
@@ -3483,6 +3491,8 @@
         clear_zips: "Limpiar Zip Codes",
         equity_spread_label: "Margen de Equidad Mínimo:",
         active_debt_label: "Deuda Activa Mínima:",
+        max_pva_label: "Tope Valor PVA Máximo:",
+        no_limit: "Sin Límite",
         distress_focus_title: "Foco de Distress",
         pill_execution: "Ejecución",
         pill_physical: "Físico",
@@ -3612,6 +3622,8 @@
         clear_zips: "Clear Zip Codes",
         equity_spread_label: "Minimum Equity Spread:",
         active_debt_label: "Minimum Active Debt:",
+        max_pva_label: "Maximum Assessed Value (PVA):",
+        no_limit: "No Limit",
         distress_focus_title: "Distress Focus",
         pill_execution: "Foreclosure",
         pill_physical: "Physical",
@@ -3777,6 +3789,16 @@
         }
       });
 
+      // Update max PVA value text if set to No Limit
+      const maxPvaFilter = document.getElementById('max-pva-filter');
+      const maxPvaVal = document.getElementById('max-pva-val');
+      if (maxPvaFilter && maxPvaVal) {
+        const val = parseInt(maxPvaFilter.value);
+        if (val >= 600000) {
+          maxPvaVal.textContent = dict.no_limit || "Sin Límite";
+        }
+      }
+
       // Re-render UI elements that generate dynamic text
       if (allLeads && allLeads.length > 0) {
         renderUI();
@@ -3909,6 +3931,21 @@
         debtVal.textContent = `$${parseInt(debtFilter.value).toLocaleString()}`;
         applyFilters();
       });
+
+      const maxPvaFilter = document.getElementById('max-pva-filter');
+      const maxPvaVal = document.getElementById('max-pva-val');
+      if (maxPvaFilter && maxPvaVal) {
+        maxPvaFilter.addEventListener('input', () => {
+          const val = parseInt(maxPvaFilter.value);
+          const dict = translations[currentLang] || translations.es;
+          if (val >= 600000) {
+            maxPvaVal.textContent = dict.no_limit || "Sin Límite";
+          } else {
+            maxPvaVal.textContent = `$${val.toLocaleString()}`;
+          }
+          applyFilters();
+        });
+      }
 
       initPhotoCarouselSwipe();
 
@@ -4398,6 +4435,8 @@
 
       const minEquity = parseFloat(document.getElementById('equity-spread-filter').value) || 0;
       const minDebt = parseFloat(document.getElementById('active-debt-filter').value) || 0;
+      const maxPvaFilter = document.getElementById('max-pva-filter');
+      const maxPva = maxPvaFilter ? parseFloat(maxPvaFilter.value) : 350000;
 
       return allLeads.filter(lead => {
         // 1. Strict Multi-Zip Code Filter
@@ -4417,11 +4456,16 @@
         const marketValue = (lead.auctions && lead.auctions.length > 0 && lead.auctions[0].appraisal_value > 0) ? lead.auctions[0].appraisal_value : (lead.mlsValue || 0);
         const equitySpread = marketValue - totalDebt;
 
-        // Filtro de Deuda Activa Mínima (solo si el usuario mueve el slider)
+        // 1. Descartar propiedades con valor superior a $350k (regla institucional de mercado rápido)
+        if (maxPva < 600000 && marketValue > maxPva) return false;
+
+        // 2. Filtro de Deuda Activa Mínima (solo si el usuario mueve el slider)
         if (minDebt > 0 && totalDebt < minDebt) return false;
 
-        // Filtro de Margen de Equidad Mínimo (solo si el usuario mueve el slider)
-        if (minEquity > 0 && marketValue > 0 && equitySpread < minEquity) return false;
+        // 3. Filtro de Margen de Equidad Mínimo: si se exige margen > $0, descartar las que no tienen valor PVA o margen < minEquity
+        if (minEquity > 0) {
+          if (marketValue <= 0 || equitySpread < minEquity) return false;
+        }
 
         // Filtro Financiero (Buenos Deals vs Bajo el Agua vs Esperando por Deuda)
         const isGoodDeal = (marketValue > 0 && equitySpread >= Math.max(40000, marketValue * 0.30)) || (totalDebt > 0 && marketValue === 0);
