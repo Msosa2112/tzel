@@ -327,20 +327,29 @@ async function runCrossReference() {
         // Calcular ARV usando Comps en tiempo real
         console.log(`[ARV COMPS] Calculando Valor Comercial Real (ARV) con comparables...`);
         const mlsValue = await calculateARV(mlsHeaders, zip, beds, sqft, closePrice, listPrice);
-        // Determinar si es de Alta Rentabilidad (Comparando Deuda vs MCA / Appraisal Value con margen >= 20%)
-        const mcaVal = (row.appraisal_value as number) || mlsValue;
+        // Determinar Valor Efectivo de Mercado (resolviendo avalúos nominales vs MLS)
+        const rawAppraisal = (row.appraisal_value as number) || 0;
+        let mcaVal = rawAppraisal;
+        if (mlsValue > 0 && (rawAppraisal <= 0 || rawAppraisal < 35000 || rawAppraisal < mlsValue * 0.35)) {
+          mcaVal = mlsValue;
+        } else if (mcaVal <= 0) {
+          mcaVal = mlsValue;
+        }
+
         const hiddenMort = (row.hidden_mortgages as number) || 0;
         const hiddenLiens = (row.hidden_liens_amount as number) || 0;
         const totalDebt = (debtAmount || 0) + hiddenMort + hiddenLiens;
 
         let isHighYield = 0;
-        if (mcaVal > 0 && totalDebt > 0) {
-          const discountPct = ((mcaVal - totalDebt) / mcaVal) * 100;
-          console.log(`[MCA SCORING] Deuda Total: $${totalDebt.toLocaleString("en-US")} vs MCA/Valor: $${mcaVal.toLocaleString("en-US")} | Margen: ${discountPct.toFixed(1)}%`);
-          if (isHighYieldProperty(mcaVal, totalDebt, 0, 0, 0.20)) {
-            isHighYield = 1;
-            console.log(`[HIGH YIELD] ¡Propiedad marcada como alta rentabilidad (Margen Real >= 20% sobre MCA/Valor)!`);
-          }
+        // Regla de Negocio: Techo de valor $350,000 y margen de equidad mínimo de $50,000
+        if (mcaVal > 0 && mcaVal <= 350000 && (mcaVal - totalDebt) >= 50000) {
+          isHighYield = 1;
+          const discountPct = totalDebt > 0 ? (((mcaVal - totalDebt) / mcaVal) * 100) : 100;
+          console.log(`[HIGH YIELD] ¡Propiedad marcada como alta rentabilidad! Valor: $${mcaVal.toLocaleString("en-US")} | Deuda: $${totalDebt.toLocaleString("en-US")} | Margen: $${(mcaVal - totalDebt).toLocaleString("en-US")} (${discountPct.toFixed(1)}%)`);
+        } else if (mcaVal > 350000) {
+          console.log(`[HIGH YIELD FILTER] Propiedad descartada de alta rotación por valor superior a $350k: $${mcaVal.toLocaleString("en-US")}`);
+        } else if (mcaVal - totalDebt < 0) {
+          console.log(`[HIGH YIELD FILTER] Propiedad bajo el agua descartada: Valor $${mcaVal.toLocaleString("en-US")} < Deuda $${totalDebt.toLocaleString("en-US")}`);
         }
 
         let photoUrls: string[] = [];
@@ -691,7 +700,7 @@ async function crossReferenceGeneric(tableName: string, idCol: string, addressCo
         const sqft = matchedProp.LivingArea || null;
 
         const mlsValue = await calculateARV(mlsHeaders, zip, beds, sqft, closePrice, listPrice);
-        const isHighYield = mlsValue > 0 ? 1 : 0;
+        const isHighYield = (mlsValue > 0 && mlsValue <= 350000) ? 1 : 0;
 
         let photoUrls: string[] = [];
         if (matchedProp.Media && Array.isArray(matchedProp.Media)) {

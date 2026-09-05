@@ -1149,15 +1149,36 @@ async function notifyOpportunities(mode?: 'legal' | 'physical') {
     }
 
 
-    const pvaVal = (lead.auctions && lead.auctions.length > 0 && (lead.auctions[0] as any).appraisal_value > 0) ? (lead.auctions[0] as any).appraisal_value : 0;
+    const rawPva = (lead.auctions && lead.auctions.length > 0 && (lead.auctions[0] as any).appraisal_value > 0) ? (lead.auctions[0] as any).appraisal_value : 0;
     const mcaVal = lead.mlsValue || 0;
-    const pvaOrMca = pvaVal > 0 ? pvaVal : mcaVal;
+    
+    // Effective Valuation: Si el avalúo del comisionado/corte es nominal (< $35k o < 35% de MLS), usamos MLS
+    let pvaOrMca = rawPva;
+    if (mcaVal > 0 && (rawPva <= 0 || rawPva < 35000 || rawPva < mcaVal * 0.35)) {
+      pvaOrMca = mcaVal;
+    } else if (pvaOrMca <= 0) {
+      pvaOrMca = mcaVal;
+    }
+
+    // Regla de Negocio 1: Excluir propiedades con valor superior a $350,000 USD
+    if (pvaOrMca > 350000) {
+      console.log(`[NOTIFICAR SKIP] Propiedad supera el tope de $350k ($${pvaOrMca.toLocaleString()}): ${lead.displayAddress}`);
+      continue;
+    }
+
     const totalDebt = primaryDebt + hiddenDebt;
     const equitySpread = pvaOrMca > 0 ? (pvaOrMca - totalDebt) : 0;
+
+    // Regla de Negocio 2: Excluir propiedades bajo el agua (deuda superior al valor)
+    if (equitySpread <= 0 && totalDebt > 0) {
+      console.log(`[NOTIFICAR SKIP] Propiedad bajo el agua descartada (Deuda: $${totalDebt.toLocaleString()} > Valor: $${pvaOrMca.toLocaleString()}): ${lead.displayAddress}`);
+      continue;
+    }
+
     const df = lead.state === 'KY' ? 0.66 : 0.70;
     const mpo = Math.max(0, Math.round((pvaOrMca * df) - totalDebt));
 
-    const pvaStr = pvaVal > 0 ? pvaVal.toLocaleString("en-US", { maximumFractionDigits: 0 }) : "0";
+    const pvaStr = rawPva > 0 ? rawPva.toLocaleString("en-US", { maximumFractionDigits: 0 }) : "0";
     const mcaStr = mcaVal > 0 ? mcaVal.toLocaleString("en-US", { maximumFractionDigits: 0 }) : "0";
 
     const cleanAddr = escapeHtml(lead.displayAddress);

@@ -370,7 +370,7 @@ interface WaterfallResult {
 /**
  * Resuelve la dirección y el propietario a través del pipeline de resolución en cascada (waterfall)
  */
-async function resolveOwnerWaterfall(address: string, state: string, county: string): Promise<WaterfallResult> {
+async function resolveOwnerWaterfall(address: string, state: string, county: string, allowBatchData: boolean = false): Promise<WaterfallResult> {
   // PASO 1: Normalización previa de la dirección
   const normalizedAddress = await validateAndCleanAddress(address, state);
   
@@ -452,18 +452,20 @@ async function resolveOwnerWaterfall(address: string, state: string, county: str
     }
   }
   
-  // PASO 4: Fallback modular a BatchData (Última instancia)
-  try {
-    const batchRes = await getOwnerNameFromBatchData(normalizedAddress, state, county);
-    if (batchRes) {
-      return {
-        ownerName: batchRes.ownerName,
-        mailingAddress: batchRes.mailingAddress,
-        needsManualReview: 0
-      };
+  // PASO 4: Fallback modular a BatchData (Opcional, desactivado en corridas manuales de Real Estate)
+  if (allowBatchData && process.env.BATCHDATA_API_KEY) {
+    try {
+      const batchRes = await getOwnerNameFromBatchData(normalizedAddress, state, county);
+      if (batchRes) {
+        return {
+          ownerName: batchRes.ownerName,
+          mailingAddress: batchRes.mailingAddress,
+          needsManualReview: 0
+        };
+      }
+    } catch (err: any) {
+      console.error(`[PVA SCRAPER ERROR] Falló fallback a BatchData para ${normalizedAddress}:`, err.message);
     }
-  } catch (err: any) {
-    console.error(`[PVA SCRAPER ERROR] Falló fallback a BatchData para ${normalizedAddress}:`, err.message);
   }
   
   // PASO 5: Protección de Privacidad y Revisión Manual
@@ -498,57 +500,61 @@ function cleanOwnerName(rawName: string): string {
 /**
  * Ejecuta el resolvedor de registros de propiedad (PVA)
  */
-async function scrapePVA() {
+async function scrapePVA(auctionsOnly: boolean = false) {
   console.log("[PVA SCRAPER] Iniciando resolvedor de registros de propiedad (PVA)...");
 
-  // 1. Obtener todos los registros con dueño desconocido en violaciones de código
-  let pendingRes;
-  try {
-    pendingRes = await db.execute(
-      "SELECT violation_id, address FROM code_violations WHERE owner_name = 'DUEÑO DESCONOCIDO' OR owner_name = 'DUEO DESCONOCIDO' OR owner_name IS NULL OR owner_name = '' OR owner_name = 'Unknown' OR owner_name = 'UNKNOWN' OR owner_name = 'No especificado'"
-    );
-  } catch (dbErr: any) {
-    console.error("[PVA SCRAPER ERROR] Falló la consulta a la base de datos:", dbErr.message);
-    process.exit(1);
-  }
-
-  const pendingList = pendingRes.rows;
-  console.log(`[PVA SCRAPER] Se encontraron ${pendingList.length} violaciones de código con dueño desconocido.`);
-
-  let resolvedCount = 0;
-
-  for (const row of pendingList) {
-    const violationId = row.violation_id as string;
-    const address = row.address as string;
-
-    const result = await resolveOwnerWaterfall(address, "KY", "Jefferson");
-
-    const rawName = result.ownerName;
-    const mailingAddr = result.mailingAddress;
-    const cleanedName = cleanOwnerName(rawName);
-
-    const isAbsentee = mailingAddr.toLowerCase().split(",")[0].trim() !== address.toLowerCase().split(",")[0].trim();
-    const absenteeLog = isAbsentee 
-      ? `(Dueño Ausente, Dirección Postal: '${mailingAddr}')` 
-      : `(Dueño Ocupante)`;
-
-    console.log(`[PVA SCRAPER] Propietario resuelto para ${address.split(",")[0].trim()}: '${cleanedName}' ${absenteeLog}. Actualizando Turso...`);
-
+  if (!auctionsOnly) {
+    // 1. Obtener todos los registros con dueño desconocido en violaciones de código
+    let pendingRes;
     try {
-      await db.execute({
-        sql: "UPDATE code_violations SET owner_name = ?, mailing_address = ?, absentee_owner = ?, needs_manual_review = ? WHERE violation_id = ?",
-        args: [cleanedName, mailingAddr, isAbsentee ? 1 : 0, result.needsManualReview, violationId]
-      });
-      resolvedCount++;
-    } catch (updateErr: any) {
-      console.error(`[PVA SCRAPER ERROR] No se pudo actualizar el registro ${violationId}:`, updateErr.message);
+      pendingRes = await db.execute(
+        "SELECT violation_id, address FROM code_violations WHERE owner_name = 'DUEÑO DESCONOCIDO' OR owner_name = 'DUEO DESCONOCIDO' OR owner_name IS NULL OR owner_name = '' OR owner_name = 'Unknown' OR owner_name = 'UNKNOWN' OR owner_name = 'No especificado'"
+      );
+    } catch (dbErr: any) {
+      console.error("[PVA SCRAPER ERROR] Falló la consulta a la base de datos:", dbErr.message);
+      process.exit(1);
     }
-  }
 
-  console.log("\n========================================================");
-  console.log("RESUMEN DE RESOLVEDOR PVA (VIOLACIONES):");
-  console.log(`- Registros de dueño de violación actualizados: ${resolvedCount}`);
-  console.log("========================================================\n");
+    const pendingList = pendingRes.rows;
+    console.log(`[PVA SCRAPER] Se encontraron ${pendingList.length} violaciones de código con dueño desconocido.`);
+
+    let resolvedCount = 0;
+
+    for (const row of pendingList) {
+      const violationId = row.violation_id as string;
+      const address = row.address as string;
+
+      const result = await resolveOwnerWaterfall(address, "KY", "Jefferson");
+
+      const rawName = result.ownerName;
+      const mailingAddr = result.mailingAddress;
+      const cleanedName = cleanOwnerName(rawName);
+
+      const isAbsentee = mailingAddr.toLowerCase().split(",")[0].trim() !== address.toLowerCase().split(",")[0].trim();
+      const absenteeLog = isAbsentee 
+        ? `(Dueño Ausente, Dirección Postal: '${mailingAddr}')` 
+        : `(Dueño Ocupante)`;
+
+      console.log(`[PVA SCRAPER] Propietario resuelto para ${address.split(",")[0].trim()}: '${cleanedName}' ${absenteeLog}. Actualizando Turso...`);
+
+      try {
+        await db.execute({
+          sql: "UPDATE code_violations SET owner_name = ?, mailing_address = ?, absentee_owner = ?, needs_manual_review = ? WHERE violation_id = ?",
+          args: [cleanedName, mailingAddr, isAbsentee ? 1 : 0, result.needsManualReview, violationId]
+        });
+        resolvedCount++;
+      } catch (updateErr: any) {
+        console.error(`[PVA SCRAPER ERROR] No se pudo actualizar el registro ${violationId}:`, updateErr.message);
+      }
+    }
+
+    console.log("\n========================================================");
+    console.log("RESUMEN DE RESOLVEDOR PVA (VIOLACIONES):");
+    console.log(`- Registros de dueño de violación actualizados: ${resolvedCount}`);
+    console.log("========================================================\n");
+  } else {
+    console.log("[PVA SCRAPER] Modo Real Estate puro: Omitiendo análisis de violaciones de código municipales.");
+  }
 
   // 2. Obtener todas las subastas judiciales sin dirección postal o con nombre de deudor inválido
   let pendingAuctionsRes;

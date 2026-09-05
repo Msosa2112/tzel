@@ -3,24 +3,33 @@ import * as dotenv from "dotenv";
 
 dotenv.config();
 
+const addressCache = new Map<string, string>();
+
 /**
  * Valida y estandariza una dirección física usando la API de Address Validation de Google.
  * Si no hay API Key configurada o la llamada falla, devuelve la dirección original intacta.
- * 
- * @param rawAddress Dirección sin formatear (ej. "456 oak lousville")
- * @param defaultState Estado por defecto ("KY" o "IN") para contextualizar la búsqueda
  */
 export async function validateAndCleanAddress(
   rawAddress: string,
   defaultState: string = "KY"
 ): Promise<string> {
-  const apiKey = process.env.GOOGLE_MAPS_API_KEY || process.env.GOOGLE_API_KEY;
-  if (!apiKey) {
-    console.log(`[ADDRESS VALIDATOR] No se detectó GOOGLE_MAPS_API_KEY en el entorno. Devolviendo dirección original.`);
+  if (!rawAddress || rawAddress.trim().length < 4) {
     return rawAddress;
   }
 
-  if (!rawAddress || rawAddress.trim().length < 4) {
+  const normalizedKey = rawAddress.trim().toLowerCase();
+  if (addressCache.has(normalizedKey)) {
+    return addressCache.get(normalizedKey)!;
+  }
+
+  // Si ya tiene un formato estándar con código postal de 5 dígitos y estado, no desperdiciar cuota de Google
+  if (/\b\d{5}\b/.test(rawAddress) && (rawAddress.includes(" KY") || rawAddress.includes(", KY") || rawAddress.includes(" IN") || rawAddress.includes(", IN"))) {
+    addressCache.set(normalizedKey, rawAddress.trim());
+    return rawAddress.trim();
+  }
+
+  const apiKey = process.env.GOOGLE_MAPS_API_KEY || process.env.GOOGLE_API_KEY;
+  if (!apiKey) {
     return rawAddress;
   }
 

@@ -167,7 +167,7 @@ async function scrapeCountyClerk(ownerName: string, county: string, state: strin
 /**
  * Función principal del módulo para auditar deudas en todas las propiedades con alta rentabilidad.
  */
-export async function runTitleLienCheck() {
+export async function runTitleLienCheck(auctionsOnly: boolean = false) {
   console.log("[INICIO] Iniciando Módulo de Verificación de Títulos y Deudas Ocultas (Doble Validación)...");
 
   // 1. Consultar subastas de alta rentabilidad
@@ -181,13 +181,15 @@ export async function runTitleLienCheck() {
   }
 
   // 2. Consultar violaciones de código de alta rentabilidad
-  let violations;
-  try {
-    const res = await db.execute("SELECT violation_id, address, owner_name, mls_estimated_value, sqft, hidden_mortgages FROM code_violations WHERE title_check_status = 'pending' OR title_check_status IS NULL");
-    violations = res.rows;
-  } catch (err: any) {
-    console.error("[DB ERROR] No se pudieron consultar las violaciones de código:", err.message);
-    throw err;
+  let violations: any[] = [];
+  if (!auctionsOnly) {
+    try {
+      const res = await db.execute("SELECT violation_id, address, owner_name, mls_estimated_value, sqft, hidden_mortgages FROM code_violations WHERE title_check_status = 'pending' OR title_check_status IS NULL");
+      violations = res.rows;
+    } catch (err: any) {
+      console.error("[DB ERROR] No se pudieron consultar las violaciones de código:", err.message);
+      throw err;
+    }
   }
 
   console.log(`[TITLE LIENS] Oportunidades encontradas para verificar: Subastas: ${auctions.length}, Violaciones: ${violations.length}`);
@@ -353,13 +355,13 @@ export async function runTitleLienCheck() {
   console.log("\n[FIN] Módulo de Verificación de Títulos y Deudas Ocultas finalizado.");
   
   // Ejecutar bucle de reintentos
-  await retryFailedTitleChecks(3);
+  await retryFailedTitleChecks(3, auctionsOnly);
 }
 
 /**
  * Reintenta las verificaciones de deudas que fallaron o quedaron pendientes debido a caídas de red o límites de cuota de API.
  */
-export async function retryFailedTitleChecks(maxRetries: number = 3) {
+export async function retryFailedTitleChecks(maxRetries: number = 3, auctionsOnly: boolean = false) {
   const limit = pLimit(5);
   console.log(`\n[REINTENTOS] Iniciando reintentos de auditorías financieras fallidas o pendientes (Max Retries: ${maxRetries})...`);
 
@@ -376,15 +378,17 @@ export async function retryFailedTitleChecks(maxRetries: number = 3) {
     const pendingAuctions = auctionsRes.rows;
 
     // 2. Buscar violaciones fallidas
-    let violationsRes;
-    try {
-      violationsRes = await db.execute(`
-        SELECT violation_id, address, owner_name, mls_estimated_value, sqft, hidden_mortgages 
-        FROM code_violations 
-        WHERE title_check_status = 'failed'
-      `);
-    } catch (e) { break; }
-    const pendingViolations = violationsRes.rows;
+    let pendingViolations: any[] = [];
+    if (!auctionsOnly) {
+      try {
+        const violationsRes = await db.execute(`
+          SELECT violation_id, address, owner_name, mls_estimated_value, sqft, hidden_mortgages 
+          FROM code_violations 
+          WHERE title_check_status = 'failed'
+        `);
+        pendingViolations = violationsRes.rows;
+      } catch (e) { break; }
+    }
 
     const totalPending = pendingAuctions.length + pendingViolations.length;
     if (totalPending === 0) {
