@@ -1,14 +1,11 @@
 name: Daily Distress Foreclosure Pipeline
 
+# on:
+#   schedule:
+#     - cron: '0 14 * * *'
+#     - cron: '0 23 * * *'
 on:
-  schedule:
-    # Ejecutar todos los días a las 10:00 AM y 7:00 PM horario del Este/Indiana (EDT - UTC-4)
-    # 10:00 AM EDT -> 14:00 UTC
-    # 7:00 PM EDT -> 23:00 UTC
-    # (En invierno EST/UTC-5 correrá a las 9:00 AM y 6:00 PM EST, lo cual es aceptable o puede ajustarse)
-    - cron: '0 14 * * *'
-    - cron: '0 23 * * *'
-  workflow_dispatch: # Permite ejecución manual desde la pestaña Actions en GitHub
+  workflow_dispatch: # Permite ejecución manual desde la pestaña Actions en GitHub cuando el usuario lo desee
 
 jobs:
   run-pipeline:
