@@ -1236,18 +1236,26 @@ app.get("/api/prospectos", async (req, res) => {
       const violationKeywords = lead.violations.map(v => v.violation_type as string);
       const rehab = calculateRehab(lead.sqft || null, violationKeywords);
       const hiddenDebt = lead.hiddenMortgages || 0;
-      const mao = calculateMAO(lead.mlsValue, rehab, hiddenDebt, lead.hiddenLiensAmount);
+
+      const rawAppraisal = (lead.auctions && lead.auctions.length > 0 && lead.auctions[0].appraisal_value > 0) 
+        ? Number(lead.auctions[0].appraisal_value) 
+        : 0;
+      const rawMls = lead.mlsValue || 0;
+      let effectiveMarketValue = rawAppraisal > 0 ? rawAppraisal : rawMls;
+      if (rawAppraisal > 0 && rawMls > 0) {
+        if (rawAppraisal < 35000 && rawMls >= 50000) effectiveMarketValue = rawMls;
+        else if (rawAppraisal < rawMls * 0.35) effectiveMarketValue = rawMls;
+      }
+
+      const mao = calculateMAO(effectiveMarketValue, rehab, hiddenDebt, lead.hiddenLiensAmount);
       const primaryDebt = hasAuctions ? Math.max(...lead.auctions.map(a => (a.debt_amount as number) || 0)) : 0;
-      const netEquity = calculateNetEquity(lead.mlsValue, primaryDebt, hiddenDebt, lead.hiddenLiensAmount);
+      const netEquity = calculateNetEquity(effectiveMarketValue, primaryDebt, hiddenDebt, lead.hiddenLiensAmount);
       const purchasePrice = primaryDebt > 0 ? primaryDebt : mao;
-      const { roi, totalCost } = calculateROI(lead.mlsValue, purchasePrice, rehab);
+      const { roi, totalCost } = calculateROI(effectiveMarketValue, purchasePrice, rehab);
 
       // Institutional Multilayer Underwriting
-      const marketVal = (lead.auctions && lead.auctions.length > 0 && lead.auctions[0].appraisal_value > 0) 
-        ? Number(lead.auctions[0].appraisal_value) 
-        : (lead.mlsValue || 0);
       const totalConsolidatedDebt = primaryDebt + hiddenDebt + (lead.hiddenLiensAmount || 0);
-      const institutionalUW = calculateInstitutionalUnderwriting(marketVal, lead.sqft || null, violationKeywords, totalConsolidatedDebt, lead.state);
+      const institutionalUW = calculateInstitutionalUnderwriting(effectiveMarketValue, lead.sqft || null, violationKeywords, totalConsolidatedDebt, lead.state);
 
       // Regla de Stacking / Alta Motivación
       let isHighMotivation = false;
