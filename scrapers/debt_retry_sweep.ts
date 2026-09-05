@@ -200,7 +200,7 @@ async function performOSINTDebtSearch(
  * Función principal de la Barrida Profunda de Reintentos de Deudas.
  * Ejecutada antes de enviar alertas y notificaciones.
  */
-export async function runDebtRetrySweep() {
+export async function runDebtRetrySweep(maxItems: number = 5) {
   console.log("=================================================================");
   console.log("🔄 [DEBT RETRY SWEEP] Iniciando Barrida Profunda y Reintentos");
   console.log("=================================================================");
@@ -216,6 +216,8 @@ export async function runDebtRetrySweep() {
          OR debt_amount = 0 
          OR hidden_mortgages IS NULL 
          OR hidden_liens_amount IS NULL
+      ORDER BY created_at DESC
+      LIMIT ${maxItems}
     `);
   } catch (dbErr: any) {
     console.error("[DEBT SWEEP ERROR] No se pudieron consultar subastas pendientes:", dbErr.message);
@@ -223,7 +225,7 @@ export async function runDebtRetrySweep() {
   }
 
   const auctions = pendingAuctionsRes.rows;
-  console.log(`[DEBT SWEEP] Encontradas ${auctions.length} subastas pendientes de reintento/barrida.`);
+  console.log(`[DEBT SWEEP] Encontradas ${auctions.length} subastas pendientes de reintento/barrida (Límite: ${maxItems}).`);
 
   let resolvedCount = 0;
 

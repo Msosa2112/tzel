@@ -162,8 +162,8 @@ async function runRealEstatePipelineManual() {
   }
 
   try {
-    console.log("\n[4B] Ejecutando barrida profunda de deudas no resueltas...");
-    await runDebtRetrySweep();
+    console.log("\n[4B] Ejecutando barrida profunda de deudas no resueltas (Límite: 3)...");
+    await runDebtRetrySweep(3);
   } catch (err: any) {
     console.error("[ERROR 4B Debt Sweep]:", err.message);
   }
@@ -176,8 +176,8 @@ async function runRealEstatePipelineManual() {
   console.log("=================================================================");
 
   try {
-    console.log("\n[5A] Calculando índice de estrés (SSI)...");
-    await scoreAllProperties();
+    console.log("\n[5A] Calculando índice de estrés (SSI solo para Subastas Judiciales)...");
+    await scoreAllProperties(["foreclosure_auctions"]);
   } catch (err: any) {
     console.error("[ERROR 5A Scoring]:", err.message);
   }

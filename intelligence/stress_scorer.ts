@@ -210,7 +210,7 @@ const idColumns: Record<string, string> = {
   life_events: "event_id"
 };
 
-export async function scoreAllProperties() {
+export async function scoreAllProperties(targetTables?: string[]) {
   console.log("\n========================================================");
   console.log("🔥 [SSI] Iniciando Motor de Índice de Puntuación de Estrés (SSI) 🔥");
   console.log("========================================================\n");
@@ -229,14 +229,18 @@ export async function scoreAllProperties() {
     console.error("[SSI ERROR] Error al cargar violaciones de código para cruce:", e.message);
   }
 
-  // 2. Procesar las 5 tablas principales de propiedades
-  const tablesToScore = [
+  // 2. Procesar las tablas solicitadas (o las 5 principales por defecto)
+  let tablesToScore = [
     { name: "foreclosure_auctions", idCol: "auction_id" },
     { name: "code_violations", idCol: "violation_id" },
     { name: "physical_distress", idCol: "distress_id" },
     { name: "financial_distress", idCol: "record_id" },
     { name: "life_events", idCol: "event_id" }
   ];
+
+  if (targetTables && targetTables.length > 0) {
+    tablesToScore = tablesToScore.filter(t => targetTables.includes(t.name));
+  }
 
   for (const tableInfo of tablesToScore) {
     try {
