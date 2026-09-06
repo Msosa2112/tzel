@@ -5,6 +5,9 @@ import { scrapeStatePublicNotices } from "../scrapers/state_public_notices_scrap
 import { scrapeKentuckyPreForeclosures } from "../scrapers/kentucky_preforeclosure_scraper";
 import { scrapeIndianaPreForeclosures } from "../scrapers/indiana_preforeclosure_scraper";
 import { scrapeSriTaxSales } from "../scrapers/sri_tax_sale_scraper";
+import { scrapeLandbank } from "../scrapers/scrape_landbank";
+import { scrapeDemolitions } from "../scrapers/scrape_demolitions_and_code";
+import { scrapeCountyDistressInstruments } from "../scrapers/scrape_county_distress_instruments";
 import { scrapePVA } from "../scrapers/scrapePVA";
 import { runCrossReference } from "../cross_reference";
 import { runPdfAppraisalWorker } from "../scrapers/pdf_appraisal_worker";
@@ -27,8 +30,8 @@ async function runRealEstatePipelineManual() {
   console.log("📌 REGLAS ACTIVAS:");
   console.log("   - CERO BATCHDATA (Sin consumo de créditos)");
   console.log("   - TECHO MÁXIMO DE VALOR: $350,000 USD");
-  console.log("   - CERO DAÑO FÍSICO / INFRACCIONES DE CÓDIGO");
-  console.log("   - FOCO: Subastas Judiciales, Lis Pendens y Tax Sales");
+  console.log("   - EXCLUSIÓN DE BASURA/MALEZAS COSMÉTICAS (Solo daño estructural grave o demolición)");
+  console.log("   - FOCO: Subastas Judiciales, Pre-Foreclosures, VAP Landbank, Demoliciones y Gravámenes Ocultos");
   console.log(`   - Fecha de Ejecución: ${new Date().toISOString()}`);
   console.log("=================================================================\n");
 
@@ -111,6 +114,30 @@ async function runRealEstatePipelineManual() {
     await scrapeSriTaxSales();
   } catch (err: any) {
     console.error("[ERROR 2D SRI Tax Sales]:", err.message);
+  }
+
+  // 2E. Louisville Metro Landbank Authority (VAP Dollar Homes & Direct Sales)
+  try {
+    console.log("\n[2E] Extrayendo inventario oficial de Louisville Landbank / VAP...");
+    await scrapeLandbank();
+  } catch (err: any) {
+    console.error("[ERROR 2E Landbank]:", err.message);
+  }
+
+  // 2F. Órdenes de Demolición y Peligro Estructural (Louisville Metro Codes & Regs)
+  try {
+    console.log("\n[2F] Extrayendo órdenes de demolición inminente y estructuras de emergencia...");
+    await scrapeDemolitions();
+  } catch (err: any) {
+    console.error("[ERROR 2F Demolitions]:", err.message);
+  }
+
+  // 2G. Gravámenes de Contratistas, Herencias y Deudas Prediales (Jefferson County Deeds)
+  try {
+    console.log("\n[2G] Extrayendo Mechanics Liens, Affidavits of Descent y Delinquent Taxes de Jefferson Deeds...");
+    await scrapeCountyDistressInstruments(45);
+  } catch (err: any) {
+    console.error("[ERROR 2G County Distress Deeds]:", err.message);
   }
 
   // =================================================================
