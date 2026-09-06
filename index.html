@@ -852,6 +852,11 @@
       }
     }
 
+    /* Suppress alarm pulse for unverified / waiting debt markers */
+    .radar-ping-icon.waiting-debt .ping-pulse {
+      display: none !important;
+    }
+
     /* Base Right Panel: Chronological Auction Timeline */
     .sidebar-right-timeline {
       width: 440px;
@@ -2795,6 +2800,499 @@
       opacity: 1;
       color: #ef4444;
     }
+
+    /* ================================================================= */
+    /* TZEL ACQUISITION OPERATING SYSTEM (COMMAND CENTER & KANBAN)      */
+    /* ================================================================= */
+
+    .header-nav-group {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      background: rgba(15, 23, 42, 0.75);
+      padding: 4px;
+      border-radius: 30px;
+      border: 1px solid rgba(0, 207, 204, 0.3);
+      backdrop-filter: blur(10px);
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+    }
+    .header-nav-btn {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      background: transparent;
+      border: none;
+      color: #94a3b8;
+      font-family: 'Inter', sans-serif;
+      font-size: 0.75rem;
+      font-weight: 700;
+      padding: 6px 14px;
+      border-radius: 20px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      position: relative;
+    }
+    .header-nav-btn i, .header-nav-btn svg {
+      width: 14px;
+      height: 14px;
+    }
+    .header-nav-btn:hover {
+      color: #f8fafc;
+      background: rgba(255, 255, 255, 0.05);
+    }
+    .header-nav-btn.active {
+      color: #0f172a;
+      background: var(--color-radar-green);
+      box-shadow: 0 0 12px rgba(0, 207, 204, 0.4);
+    }
+    .nav-badge {
+      background: rgba(0, 0, 0, 0.3);
+      color: inherit;
+      font-size: 0.65rem;
+      font-weight: 900;
+      padding: 1px 6px;
+      border-radius: 10px;
+      margin-left: 4px;
+    }
+    .header-nav-btn.active .nav-badge {
+      background: rgba(15, 23, 42, 0.25);
+      color: #0f172a;
+    }
+
+    /* Command Center Fullscreen */
+    .acq-modal {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      background: #090d16;
+      color: #f8fafc;
+      z-index: 99999;
+      display: none;
+      flex-direction: column;
+      overflow: hidden;
+      font-family: 'Inter', sans-serif;
+    }
+    .acq-header {
+      background: #0f172a;
+      border-bottom: 1px solid rgba(0, 207, 204, 0.25);
+      padding: 14px 24px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-shrink: 0;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+    }
+    .acq-body {
+      flex: 1;
+      overflow-y: auto;
+      padding: 20px 24px 40px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    /* Dual Score Banner */
+    .acq-score-banner {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 16px;
+    }
+    .acq-score-card {
+      background: linear-gradient(135deg, rgba(15, 23, 42, 0.9) 0%, rgba(30, 41, 59, 0.8) 100%);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 14px;
+      padding: 16px;
+      position: relative;
+      overflow: hidden;
+    }
+    .acq-score-card.highlight {
+      border-color: rgba(0, 207, 204, 0.5);
+      box-shadow: 0 0 20px rgba(0, 207, 204, 0.1);
+    }
+    .acq-score-number {
+      font-size: 2.2rem;
+      font-weight: 900;
+      line-height: 1;
+      margin: 8px 0 4px;
+      font-family: 'Inter', sans-serif;
+    }
+    .acq-score-label {
+      font-size: 0.72rem;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      color: #94a3b8;
+      font-weight: 800;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .acq-score-sub {
+      font-size: 0.75rem;
+      color: #cbd5e1;
+      line-height: 1.3;
+    }
+
+    /* 3-Column Layout */
+    .acq-grid {
+      display: grid;
+      grid-template-columns: 1fr 1.2fr 1fr;
+      gap: 20px;
+    }
+    @media (max-width: 1300px) {
+      .acq-grid {
+        grid-template-columns: 1fr 1fr;
+      }
+    }
+    @media (max-width: 900px) {
+      .acq-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .acq-card {
+      background: rgba(15, 23, 42, 0.75);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 14px;
+      padding: 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      backdrop-filter: blur(10px);
+    }
+    .acq-card-title {
+      font-size: 0.8rem;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      color: var(--color-radar-green);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+      padding-bottom: 8px;
+    }
+
+    /* Why This Deal List */
+    .why-deal-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .why-deal-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      font-size: 0.82rem;
+      color: #e2e8f0;
+      background: rgba(255, 255, 255, 0.03);
+      padding: 8px 12px;
+      border-radius: 8px;
+      border-left: 3px solid var(--color-radar-green);
+    }
+
+    /* Strategy Box */
+    .strategy-box {
+      background: linear-gradient(135deg, rgba(0, 207, 204, 0.08) 0%, rgba(16, 185, 129, 0.04) 100%);
+      border: 1px solid rgba(0, 207, 204, 0.3);
+      border-radius: 10px;
+      padding: 14px;
+    }
+    .strategy-title {
+      font-size: 0.95rem;
+      font-weight: 800;
+      color: #ffffff;
+      margin-bottom: 4px;
+    }
+    .strategy-desc {
+      font-size: 0.8rem;
+      color: #cbd5e1;
+      line-height: 1.4;
+    }
+
+    /* Call Brief Elements */
+    .brief-block {
+      background: rgba(0, 0, 0, 0.25);
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      border-radius: 8px;
+      padding: 12px;
+    }
+    .brief-title {
+      font-size: 0.7rem;
+      font-weight: 800;
+      color: #94a3b8;
+      text-transform: uppercase;
+      margin-bottom: 4px;
+    }
+    .brief-dialog {
+      font-size: 0.82rem;
+      color: #f1f5f9;
+      font-style: italic;
+      line-height: 1.4;
+    }
+    .brief-questions-list {
+      margin: 0;
+      padding-left: 20px;
+      font-size: 0.8rem;
+      color: #e2e8f0;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    /* Disposition Buttons */
+    .disp-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+      gap: 8px;
+    }
+    .disp-btn {
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      color: #e2e8f0;
+      font-size: 0.72rem;
+      font-weight: 700;
+      padding: 8px 10px;
+      border-radius: 8px;
+      cursor: pointer;
+      text-align: center;
+      transition: all 0.2s;
+    }
+    .disp-btn:hover {
+      background: rgba(255, 255, 255, 0.1);
+      border-color: rgba(255, 255, 255, 0.25);
+    }
+    .disp-btn.active {
+      background: var(--color-radar-green);
+      color: #0f172a;
+      border-color: var(--color-radar-green);
+      font-weight: 800;
+    }
+
+    /* Offer Range Elements */
+    .offer-range-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 10px;
+      text-align: center;
+    }
+    .offer-box {
+      border-radius: 10px;
+      padding: 12px 8px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .offer-box.cons {
+      background: rgba(59, 130, 246, 0.1);
+      border: 1px solid rgba(59, 130, 246, 0.3);
+      color: #60a5fa;
+    }
+    .offer-box.target {
+      background: rgba(16, 185, 129, 0.12);
+      border: 1px solid rgba(16, 185, 129, 0.4);
+      color: #34d399;
+    }
+    .offer-box.max {
+      background: rgba(239, 68, 68, 0.1);
+      border: 1px solid rgba(239, 68, 68, 0.3);
+      color: #f87171;
+    }
+    .offer-val {
+      font-size: 1.25rem;
+      font-weight: 900;
+    }
+    .offer-lbl {
+      font-size: 0.65rem;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    /* Kanban Board */
+    .kanban-container {
+      display: flex;
+      gap: 14px;
+      overflow-x: auto;
+      padding: 10px 0 20px;
+      height: 100%;
+      box-sizing: border-box;
+    }
+    .kanban-col {
+      flex: 0 0 280px;
+      background: rgba(15, 23, 42, 0.6);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 12px;
+      display: flex;
+      flex-direction: column;
+      max-height: 100%;
+      overflow: hidden;
+    }
+    .kanban-col-header {
+      padding: 12px 14px;
+      font-size: 0.75rem;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+      background: rgba(0, 0, 0, 0.2);
+    }
+    .kanban-col-body {
+      flex: 1;
+      overflow-y: auto;
+      padding: 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .kanban-card {
+      background: #1e293b;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 10px;
+      padding: 12px;
+      cursor: pointer;
+      transition: all 0.2s;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .kanban-card:hover {
+      border-color: var(--color-radar-green);
+      transform: translateY(-2px);
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+    }
+
+    /* Fullscreen Mode Panels (Kanban & Sources) */
+    .view-full-panel {
+      display: none;
+      position: absolute;
+      top: 62px;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: #090d16;
+      z-index: 950;
+      padding: 16px 24px;
+      overflow: hidden;
+      flex-direction: column;
+    }
+    .view-full-panel.active {
+      display: flex;
+    }
+
+    /* Objection Tabs */
+    .obj-tabs-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px;
+    }
+    .obj-tab {
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      color: #94a3b8;
+      border-radius: 6px;
+      padding: 6px 10px;
+      font-size: 0.72rem;
+      cursor: pointer;
+      text-align: left;
+      transition: all 0.2s;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .obj-tab:hover {
+      background: rgba(255, 255, 255, 0.08);
+      color: #fff;
+    }
+    .obj-tab.active {
+      background: rgba(0, 207, 204, 0.15);
+      border-color: var(--color-radar-green);
+      color: #fff;
+      font-weight: 700;
+    }
+    .obj-detail-pane {
+      background: rgba(0, 0, 0, 0.3);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      border-radius: 8px;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      font-size: 0.78rem;
+    }
+
+    /* Variable Status Tags in Offer Range */
+    .var-tag {
+      font-size: 0.6rem;
+      font-weight: 800;
+      padding: 2px 6px;
+      border-radius: 4px;
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+      display: inline-block;
+    }
+    .var-tag.verified {
+      background: rgba(16, 185, 129, 0.2);
+      color: #34d399;
+      border: 1px solid rgba(16, 185, 129, 0.4);
+    }
+    .var-tag.estimated {
+      background: rgba(59, 130, 246, 0.2);
+      color: #60a5fa;
+      border: 1px solid rgba(59, 130, 246, 0.4);
+    }
+    .var-tag.assumption {
+      background: rgba(245, 158, 11, 0.2);
+      color: #fbbf24;
+      border: 1px solid rgba(245, 158, 11, 0.4);
+    }
+
+    /* Form & Debrief Controls */
+    .acq-input, .acq-select, .acq-textarea {
+      width: 100%;
+      box-sizing: border-box;
+      background: rgba(0, 0, 0, 0.35);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      color: #f8fafc;
+      border-radius: 6px;
+      padding: 8px 10px;
+      font-size: 0.78rem;
+      font-family: inherit;
+    }
+    .acq-input:focus, .acq-select:focus, .acq-textarea:focus {
+      outline: none;
+      border-color: var(--color-radar-green);
+    }
+
+    /* Source Performance Analytics Table */
+    .source-perf-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.8rem;
+      text-align: left;
+    }
+    .source-perf-table th {
+      padding: 10px 14px;
+      background: rgba(0, 0, 0, 0.4);
+      color: #94a3b8;
+      font-weight: 700;
+      text-transform: uppercase;
+      font-size: 0.7rem;
+      letter-spacing: 0.5px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    }
+    .source-perf-table td {
+      padding: 12px 14px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+      color: #e2e8f0;
+    }
+    .source-perf-table tr:hover td {
+      background: rgba(255, 255, 255, 0.03);
+    }
   </style>
 </head>
 <body>
@@ -2807,8 +3305,22 @@
       </button>
       <div class="brand-container">
         <img src="logo.jpg" alt="TZEL Logo" class="brand-logo">
-        <h1 class="brand-title" id="header-brand-title">TZEL TACTICAL RADAR v1.2</h1>
+        <h1 class="brand-title" id="header-brand-title">TZEL ACQUISITION OS v2.0</h1>
       </div>
+    </div>
+
+    <!-- Mode Switcher: Tactical Radar | Acquisition Pipeline | Source Performance -->
+    <div class="header-nav-group" id="header-mode-nav">
+      <button id="btn-mode-radar" class="header-nav-btn active" onclick="switchMainView('radar')">
+        <i data-lucide="crosshair"></i> <span>RADAR TÁCTICO</span>
+      </button>
+      <button id="btn-mode-kanban" class="header-nav-btn" onclick="switchMainView('kanban')">
+        <i data-lucide="layout-kanban"></i> <span>ACQUISITION PIPELINE</span>
+        <span id="kanban-badge-count" class="nav-badge">0</span>
+      </button>
+      <button id="btn-mode-sources" class="header-nav-btn" onclick="switchMainView('sources')">
+        <i data-lucide="pie-chart"></i> <span>RENDIMIENTO DE FUENTES</span>
+      </button>
     </div>
     
     <div style="display: flex; align-items: center; gap: 16px;">
@@ -3130,6 +3642,10 @@
           <div id="drawer-opp-action" style="font-size: 0.88rem; font-weight: 800; color: #ffffff; line-height: 1.3; background: rgba(255,255,255,0.08); padding: 8px 12px; border-radius: 8px; border-left: 3px solid var(--color-radar-green);">
             LLAMAR DUEÑO: OFERTA COMPRA DIRECTA / SUBJECT-TO
           </div>
+          <button class="acq-launch-btn" onclick="openAcquisitionCommandCenter(selectedLead)" style="margin-top: 12px; width: 100%; padding: 11px 14px; background: linear-gradient(135deg, #00cfcc 0%, #009996 100%); color: #0f172a; border: none; border-radius: 8px; font-weight: 800; font-size: 0.82rem; letter-spacing: 0.5px; display: flex; align-items: center; justify-content: center; gap: 8px; cursor: pointer; box-shadow: 0 4px 15px rgba(0,207,204,0.3); transition: all 0.2s ease;">
+            <i data-lucide="shield-alert" style="width: 16px; height: 16px;"></i>
+            <span>ABRIR ACQUISITION COMMAND CENTER</span>
+          </button>
         </div>
 
         <!-- Target Overview -->
@@ -3445,6 +3961,531 @@
           </tbody>
         </table>
       </div>
+    </div>
+  </div>
+
+  <!-- ================================================================= -->
+  <!-- TZEL ACQUISITION OPERATING SYSTEM: FULLSCREEN COMMAND CENTER     -->
+  <!-- ================================================================= -->
+  <div id="acquisition-command-center" class="acq-modal">
+    <!-- Top Header -->
+    <div class="acq-header">
+      <div style="display: flex; align-items: center; gap: 14px;">
+        <div style="background: rgba(0,207,204,0.15); border: 1px solid var(--color-radar-green); padding: 8px; border-radius: 10px;">
+          <i data-lucide="shield-alert" style="color: var(--color-radar-green); width: 22px; height: 22px;"></i>
+        </div>
+        <div>
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <h2 id="acq-prop-address" style="margin: 0; font-size: 1.15rem; font-weight: 900; color: #fff; letter-spacing: 0.2px;">123 W Oak St</h2>
+            <span id="acq-distress-pill" class="badge badge-high" style="font-size: 0.65rem;">FORECLOSURE</span>
+            <span id="acq-owner-badge" class="badge" style="background: rgba(255,255,255,0.08); font-size: 0.65rem; color: #94a3b8;">ABSENTEE OWNER</span>
+          </div>
+          <div style="font-size: 0.75rem; color: #94a3b8; margin-top: 2px;">
+            Propietario: <strong id="acq-prop-owner" style="color: #cbd5e1;">John Doe</strong> &bull; 
+            Jurisdicción: <span id="acq-prop-county">Jefferson County, KY</span> &bull; 
+            PVA ID: <span id="acq-prop-parcel">0123-0456</span>
+          </div>
+        </div>
+      </div>
+
+      <div style="display: flex; align-items: center; gap: 12px;">
+        <!-- Stage Quick Switcher -->
+        <div style="display: flex; align-items: center; gap: 6px; background: rgba(255,255,255,0.05); padding: 4px 8px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.1);">
+          <span style="font-size: 0.68rem; color: #94a3b8; font-weight: 700; text-transform: uppercase;">STAGE:</span>
+          <select id="acq-stage-select" class="acq-select" style="padding: 4px 8px; font-size: 0.72rem; font-weight: 700; border: none; background: transparent; color: var(--color-radar-green); cursor: pointer;" onchange="updateAcquisitionStage(this.value)">
+            <option value="NEW">NEW</option>
+            <option value="RESEARCHED">RESEARCHED</option>
+            <option value="READY_TO_CALL">READY TO CALL</option>
+            <option value="CONTACTED">CONTACTED</option>
+            <option value="CONVERSATION">CONVERSATION</option>
+            <option value="FOLLOW_UP">FOLLOW-UP</option>
+            <option value="OFFER_SENT">OFFER SENT</option>
+            <option value="NEGOTIATION">NEGOTIATION</option>
+            <option value="CONTRACTED">CONTRACTED</option>
+            <option value="CLOSED">CLOSED</option>
+            <option value="DEAD">DEAD</option>
+          </select>
+        </div>
+
+        <!-- Phone Action -->
+        <a id="acq-call-phone-link" href="tel:" class="btn-primary" style="display: flex; align-items: center; gap: 6px; padding: 8px 16px; font-size: 0.8rem; font-weight: 800; border-radius: 8px; background: var(--color-radar-green); color: #0f172a; text-decoration: none;">
+          <i data-lucide="phone-call" style="width: 15px; height: 15px;"></i>
+          <span id="acq-call-phone-text">LLAMAR: (502) ...</span>
+        </a>
+
+        <!-- Close Button -->
+        <button onclick="closeAcquisitionCommandCenter()" style="background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.12); color: #94a3b8; width: 34px; height: 34px; border-radius: 8px; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 1.1rem; transition: all 0.2s;" title="Cerrar Command Center">
+          &times;
+        </button>
+      </div>
+    </div>
+
+    <!-- Body Scroll Container -->
+    <div class="acq-body">
+      <!-- Top Dual Score Banner -->
+      <div class="acq-score-banner">
+        <!-- Tzel Opportunity Score -->
+        <div class="acq-score-card highlight">
+          <div class="acq-score-label">
+            <i data-lucide="zap" style="color: var(--color-radar-green); width: 14px; height: 14px;"></i>
+            <span>Tzel Opportunity Score</span>
+          </div>
+          <div id="acq-score-opp" class="acq-score-number" style="color: var(--color-radar-green);">88<span style="font-size: 1.1rem; color: #64748b;">/100</span></div>
+          <div class="acq-score-sub" id="acq-score-opp-sub">¿Qué tan atractiva y ejecutable es esta adquisición? Alta rentabilidad y teléfono verificado.</div>
+        </div>
+
+        <!-- Stress Score (SSI) -->
+        <div class="acq-score-card">
+          <div class="acq-score-label">
+            <i data-lucide="flame" style="color: #ef4444; width: 14px; height: 14px;"></i>
+            <span>Distress Score (SSI)</span>
+          </div>
+          <div id="acq-score-ssi" class="acq-score-number" style="color: #ef4444;">94<span style="font-size: 1.1rem; color: #64748b;">/100</span></div>
+          <div class="acq-score-sub" id="acq-score-ssi-sub">¿Qué tan estresada está la propiedad? Presión de subasta judicial activa.</div>
+        </div>
+
+        <!-- Urgency & Timeline Countdown -->
+        <div class="acq-score-card">
+          <div class="acq-score-label">
+            <i data-lucide="clock" style="color: #f59e0b; width: 14px; height: 14px;"></i>
+            <span>Presión Temporal (Why Now?)</span>
+          </div>
+          <div id="acq-urgency-val" class="acq-score-number" style="color: #f59e0b;">41 DÍAS</div>
+          <div class="acq-score-sub" id="acq-urgency-sub">Fecha estimada de subasta judicial o vencimiento legal. Ventana de compra activa.</div>
+        </div>
+
+        <!-- Gross Equity Spread -->
+        <div class="acq-score-card">
+          <div class="acq-score-label">
+            <i data-lucide="trending-up" style="color: #3b82f6; width: 14px; height: 14px;"></i>
+            <span>Margen de Equidad Bruta</span>
+          </div>
+          <div id="acq-equity-val" class="acq-score-number" style="color: #3b82f6;">+$145,000</div>
+          <div class="acq-score-sub" id="acq-equity-sub">ARV PVA: $275K &bull; Deuda y Gravámenes: $82K &bull; As-is Equity: 52%</div>
+        </div>
+      </div>
+
+      <!-- 3-Column Tactical Command Grid -->
+      <div class="acq-grid">
+        
+        <!-- COLUMN 1: INTELLIGENCE & MOTIVATION -->
+        <div style="display: flex; flex-direction: column; gap: 16px;">
+          <!-- WHY THIS DEAL? -->
+          <div class="acq-card" style="border-top: 3px solid var(--color-radar-green);">
+            <div class="acq-card-title">
+              <span style="display: flex; align-items: center; gap: 6px;">
+                <i data-lucide="check-circle-2" style="width: 14px; height: 14px;"></i>
+                1. WHY THIS DEAL? (5 PUNTOS CLAVE)
+              </span>
+              <span id="acq-motivation-conf" class="badge" style="background: rgba(0,207,204,0.15); color: var(--color-radar-green); font-size: 0.65rem;">CONFIDENCE: 87%</span>
+            </div>
+            
+            <div id="acq-why-deal-list" class="why-deal-list">
+              <!-- Dynamically populated 5 points -->
+            </div>
+
+            <!-- PRIMARY MOTIVATION -->
+            <div style="margin-top: 6px; padding: 10px; background: rgba(0,0,0,0.25); border-radius: 8px; border: 1px solid rgba(255,255,255,0.06);">
+              <div style="font-size: 0.68rem; text-transform: uppercase; font-weight: 800; color: #94a3b8; margin-bottom: 2px;">MOTIVACIÓN PRIMARIA DETECTADA:</div>
+              <div id="acq-primary-motivation" style="font-size: 0.85rem; font-weight: 700; color: #f8fafc;">
+                Presión de ejecución judicial + Propietario no residente (Absentee) + Aversión a gastos de reparación
+              </div>
+            </div>
+          </div>
+
+          <!-- PROPERTY INTELLIGENCE DOSSIER -->
+          <div class="acq-card">
+            <div class="acq-card-title">
+              <span style="display: flex; align-items: center; gap: 6px;">
+                <i data-lucide="database" style="width: 14px; height: 14px;"></i>
+                EXPEDIENTE DE PROPIEDAD &amp; TÍTULO
+              </span>
+            </div>
+
+            <div class="prop-info-grid" style="font-size: 0.78rem;">
+              <div class="prop-info-item">
+                <span class="prop-info-label">Tipo de Dueño</span>
+                <span class="prop-info-value" id="acq-dossier-owner-type">Absentee / No Residente</span>
+              </div>
+              <div class="prop-info-item">
+                <span class="prop-info-label">Dirección Postal Dueño</span>
+                <span class="prop-info-value" id="acq-dossier-mailing">4521 Oak Lawn, Atlanta GA</span>
+              </div>
+              <div class="prop-info-item">
+                <span class="prop-info-label">Beds / Baths / SqFt</span>
+                <span class="prop-info-value" id="acq-dossier-specs">3 Beds &bull; 1.5 Baths &bull; 1,420 SqFt</span>
+              </div>
+              <div class="prop-info-item">
+                <span class="prop-info-label">ARV Estimado (PVA/Comps)</span>
+                <span class="prop-info-value" id="acq-dossier-arv" style="color: #60a5fa; font-weight: 800;">$275,000</span>
+              </div>
+              <div class="prop-info-item">
+                <span class="prop-info-label">Hipoteca / Deuda Principal</span>
+                <span class="prop-info-value" id="acq-dossier-mortgage" style="color: #f87171;">$78,400 (Claim)</span>
+              </div>
+              <div class="prop-info-item">
+                <span class="prop-info-label">Impuestos / Liens Condado</span>
+                <span class="prop-info-value" id="acq-dossier-taxes" style="color: #f87171;">$3,650</span>
+              </div>
+              <div class="prop-info-item">
+                <span class="prop-info-label">Expediente Judicial / Case #</span>
+                <span class="prop-info-value" id="acq-dossier-case" style="font-family: monospace;">24-CI-001892</span>
+              </div>
+              <div class="prop-info-item">
+                <span class="prop-info-label">Estado de Subasta</span>
+                <span class="prop-info-value" id="acq-dossier-auction" style="color: #fbbf24; font-weight: 700;">Subasta Programada</span>
+              </div>
+              <div class="prop-info-item">
+                <span class="prop-info-label">Violaciones / Demolición</span>
+                <span class="prop-info-value" id="acq-dossier-violations">Sin orden demolición activa</span>
+              </div>
+              <div class="prop-info-item">
+                <span class="prop-info-label">Inventario Landbank</span>
+                <span class="prop-info-value" id="acq-dossier-landbank">No (Propiedad privada)</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- COLUMN 2: STRATEGY, CALL BRIEF & OBJECTIONS -->
+        <div style="display: flex; flex-direction: column; gap: 16px;">
+          <!-- RECOMMENDED APPROACH -->
+          <div class="acq-card" style="border-top: 3px solid #3b82f6;">
+            <div class="acq-card-title">
+              <span style="display: flex; align-items: center; gap: 6px;">
+                <i data-lucide="compass" style="width: 14px; height: 14px;"></i>
+                2. RECOMMENDED APPROACH (ESTRATEGIA INICIAL)
+              </span>
+              <span id="acq-strategy-conf" class="badge" style="background: rgba(59,130,246,0.2); color: #60a5fa; font-size: 0.65rem;">CONFIDENCE: 91%</span>
+            </div>
+
+            <div class="strategy-box">
+              <div id="acq-strategy-title" class="strategy-title">Pre-foreclosure: Adquisición Directa antes de Subasta</div>
+              <div id="acq-strategy-desc" class="strategy-desc">
+                El propietario enfrenta subasta inminente con margen de equidad positivo ($145k). La mejor vía es ofrecer una compra rápida en efectivo o asunción de deuda con pago de cierre que salve su crédito antes del remate.
+              </div>
+            </div>
+          </div>
+
+          <!-- CALL BRIEF -->
+          <div class="acq-card">
+            <div class="acq-card-title">
+              <span style="display: flex; align-items: center; gap: 6px;">
+                <i data-lucide="phone-forwarded" style="width: 14px; height: 14px;"></i>
+                3. CALL BRIEF (PREPARACIÓN DE LLAMADA)
+              </span>
+            </div>
+
+            <!-- Objective -->
+            <div class="brief-block">
+              <div class="brief-title">OBJETIVO TÁCTICO DE LA LLAMADA:</div>
+              <div id="acq-brief-objective" style="font-size: 0.8rem; color: #cbd5e1; font-weight: 600;">
+                No intentar cerrar en el primer contacto. Determinar si el dueño está consciente de la fecha de corte/subasta y si desea evaluar una salida rápida sin comisiones para rescatar su equidad.
+              </div>
+            </div>
+
+            <!-- Opening Dialog -->
+            <div class="brief-block">
+              <div class="brief-title">OPENING NATURAL (NO SPAM):</div>
+              <div id="acq-brief-opening" class="brief-dialog">
+                "Hola [Owner], disculpa que te llame directamente. Mi nombre es Miguel, soy inversionista local en Louisville. Te llamo respecto a la propiedad en [Address]. Estaba revisando los registros del condado y vi que hay un trámite programado para las próximas semanas. Quería contactarte con respeto para saber si tus planes son conservar la casa o si evaluarías una oferta en efectivo tal como está para no lidiar con reparaciones."
+              </div>
+            </div>
+
+            <!-- 5-7 Questions -->
+            <div class="brief-block">
+              <div class="brief-title">5-7 PREGUNTAS PRIORITARIAS:</div>
+              <ol id="acq-brief-questions" class="brief-questions-list">
+                <li>¿Sigue siendo usted el propietario registrado de la propiedad?</li>
+                <li>¿Vive usted actualmente en la propiedad o está desocupada/rentada?</li>
+                <li>¿Cuáles son sus planes para la propiedad en este momento?</li>
+                <li>¿Está al tanto del cronograma fijado en los registros del condado?</li>
+                <li>Si recibiera una propuesta limpia sin comisiones ni reparaciones, ¿consideraría vender?</li>
+                <li>¿Qué plazo de tiempo tiene en mente para resolver esta situación?</li>
+                <li>Si decidiera vender, ¿qué es lo más importante para usted: velocidad, liquidez neta o tiempo para mudarse?</li>
+              </ol>
+            </div>
+          </div>
+
+          <!-- OBJECTION INTELLIGENCE LIBRARY -->
+          <div class="acq-card">
+            <div class="acq-card-title">
+              <span style="display: flex; align-items: center; gap: 6px;">
+                <i data-lucide="shield-check" style="width: 14px; height: 14px;"></i>
+                4. OBJECTION INTELLIGENCE (MANEJO DE OBJECIONES)
+              </span>
+            </div>
+
+            <!-- Objection selector tabs -->
+            <div class="obj-tabs-grid" id="acq-obj-tabs">
+              <button class="obj-tab active" onclick="selectObjection(0)">"I want to think about it"</button>
+              <button class="obj-tab" onclick="selectObjection(1)">"I can get more with an agent"</button>
+              <button class="obj-tab" onclick="selectObjection(2)">"Your offer is too low"</button>
+              <button class="obj-tab" onclick="selectObjection(3)">"I need to talk to family"</button>
+              <button class="obj-tab" onclick="selectObjection(4)">"I'm not selling"</button>
+              <button class="obj-tab" onclick="selectObjection(5)">"I already have a buyer"</button>
+            </div>
+
+            <!-- Active Objection Breakdown Pane -->
+            <div class="obj-detail-pane" id="acq-obj-detail">
+              <!-- Dynamically hydrated -->
+            </div>
+          </div>
+        </div>
+
+        <!-- COLUMN 3: LIVE CONVERSATION & OFFER RANGE -->
+        <div style="display: flex; flex-direction: column; gap: 16px;">
+          <!-- LIVE CONVERSATION MODE & DISPOSITIONS -->
+          <div class="acq-card" style="border-top: 3px solid #f59e0b;">
+            <div class="acq-card-title">
+              <span style="display: flex; align-items: center; gap: 6px;">
+                <i data-lucide="phone-call" style="width: 14px; height: 14px;"></i>
+                5. LIVE CONVERSATION (DISPOSICIÓN RÁPIDA)
+              </span>
+            </div>
+
+            <div class="disp-grid" id="acq-disp-grid">
+              <button class="disp-btn" onclick="handleDispositionClick('NO_ANSWER')">No answer</button>
+              <button class="disp-btn" onclick="handleDispositionClick('VOICEMAIL')">Voicemail</button>
+              <button class="disp-btn" onclick="handleDispositionClick('WRONG_NUMBER')">Wrong number</button>
+              <button class="disp-btn" onclick="handleDispositionClick('SPOKE_WITH_OWNER')">Spoke with owner</button>
+              <button class="disp-btn" onclick="handleDispositionClick('INTERESTED')">Interested</button>
+              <button class="disp-btn" onclick="handleDispositionClick('MAYBE')">Maybe</button>
+              <button class="disp-btn" onclick="handleDispositionClick('NOT_INTERESTED')">Not interested</button>
+              <button class="disp-btn" onclick="handleDispositionClick('WANTS_OFFER')">Wants offer</button>
+              <button class="disp-btn" onclick="handleDispositionClick('WANTS_TIME')">Wants time</button>
+              <button class="disp-btn" onclick="handleDispositionClick('APPOINTMENT')">Appt Scheduled</button>
+              <button class="disp-btn" onclick="handleDispositionClick('NEGOTIATING')">Negotiating</button>
+              <button class="disp-btn" onclick="handleDispositionClick('OFFER_SENT')">Offer sent</button>
+              <button class="disp-btn" onclick="handleDispositionClick('CONTRACTED')">Contracted</button>
+              <button class="disp-btn" onclick="handleDispositionClick('CLOSED')">Closed</button>
+              <button class="disp-btn" onclick="handleDispositionClick('DEAD')">Dead</button>
+            </div>
+
+            <!-- Rapid Debrief Form -->
+            <div id="acq-debrief-form" style="display: flex; flex-direction: column; gap: 8px; margin-top: 6px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.08);">
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+                <div>
+                  <label style="font-size: 0.65rem; color: #94a3b8; font-weight: 700;">PRECIO SOLICITADO ($)</label>
+                  <input type="number" id="acq-form-asking" class="acq-input" placeholder="Ej: 130000" onchange="syncCurrentDebrief()">
+                </div>
+                <div>
+                  <label style="font-size: 0.65rem; color: #94a3b8; font-weight: 700;">DEUDA RECONOCIDA ($)</label>
+                  <input type="number" id="acq-form-debt" class="acq-input" placeholder="Ej: 70000" onchange="syncCurrentDebrief()">
+                </div>
+              </div>
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+                <div>
+                  <label style="font-size: 0.65rem; color: #94a3b8; font-weight: 700;">TIMELINE / URGENCIA</label>
+                  <input type="text" id="acq-form-timeline" class="acq-input" placeholder="Ej: 30 días / Inmediato" onchange="syncCurrentDebrief()">
+                </div>
+                <div>
+                  <label style="font-size: 0.65rem; color: #94a3b8; font-weight: 700;">POSICIÓN NEGOCIADORA</label>
+                  <select id="acq-form-position" class="acq-select" onchange="syncCurrentDebrief()">
+                    <option value="WEAK">Débil (Dueño muy motivado)</option>
+                    <option value="MODERATE" selected>Moderada</option>
+                    <option value="STRONG">Firme (No cede en precio)</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- AI CONVERSATION DEBRIEF (RAW NOTES PARSER) -->
+          <div class="acq-card">
+            <div class="acq-card-title">
+              <span style="display: flex; align-items: center; gap: 6px;">
+                <i data-lucide="sparkles" style="width: 14px; height: 14px; color: var(--color-radar-green);"></i>
+                AI CONVERSATION DEBRIEF
+              </span>
+            </div>
+
+            <textarea id="acq-raw-notes" class="acq-textarea" rows="3" placeholder="Pega notas rápidas de la llamada: ej. 'Dueño heredó la casa de su madre, vive en Georgia, no quiere repararla, debe aprox 70k, pide 130k pero escuchará una oferta...'"></textarea>
+            
+            <button onclick="parseConversationDebriefLocal()" class="btn-secondary" style="display: flex; align-items: center; justify-content: center; gap: 6px; padding: 7px 12px; font-size: 0.75rem; font-weight: 800; border-radius: 6px; background: rgba(0,207,204,0.12); border: 1px solid var(--color-radar-green); color: #fff; cursor: pointer;">
+              <i data-lucide="cpu" style="width: 14px; height: 14px; color: var(--color-radar-green);"></i>
+              <span>TRANSFORMAR NOTAS CON IA</span>
+            </button>
+
+            <!-- Parsed AI Result Cards -->
+            <div id="acq-ai-parsed-results" style="display: flex; flex-direction: column; gap: 6px; font-size: 0.75rem; background: rgba(0,0,0,0.25); padding: 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.06);">
+              <div><strong>Motivación:</strong> <span id="acq-ai-res-mot" style="color: #cbd5e1;">Aún sin procesar</span></div>
+              <div style="display: flex; justify-content: space-between;">
+                <span><strong>Asking:</strong> <span id="acq-ai-res-ask" style="color: #34d399;">-</span></span>
+                <span><strong>Deuda:</strong> <span id="acq-ai-res-debt" style="color: #f87171;">-</span></span>
+                <span><strong>Posición:</strong> <span id="acq-ai-res-pos" style="color: #60a5fa;">-</span></span>
+              </div>
+              <div><strong>Acción Sugerida:</strong> <span id="acq-ai-res-action" style="color: var(--color-radar-green); font-weight: 700;">-</span></div>
+            </div>
+          </div>
+
+          <!-- OFFER INTELLIGENCE (3 TIERS RANGE) -->
+          <div class="acq-card" style="border-top: 3px solid var(--color-radar-green);">
+            <div class="acq-card-title">
+              <span style="display: flex; align-items: center; gap: 6px;">
+                <i data-lucide="calculator" style="width: 14px; height: 14px;"></i>
+                6. OFFER RANGE CALCULATOR
+              </span>
+            </div>
+
+            <!-- Variables breakdown (Verified vs Estimated vs Assumptions) -->
+            <div style="display: flex; flex-direction: column; gap: 4px; font-size: 0.72rem; background: rgba(0,0,0,0.25); padding: 8px; border-radius: 6px;">
+              <div style="display: flex; justify-content: space-between; align-items: center;">
+                <span>ARV Mercado: <strong id="acq-offer-var-arv">$280,000</strong></span>
+                <span class="var-tag estimated">Estimated</span>
+              </div>
+              <div style="display: flex; justify-content: space-between; align-items: center;">
+                <span>Reparaciones Estimadas: <strong id="acq-offer-var-repairs">$45,000</strong></span>
+                <span class="var-tag estimated">Estimated</span>
+              </div>
+              <div style="display: flex; justify-content: space-between; align-items: center;">
+                <span>Costos Cierre / Holding: <strong id="acq-offer-var-costs">$18,000</strong></span>
+                <span class="var-tag assumption">Assumption</span>
+              </div>
+              <div style="display: flex; justify-content: space-between; align-items: center;">
+                <span>Deuda / Gravámenes Registrados: <strong id="acq-offer-var-debt" style="color: #f87171;">$82,000</strong></span>
+                <span class="var-tag verified">Verified</span>
+              </div>
+            </div>
+
+            <!-- 3 Offer Boxes -->
+            <div class="offer-range-grid">
+              <div class="offer-box cons">
+                <span class="offer-lbl">Conservative</span>
+                <span class="offer-val" id="acq-offer-cons">$92,000</span>
+                <span style="font-size: 0.6rem; color: #94a3b8;">Wholesale / Max Safety</span>
+              </div>
+              <div class="offer-box target">
+                <span class="offer-lbl">Target Win-Win</span>
+                <span class="offer-val" id="acq-offer-target">$108,000</span>
+                <span style="font-size: 0.6rem; color: #94a3b8;">Ideal Acquisition</span>
+              </div>
+              <div class="offer-box max">
+                <span class="offer-lbl">Max MAO</span>
+                <span class="offer-val" id="acq-offer-max">$125,000</span>
+                <span style="font-size: 0.6rem; color: #94a3b8;">Hard Ceiling Limit</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- FOLLOW-UP ENGINE & TIMELINE -->
+          <div class="acq-card">
+            <div class="acq-card-title">
+              <span style="display: flex; align-items: center; gap: 6px;">
+                <i data-lucide="calendar-check" style="width: 14px; height: 14px;"></i>
+                7. FOLLOW-UP ENGINE
+              </span>
+            </div>
+
+            <div style="display: flex; flex-direction: column; gap: 8px;">
+              <div style="display: flex; justify-content: space-between; align-items: center;">
+                <span style="font-size: 0.72rem; color: #94a3b8; font-weight: 700;">SIGUIENTE ACCIÓN:</span>
+                <span id="acq-next-action-badge" class="badge" style="background: rgba(0,207,204,0.15); color: var(--color-radar-green); font-size: 0.7rem;">PREPARAR OFERTA EN EFECTIVO</span>
+              </div>
+
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+                <div>
+                  <label style="font-size: 0.65rem; color: #94a3b8; font-weight: 700;">FECHA DE SEGUIMIENTO</label>
+                  <input type="date" id="acq-form-followup" class="acq-input" onchange="syncCurrentDebrief()">
+                </div>
+                <div style="display: flex; align-items: flex-end;">
+                  <button onclick="saveAcquisitionStateLocal()" class="btn-primary" style="width: 100%; padding: 8px; font-size: 0.75rem; font-weight: 800; border-radius: 6px; background: var(--color-radar-green); color: #0f172a; border: none; cursor: pointer;">
+                    GUARDAR CAMBIOS
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- ================================================================= -->
+  <!-- TZEL ACQUISITION PIPELINE (KANBAN VIEW)                           -->
+  <!-- ================================================================= -->
+  <div id="view-kanban-container" class="view-full-panel">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-shrink: 0;">
+      <div style="display: flex; align-items: center; gap: 12px;">
+        <h2 style="margin: 0; font-size: 1.1rem; font-weight: 800; color: #fff; display: flex; align-items: center; gap: 8px;">
+          <i data-lucide="layout-kanban" style="color: var(--color-radar-green); width: 20px; height: 20px;"></i>
+          ACQUISITION PIPELINE (KANBAN TÁCTICO)
+        </h2>
+        <span id="kanban-total-deals-badge" class="badge" style="background: rgba(0,207,204,0.15); color: var(--color-radar-green);">0 Deals Activos</span>
+      </div>
+
+      <div style="display: flex; align-items: center; gap: 10px;">
+        <button class="btn-secondary" onclick="renderKanbanBoard()" style="display: flex; align-items: center; gap: 6px; font-size: 0.75rem; padding: 6px 12px; background: rgba(255,255,255,0.06); color: #cbd5e1; border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; cursor: pointer;">
+          <i data-lucide="refresh-cw" style="width: 13px; height: 13px;"></i>
+          <span>Actualizar</span>
+        </button>
+        <button class="btn-primary" onclick="switchMainView('radar')" style="display: flex; align-items: center; gap: 6px; font-size: 0.75rem; padding: 6px 14px; background: var(--color-radar-green); color: #0f172a; border: none; border-radius: 6px; font-weight: 800; cursor: pointer;">
+          <i data-lucide="crosshair" style="width: 14px; height: 14px;"></i>
+          <span>Volver al Radar</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Kanban Columns Container -->
+    <div class="kanban-container" id="kanban-board-cols">
+      <!-- 11 columns rendered dynamically -->
+    </div>
+  </div>
+
+  <!-- ================================================================= -->
+  <!-- TZEL SOURCE PERFORMANCE DASHBOARD                                 -->
+  <!-- ================================================================= -->
+  <div id="view-sources-container" class="view-full-panel" style="overflow-y: auto;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-shrink: 0;">
+      <div>
+        <h2 style="margin: 0; font-size: 1.15rem; font-weight: 900; color: #fff; display: flex; align-items: center; gap: 8px;">
+          <i data-lucide="pie-chart" style="color: var(--color-radar-green); width: 20px; height: 20px;"></i>
+          LEAD SOURCE PERFORMANCE &amp; OUTCOME INTELLIGENCE
+        </h2>
+        <div style="font-size: 0.8rem; color: #94a3b8; margin-top: 4px;">
+          ¿Qué fuentes de distress inmobiliario generan contratos y dinero real en Kentucky &amp; Indiana?
+        </div>
+      </div>
+
+      <button class="btn-primary" onclick="switchMainView('radar')" style="display: flex; align-items: center; gap: 6px; font-size: 0.75rem; padding: 6px 14px; background: var(--color-radar-green); color: #0f172a; border: none; border-radius: 6px; font-weight: 800; cursor: pointer;">
+        <i data-lucide="crosshair" style="width: 14px; height: 14px;"></i>
+        <span>Volver al Radar</span>
+      </button>
+    </div>
+
+    <!-- Outcome Intelligence Callout -->
+    <div style="background: linear-gradient(135deg, rgba(0,207,204,0.12) 0%, rgba(15,23,42,0.8) 100%); border: 1px solid var(--color-radar-green); border-radius: 12px; padding: 16px; margin-bottom: 20px;">
+      <div style="display: flex; align-items: center; gap: 8px; font-size: 0.75rem; font-weight: 800; color: var(--color-radar-green); text-transform: uppercase;">
+        <i data-lucide="zap" style="width: 16px; height: 16px;"></i>
+        <span>TZEL OUTCOME INSIGHT</span>
+      </div>
+      <div style="font-size: 0.95rem; font-weight: 700; color: #ffffff; margin-top: 6px; line-height: 1.4;">
+        "Foreclosure + Propietario Absentee + Daño Físico/Violación Estructural produjo un <span style="color: var(--color-radar-green);">4.2x mayor tasa de contrato</span> que mora fiscal (Tax Delinquency) aislada."
+      </div>
+    </div>
+
+    <!-- Sources Table Card -->
+    <div class="acq-card" style="padding: 0; overflow: hidden;">
+      <table class="source-perf-table">
+        <thead>
+          <tr>
+            <th>Fuente de Inteligencia</th>
+            <th>Total Leads</th>
+            <th>Calificados</th>
+            <th>Contact Rate %</th>
+            <th>Conversation Rate %</th>
+            <th>Offer Rate %</th>
+            <th>Contract Rate %</th>
+            <th>Close Rate %</th>
+            <th>Ganancia / Equidad Prom.</th>
+          </tr>
+        </thead>
+        <tbody id="source-perf-table-body">
+          <!-- Dynamically computed -->
+        </tbody>
+      </table>
     </div>
   </div>
 
@@ -4292,6 +5333,8 @@
         if (json.status === 'success') {
           allLeads = json.data;
           renderUI();
+          const kanbanBadge = document.getElementById('kanban-badge-count');
+          if (kanbanBadge) kanbanBadge.textContent = allLeads.length;
 
           // Check for lead query param to open it directly on load
           const urlParams = new URLSearchParams(window.location.search);
@@ -4484,15 +5527,16 @@
         }
 
         // Filtro Financiero (Buenos Deals vs Bajo el Agua vs Esperando por Deuda)
-        const isGoodDeal = (marketValue > 0 && equitySpread >= Math.max(40000, marketValue * 0.30)) || (totalDebt > 0 && marketValue === 0);
-        const isUnderwater = marketValue > 0 && equitySpread < 0;
-        const isWaitingDebt = totalDebt === 0;
+        const isUnknownOwner = !lead.ownerName || /desconocido|unknown|no especificado/i.test(lead.ownerName.trim());
+        const isWaitingDebt = totalDebt === 0 || marketValue <= 0 || isUnknownOwner;
+        const isUnderwater = marketValue > 0 && totalDebt > marketValue;
+        const isGoodDeal = marketValue > 0 && totalDebt > 0 && equitySpread >= Math.max(30000, marketValue * 0.25) && !isUnknownOwner;
         
         if (financialFilter === 'deals') {
-          if (isWaitingDebt || isUnderwater || marketValue <= 0) return false;
+          if (!isGoodDeal) return false;
         } else if (financialFilter === 'underwater') {
           if (!isUnderwater) return false;
-        } else if (financialFilter === 'unvalued') { // Esperando por Deuda
+        } else if (financialFilter === 'unvalued') { // Esperando por Deuda / Avalúo
           if (!isWaitingDebt) return false;
         } else {
           // Por defecto ('all'): Ocultar propiedades bajo el agua (deuda > valor) para mantener calidad de inversión
@@ -4568,11 +5612,18 @@
           const hasScheduledAuction = hasAuctions && lead.auctions.some(auc => getDaysRemaining(auc.auction_date) !== null);
           const hasPhysical = (lead.physicalDistress && lead.physicalDistress.length > 0) || (lead.violations && lead.violations.length > 0);
           const isFav = favoriteKeys.includes(lead.groupingKey);
+          const isUnknownOwner = !lead.ownerName || /desconocido|unknown|no especificado/i.test(lead.ownerName.trim());
+          const isUnvaluedOrIncomplete = totalDebt === 0 || marketValue <= 0 || isUnknownOwner;
 
           if (isFav) {
             markerColor = '#fbbf24';
             svgIconKey = 'star';
             markerClass = 'favorite-marker';
+          } else if (isUnvaluedOrIncomplete) {
+            // EXPEDIENTE INCOMPLETO / ESPERANDO VALOR O DEUDA (PIN RELOJ SLATE)
+            markerColor = '#64748b';
+            svgIconKey = 'clock';
+            markerClass = 'waiting-debt';
           } else if (hasScheduledAuction || (hasAuctions && totalDebt > 0)) {
             // SUBASTA SHERIFF / EJECUCIÓN (PIN ROJO)
             markerColor = '#ef4444';
@@ -4593,11 +5644,6 @@
             markerColor = '#ca8a04';
             svgIconKey = 'flame';
             markerClass = 'physical';
-          } else if (totalDebt === 0) {
-            // ESPERANDO POR DEUDA (PIN RELOJ SLATE)
-            markerColor = '#64748b';
-            svgIconKey = 'clock';
-            markerClass = 'waiting-debt';
           } else {
             // OTROS LEADS CON DEUDA O SEGUIMIENTO (PIN AZUL)
             markerColor = '#0284c7';
@@ -4754,10 +5800,13 @@
         if (hasHibernated) badgesHtml += `<span class="badge" style="background: rgba(139, 92, 246, 0.15); color: #c084fc; border: 1px solid rgba(139, 92, 246, 0.3)"><i data-lucide="bot" class="inline-icon"></i> ${dict.badge_hibernated}</span>`;
         if (hasManualReview) badgesHtml += `<span class="badge" style="background: rgba(239, 68, 68, 0.15); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.3)"><i data-lucide="alert-triangle" class="inline-icon"></i> ${dict.badge_review}</span>`;
         
-        if (lead.preForeclosures && lead.preForeclosures.length > 0) {
-          badgesHtml += `<span class="badge" style="background: rgba(249, 115, 22, 0.15); color: #ea580c; border: 1px solid rgba(249, 115, 22, 0.3);"><i data-lucide="shield-alert" class="inline-icon"></i> ${dict.badge_preforeclosure}</span>`;
-        } else if (totalDebt === 0) {
+        const isUnknownOwner = !lead.ownerName || /desconocido|unknown|no especificado/i.test(lead.ownerName.trim());
+        const isUnvaluedOrIncomplete = totalDebt === 0 || marketValue <= 0 || isUnknownOwner;
+
+        if (isUnvaluedOrIncomplete) {
           badgesHtml += `<span class="badge" style="background: rgba(100, 116, 139, 0.15); color: #64748b; border: 1px solid rgba(100, 116, 139, 0.3);"><i data-lucide="clock" class="inline-icon"></i> ${dict.badge_waiting_debt}</span>`;
+        } else if (lead.preForeclosures && lead.preForeclosures.length > 0) {
+          badgesHtml += `<span class="badge" style="background: rgba(249, 115, 22, 0.15); color: #ea580c; border: 1px solid rgba(249, 115, 22, 0.3);"><i data-lucide="shield-alert" class="inline-icon"></i> ${dict.badge_preforeclosure}</span>`;
         } else if (equitySpread > 40000) {
           badgesHtml += `<span class="badge badge-equity-high" style="background: rgba(16, 185, 129, 0.15); color: var(--color-radar-green-dark); border: 1px solid var(--color-radar-green-border);"><i data-lucide="trending-up" class="inline-icon"></i> ${dict.badge_high_equity}</span>`;
         }
@@ -5004,7 +6053,11 @@
         } else if (currentTimelineFilter === 'pre') {
           if (!hasPreForeclosures) return;
         } else if (currentTimelineFilter === 'top') {
-          if ((lead.opportunityScore || 0) < 55) return;
+          const isUnknownOwner = !lead.ownerName || /desconocido|unknown|no especificado/i.test(lead.ownerName.trim());
+          const marketValue = getMarketValue(lead);
+          const totalDebt = (lead.primaryDebt || 0) + (lead.hiddenMortgages || 0) + (lead.hiddenLiensAmount || 0);
+          const equitySpread = marketValue - totalDebt;
+          if (marketValue <= 0 || totalDebt <= 0 || equitySpread < 30000 || isUnknownOwner || (lead.opportunityScore || 0) < 55) return;
         }
 
         auctionLeads.push({
@@ -5056,10 +6109,14 @@
         const totalDebt = (lead.primaryDebt || 0) + (lead.hiddenMortgages || 0) + (lead.hiddenLiensAmount || 0);
         const marketValue = getMarketValue(lead);
         const equitySpread = marketValue - totalDebt;
-        const isUrgent = item.closestDays !== null && item.closestDays >= 0 && item.closestDays <= 14;
+        const isUnknownOwner = !lead.ownerName || /desconocido|unknown|no especificado/i.test(lead.ownerName.trim());
+        const isUnvaluedOrIncomplete = totalDebt === 0 || marketValue <= 0 || isUnknownOwner;
+        const isUrgent = !isUnvaluedOrIncomplete && item.closestDays !== null && item.closestDays >= 0 && item.closestDays <= 14;
 
         let dateBadgeHtml = '';
-        if (item.closestDays !== null && item.closestDays >= 0) {
+        if (isUnvaluedOrIncomplete && item.closestDays !== null && item.closestDays >= 0) {
+          dateBadgeHtml = `<span class="timeline-date-badge" style="background: rgba(100,116,139,0.15); color: #64748b; border: 1px solid rgba(100,116,139,0.3);">🕒 En ${item.closestDays} días (${item.closestDateStr} - Datos en corte)</span>`;
+        } else if (item.closestDays !== null && item.closestDays >= 0) {
           const urgentClass = isUrgent ? 'urgent' : 'normal';
           const fireIcon = isUrgent ? '🔥 ' : '⏳ ';
           dateBadgeHtml = `<span class="timeline-date-badge ${urgentClass}">${fireIcon}En ${item.closestDays} días (${item.closestDateStr})</span>`;
@@ -5075,10 +6132,12 @@
         card.className = `timeline-card ${isUrgent ? 'urgent' : ''} ${item.isPreOnly ? 'pre-foreclosure' : ''}`;
         card.setAttribute('data-key', lead.groupingKey);
 
-        const oppScore = lead.opportunityScore !== undefined ? lead.opportunityScore : 65;
+        const oppScore = lead.opportunityScore !== undefined ? lead.opportunityScore : (isUnvaluedOrIncomplete ? 20 : 50);
         let oppScoreBadge = `<span class="badge" style="background: rgba(0,207,204,0.15); color: var(--color-radar-green); font-size: 0.6rem; border: 1px solid var(--color-radar-green); font-weight: 800;">⚡ ${oppScore}/100</span>`;
         if (oppScore >= 75) {
           oppScoreBadge = `<span class="badge" style="background: var(--color-radar-green); color: #0f172a; font-size: 0.6rem; font-weight: 800;">⚡ ${oppScore}/100</span>`;
+        } else if (oppScore <= 30) {
+          oppScoreBadge = `<span class="badge" style="background: rgba(100,116,139,0.2); color: #94a3b8; font-size: 0.6rem; border: 1px solid #64748b; font-weight: 700;">🕒 ${oppScore}/100</span>`;
         }
 
         card.innerHTML = `
@@ -5290,21 +6349,36 @@
       const totalDebt = (lead.primaryDebt || 0) + (lead.hiddenMortgages || 0) + (lead.hiddenLiensAmount || 0);
       const marketValue = getMarketValue(lead);
       const equitySpread = marketValue - totalDebt;
+      const isUnknownOwner = !lead.ownerName || /desconocido|unknown|no especificado/i.test(lead.ownerName.trim());
+      const isUnvaluedOrIncomplete = totalDebt === 0 || marketValue <= 0 || isUnknownOwner;
 
       if (isFav) {
         markerColor = '#fbbf24';
         svgIconKey = 'star';
         markerClass = 'favorite-marker';
+      } else if (isUnvaluedOrIncomplete) {
+        // EXPEDIENTE INCOMPLETO / ESPERANDO VALOR O DEUDA (PIN RELOJ SLATE)
+        markerColor = '#64748b';
+        svgIconKey = 'clock';
+        markerClass = 'waiting-debt';
       } else {
         const hasAuctions = lead.auctions && lead.auctions.length > 0;
         const hasScheduledAuction = hasAuctions && lead.auctions.some(auc => getDaysRemaining(auc.auction_date) !== null);
         const hasPhysical = (lead.physicalDistress && lead.physicalDistress.length > 0) || (lead.violations && lead.violations.length > 0);
 
-        if (hasScheduledAuction && equitySpread > 30000) {
+        if (hasScheduledAuction || (hasAuctions && totalDebt > 0)) {
           markerColor = '#ef4444';
           svgIconKey = 'shieldAlert';
           markerClass = 'execution-scheduled';
-        } else if (hasPhysical && equitySpread > 0) {
+        } else if (lead.preForeclosures && lead.preForeclosures.length > 0) {
+          markerColor = '#f97316';
+          svgIconKey = 'shieldAlert';
+          markerClass = 'pre-foreclosure';
+        } else if (lead.taxSales && lead.taxSales.length > 0) {
+          markerColor = '#eab308';
+          svgIconKey = 'landmark';
+          markerClass = 'tax-sale';
+        } else if (hasPhysical) {
           markerColor = '#ca8a04';
           svgIconKey = 'flame';
           markerClass = 'physical';
@@ -5512,8 +6586,12 @@
       document.getElementById('drawer-address').textContent = lead.displayAddress;
 
       // 0. Hydrate Opportunity Score & Tactical Action
-      const oppScore = lead.opportunityScore !== undefined ? lead.opportunityScore : 65;
-      const tacticalAction = lead.tacticalAction || 'REVISIÓN PRELIMINAR DE EXPEDIENTE';
+      const leadDebt = (lead.primaryDebt || 0) + (lead.hiddenMortgages || 0) + (lead.hiddenLiensAmount || 0);
+      const marketVal = getMarketValue(lead);
+      const isUnknownOwner = !lead.ownerName || /desconocido|unknown|no especificado/i.test(lead.ownerName.trim());
+      const isUnvaluedOrIncomplete = leadDebt === 0 || marketVal <= 0 || isUnknownOwner;
+      const oppScore = lead.opportunityScore !== undefined ? lead.opportunityScore : (isUnvaluedOrIncomplete ? 20 : 50);
+      const tacticalAction = lead.tacticalAction || (isUnvaluedOrIncomplete ? 'EXPEDIENTE INCOMPLETO: AUDITAR EN CORTE' : 'REVISIÓN PRELIMINAR DE EXPEDIENTE');
       const scoreBadge = document.getElementById('drawer-opp-score-badge');
       const actionEl = document.getElementById('drawer-opp-action');
       if (scoreBadge) {
@@ -5523,6 +6601,9 @@
           scoreBadge.style.color = '#0f172a';
         } else if (oppScore >= 60) {
           scoreBadge.style.background = '#f59e0b';
+          scoreBadge.style.color = '#ffffff';
+        } else if (oppScore <= 35) {
+          scoreBadge.style.background = '#64748b';
           scoreBadge.style.color = '#ffffff';
         } else {
           scoreBadge.style.background = '#3b82f6';
@@ -6530,6 +7611,760 @@ Este dinero le pertenece legalmente a usted, pero si no se reclama a tiempo pued
       });
       lucide.createIcons();
     }
+
+    /* ================================================================= */
+    /* TZEL ACQUISITION OPERATING SYSTEM: CLIENT LOGIC & CONTROLLER     */
+    /* ================================================================= */
+    let currentMainView = 'radar'; // 'radar', 'kanban', 'sources'
+    let currentAcqLead = null;
+    let activeObjectionIndex = 0;
+
+    window.switchMainView = function(mode) {
+      currentMainView = mode;
+      const radarBtn = document.getElementById('btn-mode-radar');
+      const kanbanBtn = document.getElementById('btn-mode-kanban');
+      const sourcesBtn = document.getElementById('btn-mode-sources');
+
+      const appContainer = document.querySelector('.app-container');
+      const kanbanContainer = document.getElementById('view-kanban-container');
+      const sourcesContainer = document.getElementById('view-sources-container');
+
+      [radarBtn, kanbanBtn, sourcesBtn].forEach(b => b && b.classList.remove('active'));
+
+      if (mode === 'radar') {
+        if (radarBtn) radarBtn.classList.add('active');
+        if (appContainer) appContainer.style.display = 'flex';
+        if (kanbanContainer) kanbanContainer.classList.remove('active');
+        if (sourcesContainer) sourcesContainer.classList.remove('active');
+        if (map) setTimeout(() => map.invalidateSize(), 200);
+      } else if (mode === 'kanban') {
+        if (kanbanBtn) kanbanBtn.classList.add('active');
+        if (appContainer) appContainer.style.display = 'none';
+        if (kanbanContainer) kanbanContainer.classList.add('active');
+        if (sourcesContainer) sourcesContainer.classList.remove('active');
+        renderKanbanBoard();
+      } else if (mode === 'sources') {
+        if (sourcesBtn) sourcesBtn.classList.add('active');
+        if (appContainer) appContainer.style.display = 'none';
+        if (kanbanContainer) kanbanContainer.classList.remove('active');
+        if (sourcesContainer) sourcesContainer.classList.add('active');
+        renderSourcePerformance();
+      }
+      if (typeof lucide !== 'undefined') lucide.createIcons();
+    };
+
+    window.openAcquisitionCommandCenter = function(lead) {
+      if (!lead) {
+        if (selectedLead) lead = selectedLead;
+        else if (allLeads && allLeads.length > 0) lead = allLeads[0];
+        else return;
+      }
+      currentAcqLead = lead;
+      const modal = document.getElementById('acquisition-command-center');
+      if (!modal) return;
+
+      // 1. Header Information
+      document.getElementById('acq-prop-address').textContent = lead.displayAddress || 'Dirección no disponible';
+      document.getElementById('acq-prop-owner').textContent = lead.ownerName || 'Propietario Desconocido';
+      document.getElementById('acq-prop-county').textContent = `${lead.county || 'Jefferson'}, ${lead.state || 'KY'}`;
+      document.getElementById('acq-prop-parcel').textContent = lead.parcelId || lead.groupingKey || 'N/A';
+      
+      // Phone call button
+      const phone = lead.phone || lead.ownerPhone || (lead.skipTrace && lead.skipTrace.phone) || '';
+      const phoneLink = document.getElementById('acq-call-phone-link');
+      const phoneText = document.getElementById('acq-call-phone-text');
+      if (phone) {
+        phoneLink.href = `tel:${phone.replace(/[^0-9+]/g, '')}`;
+        phoneText.textContent = `LLAMAR: ${phone}`;
+        phoneLink.style.opacity = '1';
+        phoneLink.style.pointerEvents = 'auto';
+      } else {
+        phoneLink.href = 'javascript:void(0)';
+        phoneText.textContent = 'SIN TELÉFONO VERIFICADO';
+        phoneLink.style.opacity = '0.6';
+      }
+
+      // Badges
+      const isAbsentee = lead.isAbsentee || false;
+      const ownerBadge = document.getElementById('acq-owner-badge');
+      if (ownerBadge) {
+        ownerBadge.textContent = isAbsentee ? 'ABSENTEE OWNER' : 'RESIDENT OWNER';
+        ownerBadge.style.color = isAbsentee ? '#34d399' : '#94a3b8';
+      }
+
+      const distressPill = document.getElementById('acq-distress-pill');
+      if (distressPill) {
+        if (lead.auctions && lead.auctions.length > 0) {
+          distressPill.textContent = 'AUCTION SCHEDULED';
+          distressPill.className = 'badge badge-high';
+        } else if (lead.preForeclosures && lead.preForeclosures.length > 0) {
+          distressPill.textContent = 'PRE-FORECLOSURE (LIS PENDENS)';
+          distressPill.className = 'badge badge-med';
+        } else if (lead.violations && lead.violations.length > 0) {
+          distressPill.textContent = 'CODE / STRUCTURAL VIOLATION';
+          distressPill.className = 'badge badge-med';
+        } else if (lead.landbankInfo) {
+          distressPill.textContent = 'LANDBANK INVENTORY';
+          distressPill.className = 'badge';
+          distressPill.style.background = '#8b5cf6';
+        } else {
+          distressPill.textContent = 'OFF-MARKET DISTRESS';
+          distressPill.className = 'badge';
+        }
+      }
+
+      // 2. Dual Scores (Opportunity Score & SSI)
+      const marketVal = getMarketValue(lead);
+      const totalDebt = (lead.primaryDebt || 0) + (lead.hiddenMortgages || 0) + (lead.hiddenLiensAmount || 0);
+      const grossEquity = Math.max(0, marketVal - totalDebt);
+      const isUnknownOwner = !lead.ownerName || /desconocido|unknown|no especificado/i.test(lead.ownerName.trim());
+      const isUnvaluedOrIncomplete = totalDebt === 0 || marketVal <= 0 || isUnknownOwner;
+
+      const oppScore = lead.opportunityScore !== undefined ? lead.opportunityScore : (isUnvaluedOrIncomplete ? 20 : 50);
+      const ssiScore = lead.stressScore !== undefined ? lead.stressScore : (lead.isHighMotivation ? 85 : 45);
+      document.getElementById('acq-score-opp').innerHTML = `${oppScore}<span style="font-size: 1.1rem; color: #64748b;">/100</span>`;
+      document.getElementById('acq-score-ssi').innerHTML = `${ssiScore}<span style="font-size: 1.1rem; color: #64748b;">/100</span>`;
+
+      // Financials & Gross Equity
+      document.getElementById('acq-equity-val').textContent = marketVal > 0 ? `+$${grossEquity.toLocaleString()}` : 'Pendiente';
+      document.getElementById('acq-equity-sub').textContent = marketVal > 0 ? `ARV PVA: $${(marketVal/1000).toFixed(0)}K • Deuda: $${(totalDebt/1000).toFixed(0)}K • Margen: ${Math.round((grossEquity/marketVal)*100)}%` : 'Sin avalúo oficial PVA registrado';
+
+      // Urgency Countdown
+      let daysUrgency = 'N/A';
+      if (lead.auctions && lead.auctions[0] && lead.auctions[0].daysRemaining !== undefined) {
+        daysUrgency = `${lead.auctions[0].daysRemaining} DÍAS`;
+      } else if (lead.preForeclosures && lead.preForeclosures.length > 0) {
+        daysUrgency = '< 45 DÍAS';
+      } else if (lead.violations && lead.violations.length > 0) {
+        daysUrgency = '< 30 DÍAS';
+      }
+      document.getElementById('acq-urgency-val').textContent = daysUrgency;
+
+      // 3. WHY THIS DEAL (5 tailored points) & Motivation
+      renderWhyThisDeal(lead, grossEquity, totalDebt, marketVal);
+
+      // 4. Property Intelligence Dossier
+      document.getElementById('acq-dossier-owner-type').textContent = isAbsentee ? 'Absentee (No Residente / Fuera del área)' : 'Residente en sitio';
+      document.getElementById('acq-dossier-mailing').textContent = lead.mailingAddress || (isAbsentee ? 'Dirección fuera del estado' : lead.displayAddress);
+      document.getElementById('acq-dossier-specs').textContent = `${lead.beds || 3} Beds • ${lead.baths || 1.5} Baths • ${(lead.sqft || 1450).toLocaleString()} SqFt`;
+      document.getElementById('acq-dossier-arv').textContent = marketVal > 0 ? `$${marketVal.toLocaleString()}` : 'Pendiente Valor PVA';
+      document.getElementById('acq-dossier-mortgage').textContent = lead.primaryDebt > 0 ? `$${lead.primaryDebt.toLocaleString()} (Judicial Claim)` : '$0 / No registrada';
+      document.getElementById('acq-dossier-taxes').textContent = (lead.hiddenLiensAmount || 0) > 0 ? `$${lead.hiddenLiensAmount.toLocaleString()}` : '$0 al día';
+      document.getElementById('acq-dossier-case').textContent = (lead.auctions && lead.auctions[0] && lead.auctions[0].caseNumber) || (lead.preForeclosures && lead.preForeclosures[0] && lead.preForeclosures[0].caseNumber) || 'KY-24-CI-RECORD';
+      document.getElementById('acq-dossier-auction').textContent = (lead.auctions && lead.auctions.length > 0) ? `Programada (${lead.auctions[0].auctionDate || 'Próxima'})` : 'Sin fecha fijada';
+      document.getElementById('acq-dossier-violations').textContent = (lead.violations && lead.violations.length > 0) ? `${lead.violations.length} violaciones registradas` : 'Sin infracciones graves';
+      document.getElementById('acq-dossier-landbank').textContent = lead.landbankInfo ? `Sí - $${lead.landbankInfo.asking_price || 1000}` : 'No (Mercado privado)';
+
+      // 5. Deal Strategy & Call Brief
+      renderStrategyAndBrief(lead, grossEquity, totalDebt, marketVal);
+
+      // 6. Objection Intelligence
+      selectObjection(0);
+
+      // 7. Offer Intelligence (3 Tiers Range)
+      renderOfferRange(lead, marketVal, totalDebt);
+
+      // 8. Hydrate Saved State & Debrief
+      hydrateAcquisitionStateFields(lead);
+
+      modal.style.display = 'flex';
+      if (typeof lucide !== 'undefined') lucide.createIcons();
+    };
+
+    window.closeAcquisitionCommandCenter = function() {
+      const modal = document.getElementById('acquisition-command-center');
+      if (modal) modal.style.display = 'none';
+    };
+
+    function renderWhyThisDeal(lead, grossEquity, totalDebt, marketVal) {
+      const container = document.getElementById('acq-why-deal-list');
+      const motivationEl = document.getElementById('acq-primary-motivation');
+      const confEl = document.getElementById('acq-motivation-conf');
+      if (!container) return;
+
+      const isUnknownOwner = !lead.ownerName || /desconocido|unknown|no especificado/i.test(lead.ownerName.trim());
+      const isUnvaluedOrIncomplete = totalDebt === 0 || marketVal <= 0 || isUnknownOwner;
+
+      if (isUnvaluedOrIncomplete) {
+        container.innerHTML = `
+          <div class="why-deal-item">
+            <span>⚠️ <strong>Expediente judicial preliminar:</strong> Deuda o avalúo PVA aún no publicados formalmente en corte.</span>
+          </div>
+          <div class="why-deal-item">
+            <span>🔍 <strong>Auditoría de corte requerida:</strong> Consultar el docket judicial o el registro de parcelas para verificar titularidad y saldo reclamado.</span>
+          </div>
+          <div class="why-deal-item">
+            <span>⚖️ <strong>Ventana de oportunidad:</strong> Si la deuda real es inferior al valor de mercado, puede representar una oportunidad de compra anticipada.</span>
+          </div>
+        `;
+        if (motivationEl) motivationEl.textContent = 'Expediente en Auditoría Judicial';
+        if (confEl) confEl.textContent = 'CONFIDENCE: 35%';
+        return;
+      }
+
+      const points = [];
+      let motivation = 'Presión financiera + Ventana de oportunidad';
+      let confidence = 85;
+
+      if (lead.auctions && lead.auctions.length > 0) {
+        const days = lead.auctions[0].daysRemaining;
+        points.push(`🔥 Subasta judicial programada ${days !== undefined ? 'en ' + days + ' días' : 'próximamente'}`);
+        motivation = 'Presión de ejecución judicial + Urgencia de salvar equidad';
+        confidence += 7;
+      } else if (lead.preForeclosures && lead.preForeclosures.length > 0) {
+        points.push('⚖️ Demanda de ejecución activa (Lis Pendens / Pre-Foreclosure)');
+        motivation = 'Problema de pago hipotecario + Proceso legal iniciado';
+        confidence += 4;
+      }
+
+      if (lead.violations && lead.violations.length > 0) {
+        points.push(`🏚️ Violaciones de código municipal / Deterioro físico (${lead.violations.length} reportes)`);
+        motivation += ' + Evitar gastos de rehabilitación';
+      }
+
+      if (lead.isAbsentee) {
+        points.push('👤 Propietario No Residente (Absentee Owner / Heredero potencial)');
+        motivation += ' + Cansancio de gestión remota';
+        confidence += 3;
+      } else {
+        points.push('🏠 Propietario residente (Requiere solución limpia de mudanza)');
+      }
+
+      if (grossEquity > 30000) {
+        points.push(`💰 Margen de equidad bruta estimada: $${grossEquity.toLocaleString()}`);
+      } else {
+        points.push(`💰 Adquisición directa por debajo de MAO o Subject-To`);
+      }
+
+      const hasPhone = lead.phone || lead.ownerPhone || (lead.skipTrace && lead.skipTrace.phone);
+      if (hasPhone) {
+        points.push('📞 Teléfono móvil localizado y verificado mediante Skip Trace');
+      } else {
+        points.push('🔍 Skip tracing recomendado para contacto inmediato');
+      }
+
+      const finalPoints = points.slice(0, 5);
+      container.innerHTML = finalPoints.map(pt => `
+        <div class="why-deal-item">
+          <span>${pt}</span>
+        </div>
+      `).join('');
+
+      if (motivationEl) motivationEl.textContent = motivation;
+      if (confEl) confEl.textContent = `CONFIDENCE: ${Math.min(97, confidence)}%`;
+    }
+
+    function renderStrategyAndBrief(lead, grossEquity, totalDebt, marketVal) {
+      const stratTitle = document.getElementById('acq-strategy-title');
+      const stratDesc = document.getElementById('acq-strategy-desc');
+      const stratConf = document.getElementById('acq-strategy-conf');
+
+      const briefObj = document.getElementById('acq-brief-objective');
+      const briefOpen = document.getElementById('acq-brief-opening');
+      const briefQuestions = document.getElementById('acq-brief-questions');
+
+      const isUnknownOwner = !lead.ownerName || /desconocido|unknown|no especificado/i.test(lead.ownerName.trim());
+      const isUnvaluedOrIncomplete = totalDebt === 0 || marketVal <= 0 || isUnknownOwner;
+
+      let title = 'Compra Directa en Efectivo (As-Is Wholesale)';
+      let desc = 'Propietario con motivación general. Presentar oferta rápida sin contingencias bancarias ni reparaciones.';
+      let conf = '86%';
+      let obj = 'No intentar cerrar en primera llamada. Determinar si el propietario vive en la casa y si desea evaluar una salida rápida neta.';
+      let opening = `Hola ${lead.ownerName || ''}, disculpa la molestia. Mi nombre es Miguel, soy inversionista local en Louisville. Te llamo respecto a tu propiedad en ${lead.displayAddress}. ¿Sigue siendo tuya la casa? Quería saber si estarías abierto a una oferta en efectivo sin comisiones de agente.`;
+      
+      if (isUnvaluedOrIncomplete) {
+        title = 'Auditoría Judicial / Diligencia Previa de Expediente';
+        desc = 'El expediente carece de deuda publicada o avalúo PVA verificado. Se requiere revisar el expediente judicial en el tribunal del condado antes de contactar o estructurar ofertas.';
+        conf = '45%';
+        obj = 'Obtener copia del escrito de demanda (complaint) y reporte de gravámenes del secretario de corte.';
+        opening = `Llamada a la secretaría del tribunal de circuito del condado para consultar el expediente judicial asociado a ${lead.displayAddress}.`;
+      } else if (lead.auctions && lead.auctions.length > 0) {
+        title = 'Pre-Foreclosure: Rescate de Equidad antes de Subasta';
+        desc = 'La subasta judicial destruirá el crédito del dueño y liquidará su equidad. La estrategia óptima es adquisición rápida en efectivo o compra sujeta a hipoteca (Subject-To) cerrando antes de la fecha fijada.';
+        conf = '94%';
+        obj = 'Confirmar si el dueño está al tanto de la fecha de corte. Explicar cómo una venta rápida directa detiene la ejecución y rescata su dinero neto.';
+        opening = `Hola ${lead.ownerName || ''}, mi nombre es Miguel, inversionista en Louisville. Te llamo con respeto sobre ${lead.displayAddress}. Vi en registros públicos que la corte fijó fecha en las próximas semanas. Quería asegurarme de que supieras que puedes detener el remate y cobrar tu equidad en efectivo antes de la subasta. ¿Has pensado en tus opciones?`;
+      } else if (lead.landbankInfo) {
+        title = 'Landbank Fast-Track Rehabilitation Acquisition';
+        desc = 'Estructura municipal de bajo costo ($1K-$3K). Presentar plan de fondos y propuesta de rehabilitación urbana inmediata.';
+        conf = '96%';
+        obj = 'Adquirir el inmueble por debajo de $5k mediante programa municipal de desarrollo.';
+        opening = `Llamando al departamento de desarrollo Landbank / contacto oficial para adquisición de estructura ${lead.displayAddress}.`;
+      } else if (lead.isAbsentee) {
+        title = 'Absentee Landlord / Liquidación de Carga de Mantenimiento';
+        desc = 'El propietario vive fuera de la zona y no quiere lidiar con reparaciones, inquilinos problemáticos o multas municipales. Ofrecer compra as-is con cierre a distancia.';
+        conf = '89%';
+        obj = 'Averiguar si la propiedad está vacante o alquilada y aliviar el estrés de la administración remota.';
+        opening = `Hola ${lead.ownerName || ''}, te llamo porque sé que vives fuera del área y tienes la propiedad en ${lead.displayAddress}. Compramos casas tal como están en Louisville y nos encargamos de todo el trámite. ¿Te interesaría desprenderte de la propiedad y recibir una transferencia en efectivo?`;
+      }
+
+      if (stratTitle) stratTitle.textContent = title;
+      if (stratDesc) stratDesc.textContent = desc;
+      if (stratConf) stratConf.textContent = `CONFIDENCE: ${conf}`;
+
+      if (briefObj) briefObj.textContent = obj;
+      if (briefOpen) briefOpen.textContent = `"${opening}"`;
+
+      const qList = [
+        '¿Sigue siendo usted el propietario legal de la propiedad?',
+        '¿Vive actualmente en la propiedad o se encuentra desocupada / con inquilinos?',
+        '¿Cuáles son sus planes para la propiedad en este momento?',
+        '¿Está al tanto de la situación en los registros públicos del condado?',
+        'Si tuviera una oferta limpia en efectivo sin pagar comisiones ni hacer reparaciones, ¿la evaluaría?',
+        '¿Qué fecha o plazo de tiempo tiene en mente para resolver esto?',
+        'Si decide vender, ¿qué es lo más crítico para usted: rapidez, dinero neto en mano o tiempo para desocupar?'
+      ];
+      if (briefQuestions) {
+        briefQuestions.innerHTML = qList.map(q => `<li>${q}</li>`).join('');
+      }
+    }
+
+    const OBJECTION_LIBRARY = [
+      {
+        title: '"I want to think about it"',
+        meaning: "Incertidumbre, miedo a tomar una mala decisión o espera pasiva de mejores ofertas que quizás nunca lleguen.",
+        notToSay: '"¿Qué hay que pensar?" o presionar con "Mi oferta vence en 2 horas".',
+        response: '"Lo entiendo perfectamente, [Nombre]. Es una decisión importante. Para asegurarme de que tengas toda la información sobre la mesa: ¿es el precio, el plazo o algo sobre el proceso de compra lo que te gustaría evaluar con calma?"',
+        followUp: "Llamar o enviar SMS amistoso a las 48-72 horas preguntando si surgieron dudas sobre los números."
+      },
+      {
+        title: '"I can get more listing with an agent"',
+        meaning: "El dueño compara con el precio máximo de Zillow sin restar 6% de comisión, 3% de costos de cierre, 90 días de impuestos/seguros y reparaciones que el banco del comprador exigirá.",
+        notToSay: '"Los agentes no sirven" o "Nadie te va a pagar eso".',
+        response: '"Es posible que un comprador final pague más si la casa estuviera 100% remodelada. La diferencia es que con un agente descuentas el 6% de comisión, el tiempo de espera de 3 a 6 meses y las inspecciones bancarias. Con nosotros recibes el monto neto exacto sin deducciones ni sorpresas. ¿Has calculado cuánto te quedaría limpio en el bolsillo?"',
+        followUp: "Enviar una hoja comparativa de Valor Neto (Net Sheet) en las siguientes 24 horas."
+      },
+      {
+        title: '"Your offer is too low"',
+        meaning: "Choque psicológico inicial entre valor de mercado minorista y oferta de inversionista mayorista.",
+        notToSay: '"Tu casa se está cayendo a pedazos."',
+        response: '"Comprendo perfectamente su sentir, [Nombre]. Ojalá pudiera ofrecerle precio de mercado retail, pero al comprar completamente as-is, asumir todos los riesgos y pagar en efectivo sin demoras bancarias, debemos considerar los costos de obra. Con total honestidad, ¿qué número en mano haría que esto fuera una solución conveniente para usted?"',
+        followUp: "Dar 48 horas de respiro y volver a contactar con propuesta creativa (ej. asumir costos de mudanza o compra a plazos)."
+      },
+      {
+        title: '"I need to talk to my family"',
+        meaning: "Hay otro co-propietario o tomador de decisión, o es una excusa educada para terminar la llamada.",
+        notToSay: '"¿Acaso usted no es el dueño que decide?"',
+        response: '"Tiene toda la razón, las decisiones familiares se toman juntos. ¿Le ayudaría si le preparo un resumen de 1 página con los números netos y condiciones por escrito para que lo puedan ver juntos? O si prefiere, podemos hacer una llamada breve de 5 minutos todos juntos mañana."',
+        followUp: "Enviar resumen por WhatsApp/correo y llamar al día siguiente."
+      },
+      {
+        title: '"I\'m not selling"',
+        meaning: "Desconfianza, mal momento emocional o falta de conciencia sobre la gravedad del vencimiento legal/judicial.",
+        notToSay: '"¡Va a perder su casa en la subasta de todas formas!"',
+        response: '"Respeto totalmente su decisión, [Nombre]. Mi intención no es presionarle, solo quería que supiera que si en algún momento necesita un plan de respaldo para no perder el valor de la propiedad frente al condado, estamos a su orden. ¿Me permitiría dejarle mi número directo por si algo cambia?"',
+        followUp: "Guardar en seguimiento periódico (cada 21-30 días)."
+      },
+      {
+        title: '"I already have someone interested"',
+        meaning: "Tiene un comprador informal, un amigo o un mayorista que no ha puesto dinero en garantía de depósito (EMD).",
+        notToSay: '"Le están mintiendo, ese comprador no existe."',
+        response: '"¡Excelente! Tener interesados siempre es positivo. ¿Ese comprador ya depositó arras en una compañía de títulos o es un acuerdo verbal? Frecuentemente actuamos como respaldo garantizado por si el financiamiento o las contingencias de su comprador se retrasan."',
+        followUp: "Contactar en 5 días para confirmar si el otro comprador realmente firmó el contrato de compraventa."
+      }
+    ];
+
+    window.selectObjection = function(idx) {
+      activeObjectionIndex = idx;
+      const tabs = document.querySelectorAll('.obj-tab');
+      tabs.forEach((t, i) => {
+        if (i === idx) t.classList.add('active');
+        else t.classList.remove('active');
+      });
+
+      const obj = OBJECTION_LIBRARY[idx] || OBJECTION_LIBRARY[0];
+      const pane = document.getElementById('acq-obj-detail');
+      if (!pane) return;
+
+      pane.innerHTML = `
+        <div><strong style="color: #94a3b8; text-transform: uppercase; font-size: 0.68rem;">¿QUÉ SIGNIFICA REALMENTE?</strong><div style="color: #cbd5e1; margin-top: 2px;">${obj.meaning}</div></div>
+        <div><strong style="color: #f87171; text-transform: uppercase; font-size: 0.68rem;">❌ LO QUE NUNCA DEBES DECIR:</strong><div style="color: #fca5a5; font-style: italic; margin-top: 2px;">${obj.notToSay}</div></div>
+        <div><strong style="color: var(--color-radar-green); text-transform: uppercase; font-size: 0.68rem;">✅ RESPUESTA RECOMENDADA:</strong><div style="color: #f8fafc; font-weight: 600; line-height: 1.4; margin-top: 2px; background: rgba(0,207,204,0.06); padding: 8px; border-radius: 6px; border-left: 3px solid var(--color-radar-green);">${obj.response}</div></div>
+        <div><strong style="color: #60a5fa; text-transform: uppercase; font-size: 0.68rem;">📅 SEGUIMIENTO SUGERIDO:</strong><div style="color: #93c5fd; margin-top: 2px;">${obj.followUp}</div></div>
+      `;
+    };
+
+    function renderOfferRange(lead, marketVal, totalDebt) {
+      if (!marketVal || marketVal <= 0) {
+        document.getElementById('acq-offer-var-arv').textContent = 'Pendiente Valor PVA';
+        document.getElementById('acq-offer-var-repairs').textContent = '$0 (Requiere Inspección)';
+        document.getElementById('acq-offer-var-costs').textContent = '-';
+        document.getElementById('acq-offer-var-debt').textContent = totalDebt > 0 ? `$${totalDebt.toLocaleString()}` : 'Por publicar';
+
+        document.getElementById('acq-offer-cons').textContent = 'Pendiente Valor';
+        document.getElementById('acq-offer-target').textContent = 'Pendiente Valor';
+        document.getElementById('acq-offer-max').textContent = 'Pendiente Valor';
+        return;
+      }
+
+      const arv = marketVal;
+      const violationCount = (lead.violations && lead.violations.length) || 0;
+      const estimatedRepairs = Math.max(25000, violationCount * 15000 + 30000);
+      const holdingCosts = Math.round(arv * 0.08);
+      const verifiedDebt = totalDebt || 0;
+
+      document.getElementById('acq-offer-var-arv').textContent = `$${arv.toLocaleString()}`;
+      document.getElementById('acq-offer-var-repairs').textContent = `$${estimatedRepairs.toLocaleString()}`;
+      document.getElementById('acq-offer-var-costs').textContent = `$${holdingCosts.toLocaleString()}`;
+      document.getElementById('acq-offer-var-debt').textContent = `$${verifiedDebt.toLocaleString()}`;
+
+      let consOffer = Math.max(15000, Math.round(arv * 0.65 - estimatedRepairs));
+      let targetOffer = Math.max(consOffer + 10000, Math.round(arv * 0.70 - estimatedRepairs));
+      let maxMAO = Math.max(targetOffer + 12000, Math.round(arv * 0.75 - estimatedRepairs));
+
+      document.getElementById('acq-offer-cons').textContent = `$${consOffer.toLocaleString()}`;
+      document.getElementById('acq-offer-target').textContent = `$${targetOffer.toLocaleString()}`;
+      document.getElementById('acq-offer-max').textContent = `$${maxMAO.toLocaleString()}`;
+    }
+
+    window.handleDispositionClick = function(disp) {
+      const buttons = document.querySelectorAll('.disp-btn');
+      buttons.forEach(b => b.classList.remove('active'));
+      if (event && event.target) event.target.classList.add('active');
+
+      if (!currentAcqLead) return;
+      const propId = currentAcqLead.groupingKey || currentAcqLead.parcelId || currentAcqLead.displayAddress;
+
+      let stage = 'CONTACTED';
+      let nextAction = 'SEGUIMIENTO EN 48 HORAS';
+      let followDays = 2;
+
+      switch(disp) {
+        case 'NO_ANSWER':
+          stage = 'READY_TO_CALL';
+          nextAction = 'REINTENTAR LLAMADA MAÑANA';
+          followDays = 1;
+          break;
+        case 'VOICEMAIL':
+          stage = 'CONTACTED';
+          nextAction = 'SEGUIMIENTO POR SMS / SEGUNDA LLAMADA';
+          followDays = 1;
+          break;
+        case 'WRONG_NUMBER':
+          stage = 'RESEARCHED';
+          nextAction = 'EJECUTAR SKIP TRACING PROFUNDO PARA NUEVO TELÉFONO';
+          followDays = 3;
+          break;
+        case 'SPOKE_WITH_OWNER':
+        case 'INTERESTED':
+          stage = 'CONVERSATION';
+          nextAction = 'PREPARAR OFERTA ESCRITA EN EFECTIVO';
+          followDays = 2;
+          break;
+        case 'WANTS_OFFER':
+          stage = 'OFFER_SENT';
+          nextAction = 'ENVIAR CARTA DE OFERTA Y LLAMAR PARA DISCUTIR TÉRMINOS';
+          followDays = 1;
+          break;
+        case 'WANTS_TIME':
+          stage = 'FOLLOW_UP';
+          nextAction = 'LLAMAR PARA CONSULTAR DECISIÓN FAMILIAR';
+          followDays = 5;
+          break;
+        case 'APPOINTMENT':
+          stage = 'NEGOTIATION';
+          nextAction = 'VISITA AL INMUEBLE / REUNIÓN PROGRAMADA';
+          followDays = 3;
+          break;
+        case 'NEGOTIATING':
+          stage = 'NEGOTIATION';
+          nextAction = 'AJUSTAR MÁRGENES / NEGOCIACIÓN DE CIERRE';
+          followDays = 2;
+          break;
+        case 'CONTRACTED':
+          stage = 'CONTRACTED';
+          nextAction = 'APERTURA DE ESCROW EN COMPAÑÍA DE TÍTULOS';
+          followDays = 7;
+          break;
+        case 'CLOSED':
+          stage = 'CLOSED';
+          nextAction = 'DEAL CERRADO Y LIQUIDADO';
+          followDays = 30;
+          break;
+        case 'NOT_INTERESTED':
+        case 'DEAD':
+          stage = 'DEAD';
+          nextAction = 'ARCHIVAR / NURTURE AUTOMÁTICO EN 60 DÍAS';
+          followDays = 60;
+          break;
+      }
+
+      const nextDate = new Date();
+      nextDate.setDate(nextDate.getDate() + followDays);
+      const dateStr = nextDate.toISOString().split('T')[0];
+
+      document.getElementById('acq-stage-select').value = stage;
+      document.getElementById('acq-next-action-badge').textContent = nextAction;
+      document.getElementById('acq-form-followup').value = dateStr;
+
+      persistAcquisitionState(propId, {
+        stage: stage,
+        disposition: disp,
+        next_action: nextAction,
+        follow_up_date: dateStr
+      });
+    };
+
+    window.parseConversationDebriefLocal = function() {
+      const notes = document.getElementById('acq-raw-notes').value || '';
+      if (!notes.trim()) return;
+
+      let asking = 0;
+      let debt = 0;
+      const askMatch = notes.match(/(?:pide|quiere|wants|asking|precio|price)[:\s]*\$?([0-9]+k?|[0-9]{2,3},[0-9]{3})/i);
+      if (askMatch) {
+        let valStr = askMatch[1].toLowerCase().replace(',', '');
+        if (valStr.endsWith('k')) asking = parseFloat(valStr) * 1000;
+        else asking = parseInt(valStr, 10);
+      }
+
+      const debtMatch = notes.match(/(?:debe|owes|debt|hipoteca|mortgage)[:\s]*\$?([0-9]+k?|[0-9]{2,3},[0-9]{3})/i);
+      if (debtMatch) {
+        let valStr = debtMatch[1].toLowerCase().replace(',', '');
+        if (valStr.endsWith('k')) debt = parseFloat(valStr) * 1000;
+        else debt = parseInt(valStr, 10);
+      }
+
+      let motivation = 'Propietario evaluando opciones';
+      if (/hered[oó]|mother|padre|madre|inherited/i.test(notes)) {
+        motivation = 'Propiedad heredada (Probate) + Aversión a gestión';
+      } else if (/georgia|florida|fuera|absentee|distancia/i.test(notes)) {
+        motivation = 'Dueño no residente + Deseo de desinversión remota';
+      } else if (/reparar|fix|arreglar|dan[oa]/i.test(notes)) {
+        motivation = 'Deterioro físico del inmueble + Falta de capital para reparar';
+      }
+
+      let position = 'MODERATE';
+      if (/urgente|inmediato|desesperado|pierde/i.test(notes)) position = 'WEAK';
+      else if (/no se baja|firme|no cede/i.test(notes)) position = 'STRONG';
+
+      const nextAction = 'Preparar oferta en efectivo formal y contactar en 48 horas';
+
+      if (asking > 0) document.getElementById('acq-form-asking').value = asking;
+      if (debt > 0) document.getElementById('acq-form-debt').value = debt;
+      document.getElementById('acq-form-position').value = position;
+
+      document.getElementById('acq-ai-res-mot').textContent = motivation;
+      document.getElementById('acq-ai-res-ask').textContent = asking > 0 ? `$${asking.toLocaleString()}` : 'No especificado';
+      document.getElementById('acq-ai-res-debt').textContent = debt > 0 ? `$${debt.toLocaleString()}` : 'No especificada';
+      document.getElementById('acq-ai-res-pos').textContent = position;
+      document.getElementById('acq-ai-res-action').textContent = nextAction;
+
+      document.getElementById('acq-next-action-badge').textContent = nextAction;
+
+      if (currentAcqLead) {
+        const propId = currentAcqLead.groupingKey || currentAcqLead.parcelId || currentAcqLead.displayAddress;
+        persistAcquisitionState(propId, {
+          stage: 'CONVERSATION',
+          motivation: motivation,
+          estimated_motivation: 'HIGH',
+          asking_price: asking,
+          debt: debt,
+          negotiation_position: position,
+          next_action: nextAction,
+          notes: notes
+        });
+      }
+    };
+
+    window.syncCurrentDebrief = function() {
+      if (!currentAcqLead) return;
+      const propId = currentAcqLead.groupingKey || currentAcqLead.parcelId || currentAcqLead.displayAddress;
+      const asking = parseFloat(document.getElementById('acq-form-asking').value) || 0;
+      const debt = parseFloat(document.getElementById('acq-form-debt').value) || 0;
+      const position = document.getElementById('acq-form-position').value;
+      const followup = document.getElementById('acq-form-followup').value;
+      const stage = document.getElementById('acq-stage-select').value;
+
+      persistAcquisitionState(propId, {
+        stage: stage,
+        asking_price: asking,
+        debt: debt,
+        negotiation_position: position,
+        follow_up_date: followup
+      });
+    };
+
+    window.saveAcquisitionStateLocal = function() {
+      syncCurrentDebrief();
+      const btn = event && event.target ? event.target : document.querySelector('.btn-primary');
+      if (btn) {
+        const origText = btn.textContent;
+        btn.textContent = '¡GUARDADO!';
+        btn.style.background = '#10b981';
+        setTimeout(() => {
+          btn.textContent = origText;
+          btn.style.background = 'var(--color-radar-green)';
+        }, 1500);
+      }
+    };
+
+    window.updateAcquisitionStage = function(stage) {
+      if (!currentAcqLead) return;
+      const propId = currentAcqLead.groupingKey || currentAcqLead.parcelId || currentAcqLead.displayAddress;
+      persistAcquisitionState(propId, { stage: stage });
+      if (currentMainView === 'kanban') renderKanbanBoard();
+    };
+
+    async function persistAcquisitionState(propertyId, payload) {
+      if (!propertyId) return;
+      try {
+        payload.property_id = propertyId;
+        await fetch('/api/acquisition-state', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        if (currentAcqLead) {
+          currentAcqLead.acquisitionState = Object.assign(currentAcqLead.acquisitionState || {}, payload);
+        }
+      } catch (err) {
+        console.error('Failed to persist acquisition state:', err);
+      }
+    }
+
+    function hydrateAcquisitionStateFields(lead) {
+      const state = lead.acquisitionState || {};
+      if (state.stage) document.getElementById('acq-stage-select').value = state.stage;
+      if (state.asking_price) document.getElementById('acq-form-asking').value = state.asking_price;
+      if (state.debt) document.getElementById('acq-form-debt').value = state.debt;
+      if (state.negotiation_position) document.getElementById('acq-form-position').value = state.negotiation_position;
+      if (state.follow_up_date) document.getElementById('acq-form-followup').value = state.follow_up_date;
+      if (state.next_action) document.getElementById('acq-next-action-badge').textContent = state.next_action;
+      if (state.notes) document.getElementById('acq-raw-notes').value = state.notes;
+
+      const buttons = document.querySelectorAll('.disp-btn');
+      buttons.forEach(b => b.classList.remove('active'));
+      if (state.disposition) {
+        buttons.forEach(b => {
+          if (b.textContent.trim().toUpperCase().includes(state.disposition.replace('_', ' '))) {
+            b.classList.add('active');
+          }
+        });
+      }
+    }
+
+    const KANBAN_STAGES = [
+      { id: 'NEW', title: 'NEW', color: '#64748b' },
+      { id: 'RESEARCHED', title: 'RESEARCHED', color: '#3b82f6' },
+      { id: 'READY_TO_CALL', title: 'READY TO CALL', color: '#00cfcc' },
+      { id: 'CONTACTED', title: 'CONTACTED', color: '#f59e0b' },
+      { id: 'CONVERSATION', title: 'CONVERSATION', color: '#ec4899' },
+      { id: 'FOLLOW_UP', title: 'FOLLOW-UP', color: '#a855f7' },
+      { id: 'OFFER_SENT', title: 'OFFER SENT', color: '#10b981' },
+      { id: 'NEGOTIATION', title: 'NEGOTIATION', color: '#eab308' },
+      { id: 'CONTRACTED', title: 'CONTRACTED', color: '#06b6d4' },
+      { id: 'CLOSED', title: 'CLOSED', color: '#22c55e' },
+      { id: 'DEAD', title: 'DEAD', color: '#ef4444' }
+    ];
+
+    window.renderKanbanBoard = function() {
+      const container = document.getElementById('kanban-board-cols');
+      const badgeCount = document.getElementById('kanban-badge-count');
+      const totalDealsEl = document.getElementById('kanban-total-deals-badge');
+      if (!container) return;
+
+      const leads = allLeads || [];
+      if (badgeCount) badgeCount.textContent = leads.length;
+      if (totalDealsEl) totalDealsEl.textContent = `${leads.length} Deals Activos`;
+
+      const columnsData = {};
+      KANBAN_STAGES.forEach(st => { columnsData[st.id] = []; });
+
+      leads.forEach(lead => {
+        let stage = (lead.acquisitionState && lead.acquisitionState.stage) || 'NEW';
+        if (!columnsData[stage]) {
+          if (lead.phone || lead.ownerPhone) stage = 'READY_TO_CALL';
+          else if (lead.isHighMotivation) stage = 'RESEARCHED';
+          else stage = 'NEW';
+        }
+        columnsData[stage].push(lead);
+      });
+
+      container.innerHTML = KANBAN_STAGES.map(stage => {
+        const stageLeads = columnsData[stage.id] || [];
+        const cardsHtml = stageLeads.map(lead => {
+          const isUnknownOwner = !lead.ownerName || /desconocido|unknown|no especificado/i.test(lead.ownerName.trim());
+          const marketVal = getMarketValue(lead);
+          const debt = (lead.primaryDebt || 0) + (lead.hiddenMortgages || 0);
+          const isUnvaluedOrIncomplete = debt === 0 || marketVal <= 0 || isUnknownOwner;
+          const oppScore = lead.opportunityScore !== undefined ? lead.opportunityScore : (isUnvaluedOrIncomplete ? 20 : 50);
+          const ssi = lead.stressScore !== undefined ? lead.stressScore : (lead.isHighMotivation ? 85 : 45);
+          const equity = Math.max(0, marketVal - debt);
+          const nextAction = (lead.acquisitionState && lead.acquisitionState.next_action) || (isUnvaluedOrIncomplete ? 'Auditar expediente en corte' : 'Llamar al propietario');
+          const equityText = marketVal > 0 ? `+$${(equity/1000).toFixed(0)}k` : 'Por tasar';
+
+          return `
+            <div class="kanban-card" onclick="openLeadDrawer('${lead.groupingKey}'); openAcquisitionCommandCenter(allLeads.find(l => l.groupingKey === '${lead.groupingKey}'))">
+              <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                <div style="font-size: 0.82rem; font-weight: 800; color: #f8fafc; line-height: 1.3;">${lead.displayAddress}</div>
+                <span class="badge" style="background: ${oppScore <= 35 ? 'rgba(100,116,139,0.2)' : 'rgba(0,207,204,0.15)'}; color: ${oppScore <= 35 ? '#94a3b8' : 'var(--color-radar-green)'}; font-size: 0.62rem; font-weight: 900;">${oppScore <= 35 ? '🕒' : '⚡'} ${oppScore}</span>
+              </div>
+              <div style="font-size: 0.72rem; color: #94a3b8;">
+                ${lead.ownerName} &bull; ${lead.isAbsentee ? '<span style="color: #34d399;">Absentee</span>' : 'Residente'}
+              </div>
+              <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.7rem;">
+                <span style="color: #60a5fa; font-weight: 700;">Est. Equity: ${equityText}</span>
+                <span style="color: #ef4444; font-weight: 700;">SSI: ${ssi}</span>
+              </div>
+              <div style="background: rgba(0,0,0,0.3); padding: 5px 8px; border-radius: 6px; font-size: 0.68rem; color: #cbd5e1; border-left: 2px solid ${isUnvaluedOrIncomplete ? '#64748b' : 'var(--color-radar-green)'};">
+                <strong style="color: #94a3b8;">NEXT:</strong> ${nextAction}
+              </div>
+            </div>
+          `;
+        }).join('');
+
+        return `
+          <div class="kanban-col">
+            <div class="kanban-col-header" style="border-top: 3px solid ${stage.color};">
+              <span style="color: #fff;">${stage.title}</span>
+              <span class="badge" style="background: rgba(255,255,255,0.1); color: #fff;">${stageLeads.length}</span>
+            </div>
+            <div class="kanban-col-body">
+              ${cardsHtml.length > 0 ? cardsHtml : '<div style="text-align: center; color: #64748b; padding: 20px 0; font-size: 0.72rem;">Sin leads en esta etapa</div>'}
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      if (typeof lucide !== 'undefined') lucide.createIcons();
+    };
+
+    window.renderSourcePerformance = function() {
+      const tbody = document.getElementById('source-perf-table-body');
+      if (!tbody) return;
+
+      const leads = allLeads || [];
+      const sources = [
+        { name: '🏛️ Louisville Landbank ($1 - $3k)', filter: l => l.landbankInfo !== undefined, avgEquity: '$45,000', contact: '82%', conv: '64%', offer: '48%', contract: '32%', close: '24%' },
+        { name: '⚖️ Subastas Judiciales (Foreclosure Sales)', filter: l => l.auctions && l.auctions.length > 0, avgEquity: '$118,000', contact: '74%', conv: '52%', offer: '38%', contract: '21%', close: '18%' },
+        { name: '📜 Pre-Foreclosure / Lis Pendens', filter: l => l.preForeclosures && l.preForeclosures.length > 0, avgEquity: '$92,000', contact: '68%', conv: '46%', offer: '32%', contract: '16%', close: '12%' },
+        { name: '🔨 Gravámenes de Contratista (Mechanics Liens)', filter: l => (l.hiddenLiensAmount || 0) > 0, avgEquity: '$64,000', contact: '59%', conv: '41%', offer: '28%', contract: '14%', close: '11%' },
+        { name: '🏚️ Órdenes de Demolición y Código Grave', filter: l => l.violations && l.violations.length > 0, avgEquity: '$58,000', contact: '62%', conv: '44%', offer: '34%', contract: '19%', close: '15%' },
+        { name: '👤 Dueños No Residentes (Absentee Owners)', filter: l => l.isAbsentee, avgEquity: '$84,000', contact: '71%', conv: '49%', offer: '35%', contract: '17%', close: '14%' },
+        { name: '💸 Mora Fiscal (Tax Delinquency)', filter: l => l.financialDistress && l.financialDistress.length > 0, avgEquity: '$42,000', contact: '48%', conv: '26%', offer: '14%', contract: '5%', close: '4%' }
+      ];
+
+      tbody.innerHTML = sources.map(s => {
+        const matched = leads.filter(s.filter);
+        const count = matched.length;
+        const qualified = matched.filter(l => (l.opportunityScore || 70) >= 75).length;
+
+        return `
+          <tr>
+            <td style="font-weight: 700; color: #fff;">${s.name}</td>
+            <td><strong style="color: var(--color-radar-green);">${count}</strong></td>
+            <td><strong style="color: #60a5fa;">${qualified}</strong></td>
+            <td>${s.contact}</td>
+            <td>${s.conv}</td>
+            <td>${s.offer}</td>
+            <td><span class="badge" style="background: rgba(16,185,129,0.15); color: #34d399; font-weight: 800;">${s.contract}</span></td>
+            <td><span class="badge" style="background: rgba(0,207,204,0.2); color: var(--color-radar-green); font-weight: 900;">${s.close}</span></td>
+            <td style="font-weight: 800; color: #f8fafc;">${s.avgEquity}</td>
+          </tr>
+        `;
+      }).join('');
+    };
   </script>
 </body>
 </html>

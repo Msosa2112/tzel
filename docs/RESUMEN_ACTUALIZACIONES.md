@@ -79,3 +79,19 @@ Se descargaron e instalaron directamente en el entorno (`C:\Users\migue\.antigra
   4. **Scoring de Inteligencia (SSI):** Cálculo del índice de estrés para clasificar las mejores oportunidades.
   5. **Despacho a Telegram:** Envío de reportes ejecutivos de subastas High Yield.
   6. **Auditoría de Excedentes:** Liquidación de *Surplus Funds*.
+
+---
+
+## 7. 🚀 Tzel Acquisition OS & Blindaje de Clasificación de Deals
+
+* **Fecha de Implementación:** 6 de Septiembre, 2026
+* **Transformación Central:** Tzel pasó de ser un visor pasivo a un **Acquisition Operating System** interactivo:
+  1. **Acquisition Command Center**: Modal táctico con guía paso a paso desde el primer contacto hasta el cierre de contrato.
+  2. **Playbook de Objeciones**: 7 respuestas institucionales a objeciones comunes de propietarios.
+  3. **Motor de Ofertas en 3 Rangos**: Oferta Conservadora (65% ARV - rehab), Target (70%) y MAO (75%).
+  4. **Kanban CRM**: Gestión visual de etapas de prospección integrada.
+* **Blindaje de Clasificación e Iconos en el Mapa**:
+  * **Problema resuelto**: Expedientes sin deuda ni avalúo PVA (como `5700 COEN TUSH RD`) recibían falsos iconos rojos de ejecución urgente y ARVs inventados de $220k.
+  * **Regla Invariante**: Todo expediente con `totalDebt === 0 || marketValue <= 0 || isUnknownOwner` se clasifica como `waiting-debt` (marcador slate `#64748b`, icono de reloj `clock`, halo de alarma suprimido, score capped a 20/100).
+  * **Filtro BUENOS DEALS**: Requiere estrictamente `marketValue > 0 && totalDebt > 0 && equitySpread >= Math.max(30000, marketValue * 0.25) && !isUnknownOwner`.
+  * **Integridad**: 100% de los 829 leads auditados sin falsos positivos.

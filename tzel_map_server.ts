@@ -217,6 +217,8 @@ interface GroupedLead {
   beds?: number;
   baths?: number;
   photoUrls: string[];
+  landbankInfo?: any;
+  acquisitionState?: any;
 }
 
 let rateLimitCooldownUntil = 0;
@@ -445,7 +447,11 @@ app.get("/api/prospectos", async (req, res) => {
       // 13. tzel_encumbrances
       `SELECT * FROM tzel_encumbrances ORDER BY priority ASC`,
       // 14. tzel_opportunity_scores
-      `SELECT * FROM tzel_opportunity_scores`
+      `SELECT * FROM tzel_opportunity_scores`,
+      // 15. landbank_inventory
+      `SELECT parcel_id, address, asking_price, estimated_value, property_type, program_name, county, state, is_high_yield FROM landbank_inventory`,
+      // 16. tzel_acquisition_state
+      `SELECT * FROM tzel_acquisition_state`
     ], "read");
 
     const auctionsRes = batchRes[0];
@@ -463,6 +469,8 @@ app.get("/api/prospectos", async (req, res) => {
     const eventsRes = batchRes[12];
     const encumbrancesRes = batchRes[13];
     const opportunityScoresRes = batchRes[14];
+    const landbankRes = batchRes[15];
+    const acquisitionStateRes = batchRes[16];
 
     // Filter auctions to next 60 days or Indiana manual reviews
     const opportunities = auctionsRes.rows.filter(row => {
@@ -1193,6 +1201,50 @@ app.get("/api/prospectos", async (req, res) => {
       }
     }
 
+    // G. Group landbank inventory
+    for (const row of (landbankRes.rows || [])) {
+      const address = row.address as string;
+      if (!address) continue;
+      const key = getGroupingKey(address);
+      if (!groupedMap.has(key)) {
+        groupedMap.set(key, {
+          groupingKey: key,
+          displayAddress: address,
+          state: (row.state as string) || "KY",
+          county: (row.county as string) || "Jefferson",
+          ownerName: "LOUISVILLE METRO LANDBANK",
+          phones: new Set(),
+          emails: new Set(),
+          mlsValue: (row.estimated_value as number) || 115000,
+          mlsId: "LANDBANK",
+          auctions: [],
+          violations: [],
+          probates: [],
+          divorces: [],
+          bankruptcies: [],
+          physicalDistress: [],
+          financialDistress: [],
+          lifeEvents: [],
+          preForeclosures: [],
+          taxSales: [],
+          landbankInfo: row,
+          hiddenMortgages: 0,
+          hiddenLiensAmount: 0,
+          titleCheckStatus: "clean_municipal",
+          nextRetryDate: undefined,
+          mailingAddress: "444 S 5th St, Louisville, KY 40202",
+          isAbsentee: false,
+          sqft: 1200,
+          beds: 3,
+          baths: 1,
+          photoUrls: []
+        });
+      } else {
+        const existing = groupedMap.get(key)!;
+        existing.landbankInfo = row;
+      }
+    }
+
     // Pre-cargar eventos, encumbrances y opportunity scores del nuevo Grafo
     const eventsMap = new Map<string, any[]>();
     for (const row of eventsRes.rows) {
@@ -1220,6 +1272,13 @@ app.get("/api/prospectos", async (req, res) => {
         tacticalAction: row.tactical_action as string,
         underwritingSummary: row.underwriting_summary ? JSON.parse(row.underwriting_summary as string) : null
       });
+    }
+
+    // Pre-cargar acquisition state (Pipeline Kanban & Call Dispositions)
+    const acquisitionMap = new Map<string, any>();
+    for (const row of (acquisitionStateRes.rows || [])) {
+      const pid = row.property_id as string;
+      acquisitionMap.set(pid, row);
     }
 
     // Geocodificar y calcular variables en lote
@@ -1304,6 +1363,22 @@ app.get("/api/prospectos", async (req, res) => {
         tacticalAction: 'REVISIÓN PRELIMINAR DE EXPEDIENTE'
       };
 
+      let oppScore = scoreObj.opportunityScore;
+      let tactAction = scoreObj.tacticalAction;
+      const isUnverifiedOwner = !isValidOwnerName(lead.ownerName);
+      const isCompletelyUnvalued = effectiveMarketValue <= 0 && primaryDebt <= 0;
+
+      if (isUnverifiedOwner && isCompletelyUnvalued) {
+        oppScore = 20;
+        tactAction = 'EXPEDIENTE INCOMPLETO: AUDITAR EN CORTE';
+      } else if (isCompletelyUnvalued) {
+        oppScore = Math.min(oppScore, 35);
+        tactAction = 'PENDIENTE DE PUBLICACIÓN DE DEUDA/VALOR';
+      } else if (isUnverifiedOwner) {
+        oppScore = Math.min(oppScore, 50);
+        tactAction = 'INVESTIGACIÓN DE TITULARIDAD REQUERIDA';
+      }
+
       const zipMatches = lead.displayAddress ? lead.displayAddress.match(/\b\d{5}\b/g) : null;
       const zipCode = zipMatches ? zipMatches[zipMatches.length - 1] : (lead.mailingAddress ? (lead.mailingAddress.match(/\b\d{5}\b/)?.[0] || "") : "");
 
@@ -1331,8 +1406,8 @@ app.get("/api/prospectos", async (req, res) => {
         taxSales: lead.taxSales || [],
         eventsTimeline: propEvents,
         encumbrancesLadder: propEncumbrances,
-        opportunityScore: scoreObj.opportunityScore,
-        tacticalAction: scoreObj.tacticalAction,
+        opportunityScore: oppScore,
+        tacticalAction: tactAction,
         institutionalUW,
         confidenceBreakdown: {
           geocodeConfidence: geocodeConf,
@@ -1364,7 +1439,9 @@ app.get("/api/prospectos", async (req, res) => {
         socialProfiles: osint.socialProfiles,
         usernamesFound: osint.usernamesFound,
         envStressors: osint.envStressors,
-        envAttractors: osint.envAttractors
+        envAttractors: osint.envAttractors,
+        landbankInfo: lead.landbankInfo || null,
+        acquisitionState: acquisitionMap.get(propertyId) || acquisitionMap.get(lead.groupingKey) || null
       });
     }
 
@@ -1415,17 +1492,120 @@ app.get("/api/call-logs", async (req, res) => {
 
 app.post("/api/call-logs", async (req, res) => {
   try {
-    const { property_id, phone_dialed, contact_name, outcome, notes } = req.body;
-    if (!property_id || !phone_dialed || !outcome) {
-      return res.status(400).json({ status: "error", message: "Missing required fields" });
+    const { property_id, phone_dialed, contact_name, outcome, disposition, notes } = req.body;
+    const finalOutcome = outcome || disposition;
+    if (!property_id || !finalOutcome) {
+      return res.status(400).json({ status: "error", message: "Missing property_id or outcome" });
     }
     const logId = `CALL_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
     await db.execute({
       sql: "INSERT INTO tzel_call_logs (log_id, property_id, phone_dialed, contact_name, outcome, notes, created_at) VALUES (?, ?, ?, ?, ?, ?, datetime('now'))",
-      args: [logId, property_id, phone_dialed, contact_name || '', outcome, notes || '']
+      args: [logId, property_id, phone_dialed || 'N/A', contact_name || '', finalOutcome, notes || '']
     });
-    console.log(`[CALL LOG REGISTERED] ${phone_dialed} -> ${outcome} for property ${property_id}`);
+    console.log(`[CALL LOG REGISTERED] ${phone_dialed || 'N/A'} -> ${finalOutcome} for property ${property_id}`);
     res.json({ status: "success", log_id: logId });
+  } catch (err: any) {
+    res.status(500).json({ status: "error", message: err.message });
+  }
+});
+
+// Acquisition Operating System: State Management Endpoints
+app.get("/api/acquisition-state", async (req, res) => {
+  try {
+    const propertyId = req.query.property_id as string;
+    if (propertyId) {
+      const row = await db.execute({
+        sql: "SELECT * FROM tzel_acquisition_state WHERE property_id = ?",
+        args: [propertyId]
+      });
+      return res.json({ status: "success", data: row.rows[0] || null });
+    }
+    const allRows = await db.execute("SELECT * FROM tzel_acquisition_state ORDER BY updated_at DESC");
+    const stateMap: Record<string, any> = {};
+    for (const r of allRows.rows) {
+      stateMap[r.property_id as string] = r;
+    }
+    res.json({ status: "success", count: allRows.rows.length, data: stateMap });
+  } catch (err: any) {
+    res.status(500).json({ status: "error", message: err.message });
+  }
+});
+
+app.post("/api/acquisition-state", async (req, res) => {
+  try {
+    const {
+      property_id,
+      stage,
+      motivation,
+      estimated_motivation,
+      asking_price,
+      debt,
+      negotiation_position,
+      next_action,
+      follow_up_date,
+      offer_conservative,
+      offer_target,
+      offer_max,
+      disposition,
+      notes
+    } = req.body;
+
+    if (!property_id) {
+      return res.status(400).json({ status: "error", message: "property_id is required" });
+    }
+
+    await db.execute({
+      sql: `
+        INSERT INTO tzel_acquisition_state (
+          property_id, stage, motivation, estimated_motivation, asking_price, debt,
+          negotiation_position, next_action, follow_up_date, offer_conservative,
+          offer_target, offer_max, disposition, notes, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+        ON CONFLICT(property_id) DO UPDATE SET
+          stage = COALESCE(excluded.stage, tzel_acquisition_state.stage),
+          motivation = COALESCE(excluded.motivation, tzel_acquisition_state.motivation),
+          estimated_motivation = COALESCE(excluded.estimated_motivation, tzel_acquisition_state.estimated_motivation),
+          asking_price = COALESCE(excluded.asking_price, tzel_acquisition_state.asking_price),
+          debt = COALESCE(excluded.debt, tzel_acquisition_state.debt),
+          negotiation_position = COALESCE(excluded.negotiation_position, tzel_acquisition_state.negotiation_position),
+          next_action = COALESCE(excluded.next_action, tzel_acquisition_state.next_action),
+          follow_up_date = COALESCE(excluded.follow_up_date, tzel_acquisition_state.follow_up_date),
+          offer_conservative = COALESCE(excluded.offer_conservative, tzel_acquisition_state.offer_conservative),
+          offer_target = COALESCE(excluded.offer_target, tzel_acquisition_state.offer_target),
+          offer_max = COALESCE(excluded.offer_max, tzel_acquisition_state.offer_max),
+          disposition = COALESCE(excluded.disposition, tzel_acquisition_state.disposition),
+          notes = COALESCE(excluded.notes, tzel_acquisition_state.notes),
+          updated_at = datetime('now')
+      `,
+      args: [
+        property_id,
+        stage || 'NEW',
+        motivation || null,
+        estimated_motivation || null,
+        asking_price || null,
+        debt || null,
+        negotiation_position || null,
+        next_action || null,
+        follow_up_date || null,
+        offer_conservative || null,
+        offer_target || null,
+        offer_max || null,
+        disposition || null,
+        notes || null
+      ]
+    });
+
+    // Also register call log if disposition was provided
+    if (disposition) {
+      const logId = `CALL_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+      await db.execute({
+        sql: "INSERT INTO tzel_call_logs (log_id, property_id, phone_dialed, contact_name, outcome, notes, created_at) VALUES (?, ?, 'N/A', '', ?, ?, datetime('now'))",
+        args: [logId, property_id, disposition, notes || '']
+      }).catch(() => {});
+    }
+
+    console.log(`[ACQUISITION STATE SAVED] ${property_id} -> Stage: ${stage || 'unchanged'} | Disp: ${disposition || 'none'}`);
+    res.json({ status: "success", property_id });
   } catch (err: any) {
     res.status(500).json({ status: "error", message: err.message });
   }

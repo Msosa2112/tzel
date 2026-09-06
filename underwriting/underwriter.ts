@@ -226,7 +226,24 @@ export function calculateInstitutionalUnderwriting(
   totalDebt: number,
   state: string = 'KY'
 ): InstitutionalUnderwriting {
-  const baseVal = marketValue > 0 ? marketValue : 180000;
+  if (!marketValue || marketValue <= 0) {
+    return {
+      arv: 0,
+      rehab: 0,
+      holdingCosts: 0,
+      closingCosts: 0,
+      desiredProfit: 0,
+      assignmentFee: 0,
+      targetContractPrice: 0,
+      walkAwayPrice: 0,
+      auctionMaxBid: 0,
+      wholesaleProfitSpread: 0,
+      equitySpread: 0,
+      isUnderwater: false
+    };
+  }
+
+  const baseVal = marketValue;
   const arv = Math.round(baseVal * 1.15);
   
   // Rehab calculation
