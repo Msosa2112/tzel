@@ -4473,7 +4473,8 @@
           <tr>
             <th>Fuente de Inteligencia</th>
             <th>Total Leads</th>
-            <th>Calificados</th>
+            <th>Tier A (Score ≥ 75)</th>
+            <th>Viables (Score ≥ 50)</th>
             <th>Contact Rate %</th>
             <th>Conversation Rate %</th>
             <th>Offer Rate %</th>
@@ -8348,13 +8349,15 @@ Este dinero le pertenece legalmente a usted, pero si no se reclama a tiempo pued
       tbody.innerHTML = sources.map(s => {
         const matched = leads.filter(s.filter);
         const count = matched.length;
-        const qualified = matched.filter(l => (l.opportunityScore || 70) >= 75).length;
+        const qualified = matched.filter(l => (l.opportunityScore || 50) >= 75).length;
+        const viable = matched.filter(l => (l.opportunityScore || 50) >= 50).length;
 
         return `
           <tr>
             <td style="font-weight: 700; color: #fff;">${s.name}</td>
             <td><strong style="color: var(--color-radar-green);">${count}</strong></td>
-            <td><strong style="color: #60a5fa;">${qualified}</strong></td>
+            <td><strong style="color: ${qualified > 0 ? 'var(--color-radar-green)' : '#64748b'}; font-weight: 800;">${qualified}</strong></td>
+            <td><strong style="color: #60a5fa; font-weight: 800;">${viable}</strong></td>
             <td>${s.contact}</td>
             <td>${s.conv}</td>
             <td>${s.offer}</td>
