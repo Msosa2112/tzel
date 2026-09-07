@@ -2,6 +2,7 @@ import axios from "axios";
 import * as cheerio from "cheerio";
 import { db } from "../db";
 import { analyzeCourtDocketWithGemini } from "./llm_underwriter";
+import { querySearXNG } from "../searxng_client";
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -60,34 +61,16 @@ export async function runIndianaLegalNoticesWorker() {
 
       for (const q of queries) {
         try {
-          const ddgUrl = `https://lite.duckduckgo.com/lite/?q=${encodeURIComponent(q)}`;
-          const resp = await axios.get(ddgUrl, {
-            headers: {
-              "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-            },
-            timeout: 10000
-          });
-
-          const $ = cheerio.load(resp.data);
+          const searxResults = await querySearXNG(q);
           const snippets: string[] = [];
-
-          // Extraer snippets de resultados de DDG Lite
-          $(".result-snippet").each((_, el) => {
-            snippets.push($(el).text().trim());
-          });
-
-          $("td.result-snippet").each((_, el) => {
-            snippets.push($(el).text().trim());
-          });
-
-          // También extraer enlaces a periódicos de avisos judiciales para escaneo directo
           const links: string[] = [];
-          $("a.result-link, a").each((_, el) => {
-            const href = $(el).attr("href");
-            if (href && (href.includes("indianapublicnotices.com") || href.includes("publicnotice") || href.includes("news") || href.includes("legal") || href.includes("sriservices"))) {
-              links.push(href);
+
+          for (const item of searxResults) {
+            if (item.content) snippets.push(item.content);
+            if (item.url && (item.url.includes("indianapublicnotices.com") || item.url.includes("publicnotice") || item.url.includes("news") || item.url.includes("legal") || item.url.includes("sriservices"))) {
+              links.push(item.url);
             }
-          });
+          }
 
           combinedText += " " + snippets.join(" \n ");
 
@@ -110,10 +93,10 @@ export async function runIndianaLegalNoticesWorker() {
 
           if (combinedText.length > 300) break; // ya tenemos suficiente contexto
         } catch (searchErr: any) {
-          console.warn(`   [DDG WARNING] Búsqueda falló para query "${q}": ${searchErr.message}`);
+          console.warn(`   [SEARCH WARNING] Búsqueda falló para query "${q}": ${searchErr.message}`);
         }
 
-        await sleep(1200); // cortesía de rate limit
+        await sleep(1000);
       }
 
       if (combinedText.trim().length < 50) {
