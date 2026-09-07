@@ -70,17 +70,18 @@ export async function runPdfAppraisalWorker() {
       const base64Pdf = pdfBuffer.toString("base64");
 
       // Prompt para Gemini Flagship
-      const prompt = `Instrucción: Eres un auditor legal de subastas judiciales en Kentucky.
-Analiza minuciosamente el documento judicial adjunto (Master Commissioner Appraisal / Evaluation Report / Judgment) y extrae:
+      const prompt = `Instrucción: Eres un auditor forense de subastas judiciales y adquisiciones inmobiliarias en Kentucky.
+Analiza minuciosamente el documento judicial adjunto (Master Commissioner Appraisal / Evaluation Report / Judgment / Notice) y extrae:
 1. appraisalValue: El valor de tasación oficial del inmueble (Appraisal Value / Evaluated Value / Fair Cash Value). Suele aparecer como "appraised value", "appraisal amount", "evaluated at" o "appraised at". Si no contiene tasación numérica, null.
 2. judgmentDebt: Si se menciona en el documento, el monto de la deuda o juicio reclamado por el demandante (Judgment Debt / Principal Debt / Claim). Si no se menciona, null.
+3. explanation: Diagnóstico forense y legal conciso en español (2-3 oraciones). Explica qué ocurrió según el expediente: quién ejecuta a quién (acreedor vs demandado), origen de la deuda o gravámenes cruzados, y observaciones críticas (condición del inmueble, abandono, riesgo de moho o gravámenes mecánicos).
 
 REGLAS:
 - Responde únicamente en formato JSON válido con esta estructura:
 {
   "appraisalValue": number o null,
   "judgmentDebt": number o null,
-  "explanation": "Breve explicación en español de lo encontrado en el PDF"
+  "explanation": string
 }`;
 
       try {
@@ -149,6 +150,7 @@ REGLAS:
               UPDATE foreclosure_auctions SET
                 appraisal_value = CASE WHEN ? > 0 THEN ? ELSE appraisal_value END,
                 debt_amount = CASE WHEN ? > 0 THEN ? ELSE debt_amount END,
+                forensic_legal_story = CASE WHEN ? IS NOT NULL AND ? != '' THEN ? ELSE forensic_legal_story END,
                 is_high_yield = ?,
                 needs_manual_review = ?
               WHERE auction_id = ?
@@ -156,6 +158,7 @@ REGLAS:
             args: [
               extAppraisal || 0, extAppraisal || 0,
               extDebt || 0, extDebt || 0,
+              explanation, explanation, explanation,
               isHighYield,
               needsManual,
               auctionId

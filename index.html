@@ -4168,6 +4168,19 @@
             </div>
           </div>
 
+          <!-- DIAGNÓSTICO & HISTORIA FORENSE (GEMINI PRO) -->
+          <div id="acq-forensic-story-card" class="acq-card" style="border: 1px solid rgba(245, 158, 11, 0.45); background: linear-gradient(180deg, rgba(245, 158, 11, 0.1) 0%, rgba(15, 23, 42, 0.8) 100%); display: none; box-shadow: 0 4px 20px rgba(245, 158, 11, 0.08);">
+            <div class="acq-card-title" style="display: flex; align-items: center; justify-content: space-between;">
+              <span style="display: flex; align-items: center; gap: 7px; color: #fbbf24; font-weight: 800; letter-spacing: 0.3px;">
+                <i data-lucide="book-open-check" style="width: 15px; height: 15px; color: #fbbf24;"></i>
+                DIAGNÓSTICO &amp; HISTORIA FORENSE (GEMINI PRO)
+              </span>
+              <span class="badge" style="background: rgba(245, 158, 11, 0.25); color: #fbbf24; font-size: 0.62rem; font-weight: 800; border: 1px solid rgba(245, 158, 11, 0.4);">AUTOPSY DOSSIER</span>
+            </div>
+            <div id="acq-forensic-story-text" style="font-size: 0.76rem; color: #f8fafc; line-height: 1.55; margin-top: 8px; background: rgba(0,0,0,0.38); padding: 12px; border-radius: 8px; border: 1px solid rgba(245, 158, 11, 0.2);">
+            </div>
+          </div>
+
           <!-- GEMINI MULTIMODAL COURT AUDIT COMPONENT -->
           <div class="acq-card" style="border: 1px solid rgba(0, 207, 204, 0.4); background: linear-gradient(180deg, rgba(0, 207, 204, 0.05) 0%, rgba(15, 23, 42, 0.7) 100%);">
             <div class="acq-card-title" style="display: flex; align-items: center; justify-content: space-between;">
@@ -7844,8 +7857,8 @@ Este dinero le pertenece legalmente a usted, pero si no se reclama a tiempo pued
       document.getElementById('acq-dossier-arv').textContent = marketVal > 0 ? `$${marketVal.toLocaleString()}` : 'Pendiente Valor PVA';
       document.getElementById('acq-dossier-mortgage').textContent = lead.primaryDebt > 0 ? `$${lead.primaryDebt.toLocaleString()} (Judicial Claim)` : '$0 / No registrada';
       document.getElementById('acq-dossier-taxes').textContent = (lead.hiddenLiensAmount || 0) > 0 ? `$${lead.hiddenLiensAmount.toLocaleString()}` : '$0 al día';
-      document.getElementById('acq-dossier-case').textContent = (lead.auctions && lead.auctions[0] && lead.auctions[0].caseNumber) || (lead.preForeclosures && lead.preForeclosures[0] && lead.preForeclosures[0].caseNumber) || 'KY-24-CI-RECORD';
-      document.getElementById('acq-dossier-auction').textContent = (lead.auctions && lead.auctions.length > 0) ? `Programada (${lead.auctions[0].auctionDate || 'Próxima'})` : 'Sin fecha fijada';
+      document.getElementById('acq-dossier-case').textContent = (lead.auctions && lead.auctions[0] && (lead.auctions[0].caseNumber || lead.auctions[0].case_number)) || (lead.preForeclosures && lead.preForeclosures[0] && (lead.preForeclosures[0].caseNumber || lead.preForeclosures[0].case_number)) || 'KY-24-CI-RECORD';
+      document.getElementById('acq-dossier-auction').textContent = (lead.auctions && lead.auctions.length > 0) ? `Programada (${lead.auctions[0].auctionDate || lead.auctions[0].auction_date || 'Próxima'})` : 'Sin fecha fijada';
       document.getElementById('acq-dossier-violations').textContent = (lead.violations && lead.violations.length > 0) ? `${lead.violations.length} violaciones registradas` : 'Sin infracciones graves';
       document.getElementById('acq-dossier-landbank').textContent = lead.landbankInfo ? `Sí - $${lead.landbankInfo.asking_price || 1000}` : 'No (Mercado privado)';
 
@@ -7860,6 +7873,19 @@ Este dinero le pertenece legalmente a usted, pero si no se reclama a tiempo pued
 
       // 8. Hydrate Saved State & Debrief
       hydrateAcquisitionStateFields(lead);
+
+      // 9. Forensic Legal Story (Gemini Pro Autopsy Dossier)
+      const storyCard = document.getElementById('acq-forensic-story-card');
+      const storyText = document.getElementById('acq-forensic-story-text');
+      const forensicStory = lead.forensicLegalStory || (lead.auctions && lead.auctions[0] && lead.auctions[0].forensic_legal_story);
+      if (storyCard && storyText) {
+        if (forensicStory && forensicStory.trim()) {
+          storyText.innerHTML = forensicStory.replace(/\n/g, '<br>');
+          storyCard.style.display = 'block';
+        } else {
+          storyCard.style.display = 'none';
+        }
+      }
 
       // Reset document audit card
       const dropzone = document.getElementById('acq-doc-dropzone');
@@ -7909,7 +7935,7 @@ Este dinero le pertenece legalmente a usted, pero si no se reclama a tiempo pued
             documentBase64: base64Data,
             mimeType: file.type || (file.name.endsWith('.pdf') ? 'application/pdf' : 'image/jpeg'),
             auctionId: (currentAcqLead && currentAcqLead.auctions && currentAcqLead.auctions[0] && currentAcqLead.auctions[0].auction_id) || '',
-            caseNumber: (currentAcqLead && currentAcqLead.auctions && currentAcqLead.auctions[0] && currentAcqLead.auctions[0].caseNumber) || (currentAcqLead && currentAcqLead.caseNumber) || '',
+            caseNumber: (currentAcqLead && currentAcqLead.auctions && currentAcqLead.auctions[0] && (currentAcqLead.auctions[0].caseNumber || currentAcqLead.auctions[0].case_number)) || (currentAcqLead && currentAcqLead.caseNumber) || '',
             address: (currentAcqLead && currentAcqLead.displayAddress) || ''
           };
           
@@ -7988,6 +8014,13 @@ Este dinero le pertenece legalmente a usted, pero si no se reclama a tiempo pued
       if (plaintiff && plaintiff.trim()) {
         if (currentAcqLead.auctions && currentAcqLead.auctions.length > 0) {
           currentAcqLead.auctions[0].plaintiff = plaintiff;
+        }
+      }
+
+      if (lastAuditedDocumentData.explanation) {
+        currentAcqLead.forensicLegalStory = lastAuditedDocumentData.explanation;
+        if (currentAcqLead.auctions && currentAcqLead.auctions.length > 0) {
+          currentAcqLead.auctions[0].forensic_legal_story = lastAuditedDocumentData.explanation;
         }
       }
 

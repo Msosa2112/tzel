@@ -220,6 +220,7 @@ interface GroupedLead {
   photoUrls: string[];
   landbankInfo?: any;
   acquisitionState?: any;
+  forensicLegalStory?: string;
 }
 
 let rateLimitCooldownUntil = 0;
@@ -402,7 +403,7 @@ app.get("/api/prospectos", async (req, res) => {
         mls_estimated_value, mls_id, pdf_url,
         defendant_phones, defendant_emails, needs_manual_review,
         mailing_address, absentee_owner, sqft, beds, baths, hidden_mortgages, hidden_liens_amount, photo_urls,
-        title_check_status, next_retry_date
+        title_check_status, next_retry_date, forensic_legal_story
       FROM foreclosure_auctions
       WHERE (status IS NULL OR status = 'active' OR status = '') AND (mls_status IS NULL OR mls_status != 'resolved')`,
       // 1. code_violations
@@ -480,7 +481,8 @@ app.get("/api/prospectos", async (req, res) => {
       const dateStr = row.auction_date as string;
       const daysRemaining = getDaysRemaining(dateStr);
       if (daysRemaining === null) return true; // Keep manual reviews
-      return daysRemaining >= 0 && daysRemaining <= 60;
+      if (row.forensic_legal_story || (row.needs_manual_review as number) === 1) return true; // Retener casos auditados por IA
+      return daysRemaining >= -45 && daysRemaining <= 60; // Ventana de 60 días futuros y 45 días post-remate (redención/confirmación)
     });
 
     const violations = violationsRes.rows;
@@ -553,10 +555,14 @@ app.get("/api/prospectos", async (req, res) => {
           sqft: row.sqft as number || undefined,
           beds: row.beds as number || undefined,
           baths: row.baths as number || undefined,
-          photoUrls: []
+          photoUrls: [],
+          forensicLegalStory: row.forensic_legal_story as string || undefined
         });
       } else {
         const existing = groupedMap.get(key)!;
+        if (row.forensic_legal_story && !existing.forensicLegalStory) {
+          existing.forensicLegalStory = row.forensic_legal_story as string;
+        }
         if (row.mls_estimated_value && (row.mls_estimated_value as number) > existing.mlsValue) {
           existing.mlsValue = row.mls_estimated_value as number;
         }
@@ -1442,7 +1448,8 @@ app.get("/api/prospectos", async (req, res) => {
         envStressors: osint.envStressors,
         envAttractors: osint.envAttractors,
         landbankInfo: lead.landbankInfo || null,
-        acquisitionState: acquisitionMap.get(propertyId) || acquisitionMap.get(lead.groupingKey) || null
+        acquisitionState: acquisitionMap.get(propertyId) || acquisitionMap.get(lead.groupingKey) || null,
+        forensicLegalStory: lead.forensicLegalStory || (lead.auctions && lead.auctions[0] && lead.auctions[0].forensic_legal_story) || undefined
       });
     }
 
@@ -2008,6 +2015,7 @@ Responde estrictamente en formato JSON válido con esta estructura:
               hidden_liens_amount = CASE WHEN ? > 0 THEN ? ELSE hidden_liens_amount END,
               plaintiff = CASE WHEN ? IS NOT NULL AND ? != '' THEN ? ELSE plaintiff END,
               defendant = CASE WHEN ? IS NOT NULL AND ? != '' THEN ? ELSE defendant END,
+              forensic_legal_story = CASE WHEN ? IS NOT NULL AND ? != '' THEN ? ELSE forensic_legal_story END,
               needs_manual_review = CASE WHEN ? > 0 THEN 0 ELSE needs_manual_review END
             WHERE auction_id = ? OR (case_number IS NOT NULL AND case_number = ?) OR (address IS NOT NULL AND address LIKE ?)
           `,
@@ -2017,6 +2025,7 @@ Responde estrictamente en formato JSON válido con esta estructura:
             secondaryLiens, secondaryLiens,
             responseJson.plaintiff, responseJson.plaintiff, responseJson.plaintiff,
             responseJson.defendant, responseJson.defendant, responseJson.defendant,
+            responseJson.explanation, responseJson.explanation, responseJson.explanation,
             debt,
             auctionId || "",
             caseNumber || responseJson.caseNumber || "",
