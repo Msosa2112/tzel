@@ -8336,7 +8336,7 @@ Este dinero le pertenece legalmente a usted, pero si no se reclama a tiempo pued
 
       const leads = allLeads || [];
       const sources = [
-        { name: '🏛️ Louisville Landbank ($1 - $3k)', filter: l => l.landbankInfo !== undefined, avgEquity: '$45,000', contact: '82%', conv: '64%', offer: '48%', contract: '32%', close: '24%' },
+        { name: '🏛️ Louisville Landbank ($1 - $3k)', filter: l => Boolean(l.landbankInfo), avgEquity: '$45,000', contact: '82%', conv: '64%', offer: '48%', contract: '32%', close: '24%' },
         { name: '⚖️ Subastas Judiciales (Foreclosure Sales)', filter: l => l.auctions && l.auctions.length > 0, avgEquity: '$118,000', contact: '74%', conv: '52%', offer: '38%', contract: '21%', close: '18%' },
         { name: '📜 Pre-Foreclosure / Lis Pendens', filter: l => l.preForeclosures && l.preForeclosures.length > 0, avgEquity: '$92,000', contact: '68%', conv: '46%', offer: '32%', contract: '16%', close: '12%' },
         { name: '🔨 Gravámenes de Contratista (Mechanics Liens)', filter: l => (l.hiddenLiensAmount || 0) > 0, avgEquity: '$64,000', contact: '59%', conv: '41%', offer: '28%', contract: '14%', close: '11%' },
