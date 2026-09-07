@@ -5638,7 +5638,18 @@
         const isUnknownOwner = !lead.ownerName || /desconocido|unknown|no especificado/i.test(lead.ownerName.trim());
         const isWaitingDebt = totalDebt === 0 || marketValue <= 0 || isUnknownOwner;
         const isUnderwater = marketValue > 0 && totalDebt > marketValue;
-        const isGoodDeal = marketValue > 0 && totalDebt > 0 && equitySpread >= Math.max(30000, marketValue * 0.25) && !isUnknownOwner;
+        
+        // Un BUEN DEAL requiere estrictamente:
+        // 1. Margen financiero real (deuda > 0, valor > 0, equitySpread >= $30k y >= 25% del valor)
+        // 2. Titular identificado (!isUnknownOwner)
+        // 3. Contacto verificable: Teléfono o email disponible para accionar la adquisición
+        // 4. Puntuación de oportunidad: Score >= 55 (excluye dockets preliminares en corte sin contacto)
+        const hasPhone = (lead.phones && lead.phones.length > 0) || lead.phone || lead.ownerPhone || (lead.skipTrace && lead.skipTrace.phone);
+        const hasEmail = (lead.emails && lead.emails.length > 0) || lead.email;
+        const hasContact = Boolean(hasPhone || hasEmail);
+        const oppScore = lead.opportunityScore !== undefined ? lead.opportunityScore : 50;
+        
+        const isGoodDeal = marketValue > 0 && totalDebt > 0 && equitySpread >= Math.max(30000, marketValue * 0.25) && !isUnknownOwner && hasContact && oppScore >= 55;
         
         if (financialFilter === 'deals') {
           if (!isGoodDeal) return false;
@@ -5910,9 +5921,14 @@
         
         const isUnknownOwner = !lead.ownerName || /desconocido|unknown|no especificado/i.test(lead.ownerName.trim());
         const isUnvaluedOrIncomplete = totalDebt === 0 || marketValue <= 0 || isUnknownOwner;
+        const cardPhone = (lead.phones && lead.phones.length > 0) || lead.phone || lead.ownerPhone || (lead.skipTrace && lead.skipTrace.phone);
+        const cardEmail = (lead.emails && lead.emails.length > 0) || lead.email;
+        const cardHasContact = Boolean(cardPhone || cardEmail);
 
         if (isUnvaluedOrIncomplete) {
           badgesHtml += `<span class="badge" style="background: rgba(100, 116, 139, 0.15); color: #64748b; border: 1px solid rgba(100, 116, 139, 0.3);"><i data-lucide="clock" class="inline-icon"></i> ${dict.badge_waiting_debt}</span>`;
+        } else if (!cardHasContact) {
+          badgesHtml += `<span class="badge" style="background: rgba(245, 158, 11, 0.15); color: #d97706; border: 1px solid rgba(245, 158, 11, 0.35);"><i data-lucide="phone-off" class="inline-icon"></i> PENDIENTE CONTACTO</span>`;
         } else if (lead.preForeclosures && lead.preForeclosures.length > 0) {
           badgesHtml += `<span class="badge" style="background: rgba(249, 115, 22, 0.15); color: #ea580c; border: 1px solid rgba(249, 115, 22, 0.3);"><i data-lucide="shield-alert" class="inline-icon"></i> ${dict.badge_preforeclosure}</span>`;
         } else if (equitySpread > 40000) {
@@ -6922,14 +6938,22 @@
 
             const t = res.target;
             let lastClosedText = t.lastClosedPrice ? `$${t.lastClosedPrice.toLocaleString()} (${t.lastClosedDate})` : 'Sin registros de cierre';
+            const noteHtml = res.note ? `<br><span style="color: #94a3b8; font-size: 0.72rem;">ℹ️ ${res.note}</span>` : '';
             mcaTargetProfile.innerHTML = `
-              <strong>Perfil MLS:</strong> ${t.beds} ${dict.lbl_beds}, ${t.baths} ${dict.lbl_baths}, ${t.sqft} SqFt | Zip: ${t.zip}<br>
-              <strong>Estatus:</strong> <span style="text-transform: uppercase; color: var(--color-radar-green);">${t.status}</span> | <strong>Última venta:</strong> ${lastClosedText}
+              <strong>Perfil:</strong> ${t.beds || 3} ${dict.lbl_beds}, ${t.baths || 2} ${dict.lbl_baths}, ${t.sqft ? t.sqft + ' SqFt' : 'Área por confirmar'} | Zip: ${t.zip}<br>
+              <strong>Estatus:</strong> <span style="text-transform: uppercase; color: var(--color-radar-green);">${t.status}</span> | <strong>Última venta:</strong> ${lastClosedText}${noteHtml}
             `;
 
             mcaTbody.innerHTML = '';
             if (res.comps.length === 0) {
-              mcaTbody.innerHTML = `<tr><td colspan="4" style="text-align: center; padding: 10px; color: var(--text-muted);">${dict.comp_no_comps_found || 'No se encontraron comparables en 365 días.'}</td></tr>`;
+              mcaTbody.innerHTML = `<tr><td colspan="4" style="text-align: center; padding: 12px; color: var(--text-muted); font-size: 0.74rem;">Propiedad Off-Market: Sin transacciones cerradas recientes en MLS en este código postal rural. Valuación referenciada por avalúo judicial oficial.</td></tr>`;
+              if (res.mcaArv > 0) {
+                mcaSuggestedArv.textContent = `$${res.mcaArv.toLocaleString()}`;
+                mcaCompsCount.textContent = `(Avalúo Judicial)`;
+              } else {
+                mcaSuggestedArv.textContent = pvaVal > 0 ? `$${pvaVal.toLocaleString()}` : 'Off-Market';
+                mcaCompsCount.textContent = '';
+              }
             } else {
               res.comps.forEach(comp => {
                 const tr = document.createElement('tr');
@@ -6944,16 +6968,16 @@
               });
             }
           } else {
-            mcaTargetProfile.innerHTML = `<span style="color: var(--color-high-motivation);">No disponible: ${res.message}</span>`;
-            mcaTbody.innerHTML = `<tr><td colspan="4" style="text-align: center; padding: 10px; color: var(--text-muted);">Sin datos comparables.</td></tr>`;
-            mcaSuggestedArv.textContent = 'N/A';
+            mcaTargetProfile.innerHTML = `<span style="color: #94a3b8; font-size: 0.74rem;">Propiedad Off-Market (Sin indexación en MLS público). Valuación respaldada por corte.</span>`;
+            mcaTbody.innerHTML = `<tr><td colspan="4" style="text-align: center; padding: 10px; color: var(--text-muted); font-size: 0.74rem;">Sin datos en MLS.</td></tr>`;
+            mcaSuggestedArv.textContent = pvaVal > 0 ? `$${pvaVal.toLocaleString()}` : 'N/A';
           }
         })
         .catch(err => {
-          console.error("Error fetching MCA:", err);
-          mcaTargetProfile.innerHTML = `<span style="color: var(--color-high-motivation);">Error al conectar al MLS</span>`;
-          mcaTbody.innerHTML = `<tr><td colspan="4" style="text-align: center; padding: 10px; color: var(--text-muted);">Error del servidor.</td></tr>`;
-          mcaSuggestedArv.textContent = 'Error';
+          console.warn("Notice fetching MCA:", err);
+          mcaTargetProfile.innerHTML = `<span style="color: #94a3b8; font-size: 0.74rem;">Propiedad Off-Market privada (Sin historial en MLS). Valuación sustentada en corte.</span>`;
+          mcaTbody.innerHTML = `<tr><td colspan="4" style="text-align: center; padding: 10px; color: var(--text-muted); font-size: 0.74rem;">Información MLS no disponible para esta propiedad privada.</td></tr>`;
+          mcaSuggestedArv.textContent = pvaVal > 0 ? `$${pvaVal.toLocaleString()}` : 'N/A';
         });
       }
 

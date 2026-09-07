@@ -34,8 +34,8 @@ Tzel es un **Acquisition Operating System** para inversión inmobiliaria en Kent
 
 ### C. Filtro de "BUENOS DEALS" (`#btn-deals`)
 * **Condición estricta**:
-  `marketValue > 0 && totalDebt > 0 && equitySpread >= Math.max(30000, marketValue * 0.25) && !isUnknownOwner`
-* Todo docket sin datos o con dueño desconocido queda **100% excluido**.
+  `marketValue > 0 && totalDebt > 0 && equitySpread >= Math.max(30000, marketValue * 0.25) && !isUnknownOwner && hasContact && opportunityScore >= 55`
+* Todo prospecto sin contacto directo verificado (teléfono o email) o sin datos mínimos queda **100% excluido** de "Buenos Deals" y clasificado como `PENDIENTE CONTACTO`. Solo prospectos accionables con titular y teléfono pueden calificar.
 
 ### D. Pestaña "Top Oportunidades" del Timeline
 * Filtra leads incompletos; exige `marketValue > 0 && totalDebt > 0 && equitySpread >= 30000 && !isUnknownOwner && opportunityScore >= 55`.
