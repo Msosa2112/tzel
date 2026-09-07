@@ -13,7 +13,8 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 app.use(express.static(path.join(__dirname, ".")));
-app.use(express.json());
+app.use(express.json({ limit: "50mb" }));
+app.use(express.urlencoded({ limit: "50mb", extended: true }));
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -1887,6 +1888,161 @@ app.get("/api/guiones", async (req, res) => {
   } catch (err: any) {
     console.error("[API ERROR] Failed to load telephony scripts:", err.message);
     res.status(500).json({ status: "error", message: err.message });
+  }
+});
+
+/**
+ * Endpoint de Auditoría Multimodal de Documentos Judiciales (PDF, JPG, PNG)
+ * Utiliza Gemini 3.1 Pro Preview (con fallback a Gemini 3.8 Flash) para extraer
+ * montos de juicio, avalúos, gravámenes secundarios y situación procesal.
+ */
+app.post("/api/audit-court-document", async (req, res) => {
+  console.log("[API] /api/audit-court-document solicitado");
+  try {
+    const { documentBase64, mimeType, auctionId, caseNumber, address } = req.body;
+    if (!documentBase64) {
+      return res.status(400).json({ status: "error", message: "Falta el parámetro documentBase64 (documento en Base64)." });
+    }
+
+    const cleanBase64 = documentBase64.replace(/^data:[^;]+;base64,/, "");
+    const effectiveMime = mimeType || (cleanBase64.startsWith("JVBER") ? "application/pdf" : "image/jpeg");
+    const apiKey = process.env.GEMINI_API_KEY;
+
+    if (!apiKey) {
+      return res.status(500).json({ status: "error", message: "GEMINI_API_KEY no configurada en el servidor." });
+    }
+
+    const prompt = `Eres un Auditor Legal y Especialista en Ejecuciones Hipotecarias (Foreclosure & Acquisition Underwriter) para Kentucky e Indiana.
+Analiza con precisión forense el documento judicial adjunto (decreto de ejecución hipotecaria, tasación judicial, orden de venta del Sheriff, desglose de liquidación o aviso público) y extrae:
+
+1. judgmentDebt: Monto líquido total de la sentencia de ejecución hipotecaria o deuda reclamada por el banco/acreedor (número decimal puro, ej: 84500.50). Si no aparece, null.
+2. appraisalValue: Valor de tasación oficial de la corte o PVA (Appraisal Value / Evaluated Cash Value). Si no aparece, null.
+3. secondaryLiensAmount: Gravámenes secundarios, embargos fiscales, impuestos acumulados o segundas hipotecas (número decimal, ej: 4500, o 0).
+4. plaintiff: Nombre del banco/acreedor demandante (o null).
+5. defendant: Nombre del deudor/titular demandado (o null).
+6. isDismissed: true si el caso fue desestimado/anulado, false si está activo o con orden de venta.
+7. caseNumber: Número de expediente judicial si aparece en el documento (o null).
+8. explanation: Resumen ejecutivo en español de 2-3 frases detallando la situación legal, montos encontrados y conceptos.
+9. actionableAdvice: Recomendación táctica directa para el inversionista de adquisición sobre cómo ofertar este inmueble.
+
+Responde estrictamente en formato JSON válido con esta estructura:
+{
+  "judgmentDebt": number o null,
+  "appraisalValue": number o null,
+  "secondaryLiensAmount": number,
+  "plaintiff": string o null,
+  "defendant": string o null,
+  "isDismissed": boolean,
+  "caseNumber": string o null,
+  "explanation": string,
+  "actionableAdvice": string
+}`;
+
+    // Priority: gemini-3.1-pro-preview primero, fallback a gemini-3.8-flash
+    const models = ["gemini-3.1-pro-preview", "gemini-3.8-flash"];
+    let responseJson: any = null;
+    let usedModel = "";
+
+    for (const model of models) {
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+      try {
+        console.log(`[AUDIT DOC API] Procesando documento multimodal con ${model} (${effectiveMime})...`);
+        const geminiResp = await fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            contents: [
+              {
+                parts: [
+                  {
+                    inlineData: {
+                      mimeType: effectiveMime,
+                      data: cleanBase64
+                    }
+                  },
+                  { text: prompt }
+                ]
+              }
+            ],
+            generationConfig: { response_mime_type: "application/json" }
+          }),
+          signal: AbortSignal.timeout(45000)
+        });
+
+        if (!geminiResp.ok) {
+          const errTxt = await geminiResp.text();
+          console.warn(`[AUDIT DOC API] Falló ${model}: HTTP ${geminiResp.status} - ${errTxt.slice(0, 120)}`);
+          continue;
+        }
+
+        const gData = await geminiResp.json() as any;
+        const textResp = gData.candidates?.[0]?.content?.parts?.[0]?.text;
+        if (textResp) {
+          const match = textResp.match(/\{[\s\S]*\}/);
+          responseJson = JSON.parse(match ? match[0] : textResp);
+          usedModel = model;
+          break;
+        }
+      } catch (err: any) {
+        console.warn(`[AUDIT DOC API] Error consultando ${model}: ${err.message}`);
+      }
+    }
+
+    if (!responseJson) {
+      return res.status(500).json({ status: "error", message: "No se pudo extraer información del documento con los modelos de Gemini." });
+    }
+
+    // Actualizar en base de datos si tenemos auctionId, caseNumber o address
+    let updatedDb = false;
+    const debt = responseJson.judgmentDebt && !isNaN(Number(responseJson.judgmentDebt)) ? Number(responseJson.judgmentDebt) : null;
+    const appraisal = responseJson.appraisalValue && !isNaN(Number(responseJson.appraisalValue)) ? Number(responseJson.appraisalValue) : null;
+    const secondaryLiens = Number(responseJson.secondaryLiensAmount || 0);
+
+    if (auctionId || caseNumber || address) {
+      try {
+        const updateRes = await db.execute({
+          sql: `
+            UPDATE foreclosure_auctions SET
+              debt_amount = CASE WHEN ? IS NOT NULL THEN ? ELSE debt_amount END,
+              appraisal_value = CASE WHEN ? IS NOT NULL THEN ? ELSE appraisal_value END,
+              hidden_liens_amount = CASE WHEN ? > 0 THEN ? ELSE hidden_liens_amount END,
+              plaintiff = CASE WHEN ? IS NOT NULL AND ? != '' THEN ? ELSE plaintiff END,
+              defendant = CASE WHEN ? IS NOT NULL AND ? != '' THEN ? ELSE defendant END,
+              needs_manual_review = CASE WHEN ? > 0 THEN 0 ELSE needs_manual_review END
+            WHERE auction_id = ? OR (case_number IS NOT NULL AND case_number = ?) OR (address IS NOT NULL AND address LIKE ?)
+          `,
+          args: [
+            debt, debt,
+            appraisal, appraisal,
+            secondaryLiens, secondaryLiens,
+            responseJson.plaintiff, responseJson.plaintiff, responseJson.plaintiff,
+            responseJson.defendant, responseJson.defendant, responseJson.defendant,
+            debt,
+            auctionId || "",
+            caseNumber || responseJson.caseNumber || "",
+            address ? `%${address.split(",")[0].trim()}%` : ""
+          ]
+        });
+
+        if (updateRes.rowsAffected > 0) {
+          updatedDb = true;
+          cachedProspectos = null; // invalidar caché del mapa
+          console.log(`[AUDIT DOC API SUCCESS] Registro en Turso actualizado (${updateRes.rowsAffected} filas). Deuda: $${debt?.toLocaleString()}`);
+        }
+      } catch (dbErr: any) {
+        console.error(`[AUDIT DOC API DB ERROR]: ${dbErr.message}`);
+      }
+    }
+
+    return res.json({
+      status: "success",
+      model: usedModel,
+      data: responseJson,
+      updatedDb
+    });
+  } catch (e: any) {
+    console.error("[AUDIT DOC API FATAL]:", e.message);
+    return res.status(500).json({ status: "error", message: e.message });
   }
 });
 

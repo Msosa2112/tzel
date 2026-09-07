@@ -35,7 +35,7 @@ export async function runPdfAppraisalWorker() {
     const rows = pendingAuctions.rows;
     console.log(`[PDF WORKER] Encontrados ${rows.length} expedientes con PDF pendiente de tasación.`);
 
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${apiKey}`;
+    const models = ["gemini-3.1-pro-preview", "gemini-3.8-flash"];
 
     for (let i = 0; i < rows.length; i++) {
       const row = rows[i];
@@ -84,49 +84,46 @@ REGLAS:
 }`;
 
       try {
-        console.log(`  Consultando API de Gemini (gemini-2.5-flash) con el PDF multimodal...`);
-        
-        const geminiResp = await fetch(url, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            contents: [
-              {
-                parts: [
-                  {
-                    inlineData: {
-                      mimeType: "application/pdf",
-                      data: base64Pdf
-                    }
-                  },
-                  {
-                    text: prompt
-                  }
-                ]
-              }
-            ],
-            generationConfig: {
-              response_mime_type: "application/json"
-            }
-          }),
-          signal: AbortSignal.timeout(20000)
-        });
-
-        if (!geminiResp.ok) {
-          throw new Error(`HTTP Error ${geminiResp.status}: ${geminiResp.statusText}`);
-        }
-
-        const data = await geminiResp.json() as any;
         let responseText = "";
+        let usedModel = "";
 
-        if (data.candidates && data.candidates[0]?.content?.parts && data.candidates[0].content.parts[0]) {
-          responseText = data.candidates[0].content.parts[0].text;
+        for (const model of models) {
+          try {
+            console.log(`  Consultando API de Gemini (${model}) con el PDF multimodal...`);
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+            const geminiResp = await fetch(url, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                contents: [{
+                  parts: [
+                    { inlineData: { mimeType: "application/pdf", data: base64Pdf } },
+                    { text: prompt }
+                  ]
+                }],
+                generationConfig: { response_mime_type: "application/json" }
+              }),
+              signal: AbortSignal.timeout(30000)
+            });
+
+            if (!geminiResp.ok) {
+              console.warn(`  [PDF WORKER] Falló ${model}: HTTP ${geminiResp.status}`);
+              continue;
+            }
+
+            const data = await geminiResp.json() as any;
+            if (data.candidates?.[0]?.content?.parts?.[0]?.text) {
+              responseText = data.candidates[0].content.parts[0].text;
+              usedModel = model;
+              break;
+            }
+          } catch (mErr: any) {
+            console.warn(`  [PDF WORKER] Error en ${model}: ${mErr.message}`);
+          }
         }
 
         if (!responseText) {
-          throw new Error("Respuesta vacía de la API de Gemini.");
+          throw new Error("Respuesta vacía o fallida de todos los modelos de Gemini.");
         }
 
         const match = responseText.match(/\{[\s\S]*\}/);

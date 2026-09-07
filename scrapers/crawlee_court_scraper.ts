@@ -343,12 +343,19 @@ export async function scrapeIndianaCaseWithCrawlee(caseNumber: string): Promise<
       
       const llmAnalysis = await analyzeTextWithGemma(caseDetailsText);
       const isDismissed = llmAnalysis.isDismissed;
+      const finalDebt = debt || llmAnalysis.debtAmount;
+      const finalPlaintiff = plaintiff || llmAnalysis.plaintiff;
+      const finalDefendant = defendant || llmAnalysis.defendant;
+
+      if (!debt && llmAnalysis.debtAmount) {
+        log.info(`[GEMINI ENRICHMENT] Deuda recuperada semánticamente por Gemini: $${llmAnalysis.debtAmount.toLocaleString()}`);
+      }
 
       result = {
         caseNumber,
-        plaintiff,
-        defendant,
-        debtAmount: debt,
+        plaintiff: finalPlaintiff,
+        defendant: finalDefendant,
+        debtAmount: finalDebt,
         isDismissed
       };
       

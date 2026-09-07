@@ -4167,6 +4167,69 @@
               </div>
             </div>
           </div>
+
+          <!-- GEMINI MULTIMODAL COURT AUDIT COMPONENT -->
+          <div class="acq-card" style="border: 1px solid rgba(0, 207, 204, 0.4); background: linear-gradient(180deg, rgba(0, 207, 204, 0.05) 0%, rgba(15, 23, 42, 0.7) 100%);">
+            <div class="acq-card-title" style="display: flex; align-items: center; justify-content: space-between;">
+              <span style="display: flex; align-items: center; gap: 6px; color: var(--color-radar-green); font-weight: 800;">
+                <i data-lucide="scan-line" style="width: 14px; height: 14px;"></i>
+                AUDITORÍA MULTIMODAL IA (GEMINI 3.1 PRO)
+              </span>
+              <span class="badge" style="background: rgba(0,207,204,0.2); color: var(--color-radar-green); font-size: 0.62rem;">FLAGSHIP REASONING</span>
+            </div>
+
+            <div style="font-size: 0.73rem; color: #94a3b8; margin-top: 4px; line-height: 1.4;">
+              Sube o arrastra el PDF judicial, decreto de remate o foto del expediente. Gemini extraerá la deuda real y actualizará el deal al instante.
+            </div>
+
+            <!-- Drag and drop zone -->
+            <div id="acq-doc-dropzone" style="margin-top: 10px; border: 2px dashed rgba(0, 207, 204, 0.35); border-radius: 8px; padding: 14px; text-align: center; background: rgba(0, 0, 0, 0.25); cursor: pointer; transition: all 0.2s ease;" onclick="document.getElementById('acq-file-input').click()">
+              <input type="file" id="acq-file-input" style="display: none;" accept=".pdf,image/png,image/jpeg,image/jpg" onchange="handleCourtDocumentUpload(this.files[0])">
+              <i data-lucide="upload-cloud" style="width: 24px; height: 24px; color: var(--color-radar-green); margin: 0 auto 6px auto; display: block;"></i>
+              <div style="font-size: 0.78rem; font-weight: 700; color: #f1f5f9;">
+                Arrastra aquí el PDF / Imagen o <span style="color: var(--color-radar-green); text-decoration: underline;">haz clic para subir</span>
+              </div>
+              <div style="font-size: 0.66rem; color: #64748b; margin-top: 2px;">
+                Soporta PDFs judiciales escaneados, fotos JPG/PNG de expedientes hasta 50MB
+              </div>
+            </div>
+
+            <!-- Loading State -->
+            <div id="acq-doc-loading" style="display: none; margin-top: 10px; padding: 12px; border-radius: 8px; background: rgba(0, 207, 204, 0.1); text-align: center; border: 1px solid rgba(0, 207, 204, 0.25);">
+              <div style="display: inline-block; width: 18px; height: 18px; border: 2px solid var(--color-radar-green); border-top-color: transparent; border-radius: 50%; animation: spin 0.8s linear infinite; vertical-align: middle; margin-right: 8px;"></div>
+              <span style="font-size: 0.76rem; font-weight: 700; color: var(--color-radar-green);">Auditando documento con Gemini 3.1 Pro...</span>
+            </div>
+
+            <!-- Result Container -->
+            <div id="acq-doc-result" style="display: none; margin-top: 10px; padding: 12px; border-radius: 8px; background: rgba(15, 23, 42, 0.9); border: 1px solid rgba(0, 207, 204, 0.3);">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                <span style="font-size: 0.72rem; font-weight: 800; color: var(--color-radar-green); text-transform: uppercase;">
+                  HALLAZGOS JUDICIALES EXTRAÍDOS:
+                </span>
+                <span id="acq-doc-model-badge" class="badge" style="background: rgba(255,255,255,0.08); font-size: 0.6rem; color: #cbd5e1;">Gemini 3.1 Pro</span>
+              </div>
+
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 8px;">
+                <div style="background: rgba(255,255,255,0.03); padding: 6px 8px; border-radius: 6px;">
+                  <div style="font-size: 0.65rem; color: #94a3b8;">DEUDA EXTRAÍDA</div>
+                  <div id="acq-doc-res-debt" style="font-size: 0.92rem; font-weight: 800; color: #ef4444;">$0</div>
+                </div>
+                <div style="background: rgba(255,255,255,0.03); padding: 6px 8px; border-radius: 6px;">
+                  <div style="font-size: 0.65rem; color: #94a3b8;">AVALÚO / VALOR</div>
+                  <div id="acq-doc-res-val" style="font-size: 0.92rem; font-weight: 800; color: #3b82f6;">$0</div>
+                </div>
+              </div>
+
+              <div id="acq-doc-res-explanation" style="font-size: 0.72rem; color: #cbd5e1; line-height: 1.4; margin-bottom: 10px; background: rgba(0,0,0,0.25); padding: 8px; border-radius: 6px;">
+                Explicación...
+              </div>
+
+              <button id="acq-doc-apply-btn" onclick="applyAuditedDataToDeal()" style="width: 100%; padding: 8px 12px; background: var(--color-radar-green); color: #0f172a; border: none; border-radius: 6px; font-weight: 800; font-size: 0.76rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; box-shadow: 0 4px 12px rgba(0,207,204,0.25);">
+                <i data-lucide="check-check" style="width: 14px; height: 14px;"></i>
+                APLICAR AL DEAL Y RECALCULAR OFERTAS
+              </button>
+            </div>
+          </div>
         </div>
 
         <!-- COLUMN 2: STRATEGY, CALL BRIEF & OBJECTIONS -->
@@ -7798,6 +7861,23 @@ Este dinero le pertenece legalmente a usted, pero si no se reclama a tiempo pued
       // 8. Hydrate Saved State & Debrief
       hydrateAcquisitionStateFields(lead);
 
+      // Reset document audit card
+      const dropzone = document.getElementById('acq-doc-dropzone');
+      const loading = document.getElementById('acq-doc-loading');
+      const resultBox = document.getElementById('acq-doc-result');
+      const fileInput = document.getElementById('acq-file-input');
+      const applyBtn = document.getElementById('acq-doc-apply-btn');
+      if (dropzone) dropzone.style.display = 'block';
+      if (loading) loading.style.display = 'none';
+      if (resultBox) resultBox.style.display = 'none';
+      if (fileInput) fileInput.value = '';
+      if (applyBtn) {
+        applyBtn.innerHTML = '<i data-lucide="check-check" style="width: 14px; height: 14px;"></i> APLICAR AL DEAL Y RECALCULAR OFERTAS';
+        applyBtn.style.background = 'var(--color-radar-green)';
+        applyBtn.style.color = '#0f172a';
+      }
+      lastAuditedDocumentData = null;
+
       modal.style.display = 'flex';
       if (typeof lucide !== 'undefined') lucide.createIcons();
     };
@@ -7805,6 +7885,142 @@ Este dinero le pertenece legalmente a usted, pero si no se reclama a tiempo pued
     window.closeAcquisitionCommandCenter = function() {
       const modal = document.getElementById('acquisition-command-center');
       if (modal) modal.style.display = 'none';
+    };
+
+    let lastAuditedDocumentData = null;
+
+    window.handleCourtDocumentUpload = async function(file) {
+      if (!file) return;
+      
+      const dropzone = document.getElementById('acq-doc-dropzone');
+      const loading = document.getElementById('acq-doc-loading');
+      const resultBox = document.getElementById('acq-doc-result');
+      
+      if (dropzone) dropzone.style.display = 'none';
+      if (loading) loading.style.display = 'block';
+      if (resultBox) resultBox.style.display = 'none';
+      
+      try {
+        const reader = new FileReader();
+        reader.onload = async function(e) {
+          const base64Data = e.target.result;
+          
+          const payload = {
+            documentBase64: base64Data,
+            mimeType: file.type || (file.name.endsWith('.pdf') ? 'application/pdf' : 'image/jpeg'),
+            auctionId: (currentAcqLead && currentAcqLead.auctions && currentAcqLead.auctions[0] && currentAcqLead.auctions[0].auction_id) || '',
+            caseNumber: (currentAcqLead && currentAcqLead.auctions && currentAcqLead.auctions[0] && currentAcqLead.auctions[0].caseNumber) || (currentAcqLead && currentAcqLead.caseNumber) || '',
+            address: (currentAcqLead && currentAcqLead.displayAddress) || ''
+          };
+          
+          try {
+            const resp = await fetch('/api/audit-court-document', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(payload)
+            });
+            
+            const resJson = await resp.json();
+            if (loading) loading.style.display = 'none';
+            
+            if (resJson.status === 'success' && resJson.data) {
+              lastAuditedDocumentData = resJson.data;
+              
+              const debt = resJson.data.judgmentDebt;
+              const val = resJson.data.appraisalValue;
+              
+              document.getElementById('acq-doc-res-debt').textContent = debt ? `$${debt.toLocaleString()}` : 'No especificada';
+              document.getElementById('acq-doc-res-val').textContent = val ? `$${val.toLocaleString()}` : 'No especificado';
+              document.getElementById('acq-doc-res-explanation').innerHTML = `<strong>${resJson.data.plaintiff ? 'Acreedor: ' + resJson.data.plaintiff + '<br>' : ''}</strong>${resJson.data.explanation}<br><br><span style="color: #60a5fa;">💡 <em>${resJson.data.actionableAdvice || ''}</em></span>`;
+              document.getElementById('acq-doc-model-badge').textContent = resJson.model || 'Gemini 3.1 Pro';
+              
+              if (resultBox) resultBox.style.display = 'block';
+              if (typeof lucide !== 'undefined') lucide.createIcons();
+            } else {
+              alert('Error al auditar el documento: ' + (resJson.message || resJson.error || 'Error desconocido'));
+              if (dropzone) dropzone.style.display = 'block';
+            }
+          } catch (netErr) {
+            if (loading) loading.style.display = 'none';
+            if (dropzone) dropzone.style.display = 'block';
+            alert('Error de red al conectar con el servidor de auditoría: ' + netErr.message);
+          }
+        };
+        reader.readAsDataURL(file);
+      } catch (err) {
+        if (loading) loading.style.display = 'none';
+        if (dropzone) dropzone.style.display = 'block';
+        alert('Error al leer archivo local: ' + err.message);
+      }
+    };
+
+    window.applyAuditedDataToDeal = function() {
+      if (!lastAuditedDocumentData || !currentAcqLead) return;
+      
+      const debt = lastAuditedDocumentData.judgmentDebt;
+      const val = lastAuditedDocumentData.appraisalValue;
+      const plaintiff = lastAuditedDocumentData.plaintiff;
+      const defendant = lastAuditedDocumentData.defendant;
+      
+      if (debt && debt > 0) {
+        currentAcqLead.primaryDebt = debt;
+        if (currentAcqLead.auctions && currentAcqLead.auctions.length > 0) {
+          currentAcqLead.auctions[0].debtAmount = debt;
+          currentAcqLead.auctions[0].needs_manual_review = 0;
+        }
+      }
+      
+      if (val && val > 0) {
+        currentAcqLead.appraisalValue = val;
+        currentAcqLead.marketValue = val;
+        if (currentAcqLead.auctions && currentAcqLead.auctions.length > 0) {
+          currentAcqLead.auctions[0].appraisalValue = val;
+        }
+      }
+
+      if (defendant && defendant.trim()) {
+        currentAcqLead.ownerName = defendant;
+        if (currentAcqLead.auctions && currentAcqLead.auctions.length > 0) {
+          currentAcqLead.auctions[0].defendant = defendant;
+        }
+      }
+
+      if (plaintiff && plaintiff.trim()) {
+        if (currentAcqLead.auctions && currentAcqLead.auctions.length > 0) {
+          currentAcqLead.auctions[0].plaintiff = plaintiff;
+        }
+      }
+
+      // Recalcular Opportunity Score
+      const totalDebt = (currentAcqLead.primaryDebt || 0) + (currentAcqLead.hiddenMortgages || 0) + (currentAcqLead.hiddenLiensAmount || 0);
+      const mVal = getMarketValue(currentAcqLead);
+      const equitySpread = Math.max(0, mVal - totalDebt);
+      
+      if (mVal > 0 && totalDebt > 0 && equitySpread >= 30000) {
+        currentAcqLead.opportunityScore = Math.min(100, Math.round(55 + (equitySpread / mVal) * 40));
+      }
+
+      // Actualizar en el array global allLeads
+      const idx = allLeads.findIndex(l => l.groupingKey === currentAcqLead.groupingKey);
+      if (idx !== -1) {
+        allLeads[idx] = currentAcqLead;
+      }
+
+      // Re-renderizar Command Center con los nuevos datos
+      openAcquisitionCommandCenter(currentAcqLead);
+      
+      // Actualizar marcador de mapa si la capa de marcadores existe
+      if (typeof updateLeadMarkers === 'function') {
+        updateLeadMarkers();
+      }
+
+      // Notificación de éxito
+      const btn = document.getElementById('acq-doc-apply-btn');
+      if (btn) {
+        btn.innerHTML = '✅ ¡DATOS APLICADOS Y DEAL RECALCULADO!';
+        btn.style.background = '#22c55e';
+        btn.style.color = '#fff';
+      }
     };
 
     function renderWhyThisDeal(lead, grossEquity, totalDebt, marketVal) {

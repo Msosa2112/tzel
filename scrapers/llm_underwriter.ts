@@ -4,11 +4,15 @@ dotenv.config();
 
 export interface LLMAnalysisResult {
   isDismissed: boolean;
+  debtAmount: number | null;
+  appraisalValue: number | null;
+  plaintiff: string | null;
+  defendant: string | null;
   reason: string;
 }
 
 /**
- * Lógica de fallback basada en reglas rígidas en caso de que Ollama no esté disponible.
+ * Lógica de fallback basada en reglas rígidas en caso de falla de la API.
  */
 function runRuleBasedFallback(rawText: string): LLMAnalysisResult {
   const textLower = rawText.toLowerCase();
@@ -20,65 +24,50 @@ function runRuleBasedFallback(rawText: string): LLMAnalysisResult {
                         textLower.includes("dismissed with prejudice") ||
                         textLower.includes("dismissed without prejudice")));
   
+  // Intento de extracción de deuda por regex
+  let debtAmount: number | null = null;
+  const judgmentMatch = rawText.match(/(?:Judgment|Principal|Claim|Decree|Amount|Deuda)[\s\w]*\$([0-9,]+(?:\.[0-9]{2})?)/i);
+  if (judgmentMatch) {
+    const val = parseFloat(judgmentMatch[1].replace(/,/g, ""));
+    if (!isNaN(val) && val > 0) debtAmount = val;
+  }
+
   return {
     isDismissed,
+    debtAmount,
+    appraisalValue: null,
+    plaintiff: null,
+    defendant: null,
     reason: isDismissed 
-      ? "Desestimado detectado por reglas de fallback (Dismissed or Decided + Dismissal)." 
+      ? "Desestimado detectado por reglas de fallback." 
       : "Caso activo detectado por reglas de fallback."
   };
 }
 
 /**
- * Envía el texto del expediente judicial a la API de Google Gemini (gemini-1.5-flash)
- * para clasificar semánticamente si el caso ha sido desestimado.
+ * Consulta la API de Google Gemini utilizando el modelo insignia (gemini-3.1-pro-preview),
+ * con fallback automático a gemini-3.8-flash si se agotan cuotas o hay latencia.
  */
-export async function analyzeTextWithGemma(rawText: string): Promise<LLMAnalysisResult> {
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`;
-  const prompt = `Instrucción: Eres un asistente legal experto. Analiza el siguiente texto de un expediente judicial de ejecución hipotecaria (foreclosure) y determina si el caso ha sido desestimado (dismissed) por el tribunal.
+async function callGeminiModels(prompt: string): Promise<string> {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) throw new Error("GEMINI_API_KEY no configurada en .env");
 
-REGLAS DE CLASIFICACIÓN (Síguelas al pie de la letra):
-1. Un caso está DESESTIMADO (isDismissed = true) si y solo si se cerró sin que el acreedor/banco obtuviera una sentencia de ejecución. Esto se indica por la presencia de mociones u órdenes de desestimación ("Motion to Dismiss", "Order Dismissing", "Dismissal", "Desestimado").
-2. Un caso NO está desestimado (isDismissed = false) si se dictó una sentencia a favor del banco ("Judgment", "Default Judgment", "Foreclosure Judgment", "Summary Judgment", "Order of Sale", "Sheriff Sale Ordered", "Deuda extraída", "Monetary Award"). El estatus "Decided" simplemente significa que hay una resolución, la cual suele ser la sentencia de ejecución, por lo que NO implica desestimación.
-3. Si el caso sigue en curso ("Pending", "Open") y no tiene órdenes de desestimación, isDismissed debe ser false.
-
-Por favor, analiza el texto del expediente provisto abajo y responde con este formato JSON:
-{
-  "pensamiento": "Analiza aquí paso a paso si hay alguna orden de desestimación (dismiss) o si por el contrario hay una sentencia (judgment) o si el caso sigue activo.",
-  "isDismissed": true o false,
-  "reason": "Explicación breve y específica del caso analizado en español (¡NUNCA inventes eventos ni copies ejemplos!)"
-}
-
-Texto del expediente a analizar:
-${rawText}`;
-
+  // Orden de prioridad: Modelo insignia Pro primero, luego Flash
+  const models = ["gemini-3.1-pro-preview", "gemini-3.8-flash"];
   let lastError: any = null;
-  let delay = 5000;
-  const attempts = 3;
 
-  for (let attempt = 1; attempt <= attempts; attempt++) {
+  for (const model of models) {
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
     try {
-      console.log(`[LLM UNDERWRITER] Consultando API de Gemini (gemini-2.5-flash) - Intento ${attempt}/${attempts}...`);
+      console.log(`[LLM UNDERWRITER] Consultando modelo Gemini (${model})...`);
       const response = await fetch(url, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          contents: [
-            {
-              parts: [
-                {
-                  text: prompt
-                }
-              ]
-            }
-          ],
-          generationConfig: {
-            response_mime_type: "application/json"
-          }
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: { response_mime_type: "application/json" }
         }),
-        // Añadir un timeout razonable para evitar colgar el pipeline si Gemini no responde
-        signal: AbortSignal.timeout(15000)
+        signal: AbortSignal.timeout(20000)
       });
 
       if (!response.ok) {
@@ -86,64 +75,90 @@ ${rawText}`;
       }
 
       const data = await response.json() as any;
-      
-      // Mapear respuesta del API de Gemini
-      let responseText = "";
-      if (data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts && data.candidates[0].content.parts[0]) {
-        responseText = data.candidates[0].content.parts[0].text;
-      } else if (data.candidates && (data.candidates as any).content && (data.candidates as any).content.parts && (data.candidates as any).content.parts.text) {
-        responseText = (data.candidates as any).content.parts.text;
-      } else {
-        throw new Error("Estructura de respuesta de Gemini inválida.");
+      let text = "";
+      if (data.candidates?.[0]?.content?.parts?.[0]?.text) {
+        text = data.candidates[0].content.parts[0].text;
       }
-      
-      if (!responseText) {
-        throw new Error("Respuesta vacía recibida desde Gemini.");
-      }
-
-      const match = responseText.match(/\{[\s\S]*\}/);
-      const cleanJson = match ? match[0] : responseText;
-      const parsedResult = JSON.parse(cleanJson);
-      
-      let isDismissed = false;
-      let reason = "Sin detalles adicionales del LLM.";
-      
-      if (parsedResult) {
-        const keys = Object.keys(parsedResult);
-        const isDismissedKey = keys.find(k => k.toLowerCase() === "isdismissed");
-        if (isDismissedKey) {
-          const val = (parsedResult as any)[isDismissedKey];
-          isDismissed = val === true || val === "true" || val === 1 || String(val).toLowerCase() === "true";
-        }
-        
-        const reasonKey = keys.find(k => k.toLowerCase() === "reason");
-        if (reasonKey) {
-          reason = (parsedResult as any)[reasonKey] || reason;
-        }
-      }
-      
-      console.log(`[LLM UNDERWRITER SUCCESS] Decisión: ${isDismissed} | Razón: ${reason}`);
-      
-      return {
-        isDismissed,
-        reason
-      };
-
+      if (text) return text;
     } catch (err: any) {
+      console.warn(`[LLM UNDERWRITER] Falló consulta con ${model}: ${err.message}. Probando siguiente modelo...`);
       lastError = err;
-      const statusStr = err.message || "";
-      const isRetryable = statusStr.includes("429") || statusStr.includes("503") || statusStr.includes("timeout") || statusStr.includes("fetch") || err.name === "TimeoutError";
-      
-      if (isRetryable && attempt < attempts) {
-        console.warn(`[LLM UNDERWRITER WARNING] Intento ${attempt} falló con: ${err.message}. Reintentando en ${delay / 1000}s (backoff exponencial)...`);
-        await new Promise(resolve => setTimeout(resolve, delay));
-        delay *= 2;
-      } else {
-        break;
-      }
     }
   }
 
-  console.warn(`[LLM UNDERWRITER WARNING] No se pudo conectar con Gemini o falló la respuesta tras ${attempts} intentos: ${lastError?.message || "Error desconocido"}. Usando fallback de reglas rígidas.`);
-  return runRuleBasedFallback(rawText);
+  throw lastError || new Error("No se pudo obtener respuesta de ningún modelo Gemini.");
+}
+
+/**
+ * Analiza semánticamente el texto del expediente judicial (Chronological Case Summary o decreto)
+ * extrayendo: desestimación, deuda de sentencia, partes procesales y tasación.
+ */
+export async function analyzeCourtDocketWithGemini(rawText: string): Promise<LLMAnalysisResult> {
+  const prompt = `Eres un auditor legal de ejecuciones hipotecarias (Foreclosure Underwriting Specialist) para Kentucky e Indiana.
+Analiza minuciosamente el siguiente texto de expediente judicial o aviso de corte y extrae los datos clave:
+
+REGLAS DE EVALUACIÓN:
+1. DESESTIMACIÓN (isDismissed):
+   - isDismissed = true SI Y SOLO SI el caso se cerró sin sentencia favorable al acreedor (ej: "Order Dismissing", "Motion to Dismiss", "Dismissed with prejudice", etc.).
+   - isDismissed = false si el caso sigue abierto o si se dictó sentencia a favor del banco/ejecutante ("Judgment", "Default Judgment", "Decree of Foreclosure", "Order of Sale").
+2. DEUDA DE SENTENCIA (debtAmount):
+   - Si se menciona un monto de dinero ordenado a pagar, sentencia de foreclosure, capital adeudado, monto reclamado por el banco, o adjudicación monetaria, extráelo como número decimal puro (ej: 84520.12).
+   - Si no se especifica ninguna cifra monetaria, devuelve null.
+3. VALOR DE AVALÚO (appraisalValue):
+   - Si se menciona tasación oficial, fair cash value o appraisal, extráelo como número; si no, null.
+4. PARTES:
+   - plaintiff: Nombre del acreedor/banco ejecutante si se menciona, o null.
+   - defendant: Nombre del deudor/propietario demandado si se menciona, o null.
+
+Responde estrictamente con un JSON válido con esta estructura:
+{
+  "isDismissed": boolean,
+  "debtAmount": number o null,
+  "appraisalValue": number o null,
+  "plaintiff": string o null,
+  "defendant": string o null,
+  "reason": "Breve explicación en español de lo detectado"
+}
+
+Texto judicial a analizar:
+"""${rawText.slice(0, 15000)}"""`;
+
+  try {
+    const responseText = await callGeminiModels(prompt);
+    const match = responseText.match(/\{[\s\S]*\}/);
+    const cleanJson = match ? match[0] : responseText;
+    const parsed = JSON.parse(cleanJson);
+
+    const isDismissed = Boolean(parsed.isDismissed);
+    const debtAmount = parsed.debtAmount && !isNaN(Number(parsed.debtAmount)) && Number(parsed.debtAmount) > 0 
+      ? Number(parsed.debtAmount) 
+      : null;
+    const appraisalValue = parsed.appraisalValue && !isNaN(Number(parsed.appraisalValue)) && Number(parsed.appraisalValue) > 0 
+      ? Number(parsed.appraisalValue) 
+      : null;
+    const plaintiff = parsed.plaintiff && parsed.plaintiff !== "null" ? String(parsed.plaintiff).trim() : null;
+    const defendant = parsed.defendant && parsed.defendant !== "null" ? String(parsed.defendant).trim() : null;
+    const reason = parsed.reason || "Análisis completado con Gemini Flagship.";
+
+    console.log(`[LLM UNDERWRITER SUCCESS] isDismissed: ${isDismissed} | Deuda: $${debtAmount?.toLocaleString() || "N/A"} | Razón: ${reason}`);
+
+    return {
+      isDismissed,
+      debtAmount,
+      appraisalValue,
+      plaintiff,
+      defendant,
+      reason
+    };
+  } catch (err: any) {
+    console.error(`[LLM UNDERWRITER ERROR] Error en análisis con Gemini: ${err.message}. Ejecutando fallback.`);
+    return runRuleBasedFallback(rawText);
+  }
+}
+
+/**
+ * Función compatible hacia atrás para scrapers existentes
+ */
+export async function analyzeTextWithGemma(rawText: string): Promise<LLMAnalysisResult> {
+  return analyzeCourtDocketWithGemini(rawText);
 }
