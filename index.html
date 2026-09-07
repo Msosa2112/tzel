@@ -3115,17 +3115,39 @@
       display: flex;
       gap: 14px;
       overflow-x: auto;
-      padding: 10px 0 20px;
-      height: 100%;
+      overflow-y: hidden;
+      flex: 1;
+      min-height: 0;
+      width: 100%;
+      min-width: 0;
+      padding: 6px 0 16px;
       box-sizing: border-box;
+      scroll-behavior: smooth;
+    }
+    .kanban-container::-webkit-scrollbar {
+      height: 10px;
+    }
+    .kanban-container::-webkit-scrollbar-track {
+      background: rgba(15, 23, 42, 0.9);
+      border-radius: 6px;
+    }
+    .kanban-container::-webkit-scrollbar-thumb {
+      background: #334155;
+      border-radius: 6px;
+      border: 2px solid rgba(15, 23, 42, 0.9);
+    }
+    .kanban-container::-webkit-scrollbar-thumb:hover {
+      background: var(--color-radar-green);
     }
     .kanban-col {
       flex: 0 0 280px;
-      background: rgba(15, 23, 42, 0.6);
+      width: 280px;
+      background: rgba(15, 23, 42, 0.75);
       border: 1px solid rgba(255, 255, 255, 0.08);
       border-radius: 12px;
       display: flex;
       flex-direction: column;
+      height: 100%;
       max-height: 100%;
       overflow: hidden;
     }
@@ -4417,6 +4439,14 @@
       </div>
 
       <div style="display: flex; align-items: center; gap: 10px;">
+        <div style="display: flex; gap: 4px;">
+          <button class="btn-secondary" onclick="scrollKanban(-320)" style="display: flex; align-items: center; justify-content: center; width: 32px; height: 32px; background: rgba(255,255,255,0.08); color: #fff; border: 1px solid rgba(255,255,255,0.12); border-radius: 6px; cursor: pointer;" title="Desplazar a la izquierda">
+            <i data-lucide="chevron-left" style="width: 16px; height: 16px;"></i>
+          </button>
+          <button class="btn-secondary" onclick="scrollKanban(320)" style="display: flex; align-items: center; justify-content: center; width: 32px; height: 32px; background: rgba(255,255,255,0.08); color: #fff; border: 1px solid rgba(255,255,255,0.12); border-radius: 6px; cursor: pointer;" title="Desplazar a la derecha">
+            <i data-lucide="chevron-right" style="width: 16px; height: 16px;"></i>
+          </button>
+        </div>
         <button class="btn-secondary" onclick="renderKanbanBoard()" style="display: flex; align-items: center; gap: 6px; font-size: 0.75rem; padding: 6px 12px; background: rgba(255,255,255,0.06); color: #cbd5e1; border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; cursor: pointer;">
           <i data-lucide="refresh-cw" style="width: 13px; height: 13px;"></i>
           <span>Actualizar</span>
@@ -8259,6 +8289,11 @@ Este dinero le pertenece legalmente a usted, pero si no se reclama a tiempo pued
       { id: 'DEAD', title: 'DEAD', color: '#ef4444' }
     ];
 
+    window.scrollKanban = function(offset) {
+      const el = document.getElementById('kanban-board-cols');
+      if (el) el.scrollBy({ left: offset, behavior: 'smooth' });
+    };
+
     window.renderKanbanBoard = function() {
       const container = document.getElementById('kanban-board-cols');
       const badgeCount = document.getElementById('kanban-badge-count');
@@ -8273,18 +8308,24 @@ Este dinero le pertenece legalmente a usted, pero si no se reclama a tiempo pued
       KANBAN_STAGES.forEach(st => { columnsData[st.id] = []; });
 
       leads.forEach(lead => {
-        let stage = (lead.acquisitionState && lead.acquisitionState.stage) || 'NEW';
-        if (!columnsData[stage]) {
-          if (lead.phone || lead.ownerPhone) stage = 'READY_TO_CALL';
-          else if (lead.isHighMotivation) stage = 'RESEARCHED';
-          else stage = 'NEW';
+        let stage = lead.acquisitionState && lead.acquisitionState.stage;
+        if (!stage || !columnsData[stage]) {
+          const hasPhone = (lead.phones && lead.phones.length > 0) || lead.phone || lead.ownerPhone;
+          if (hasPhone) {
+            stage = 'READY_TO_CALL';
+          } else if (lead.isHighMotivation || (lead.opportunityScore && lead.opportunityScore >= 50)) {
+            stage = 'RESEARCHED';
+          } else {
+            stage = 'NEW';
+          }
         }
         columnsData[stage].push(lead);
       });
 
       container.innerHTML = KANBAN_STAGES.map(stage => {
         const stageLeads = columnsData[stage.id] || [];
-        const cardsHtml = stageLeads.map(lead => {
+        const displayLeads = stageLeads.slice(0, 40);
+        const cardsHtml = displayLeads.map(lead => {
           const isUnknownOwner = !lead.ownerName || /desconocido|unknown|no especificado/i.test(lead.ownerName.trim());
           const marketVal = getMarketValue(lead);
           const debt = (lead.primaryDebt || 0) + (lead.hiddenMortgages || 0);
@@ -8315,6 +8356,9 @@ Este dinero le pertenece legalmente a usted, pero si no se reclama a tiempo pued
           `;
         }).join('');
 
+        const extraCount = stageLeads.length - displayLeads.length;
+        const extraNote = extraCount > 0 ? `<div style="text-align: center; color: #94a3b8; font-size: 0.7rem; padding: 6px; background: rgba(255,255,255,0.03); border-radius: 6px; margin-top: 4px;">+ ${extraCount} leads adicionales en esta etapa</div>` : '';
+
         return `
           <div class="kanban-col">
             <div class="kanban-col-header" style="border-top: 3px solid ${stage.color};">
@@ -8322,7 +8366,7 @@ Este dinero le pertenece legalmente a usted, pero si no se reclama a tiempo pued
               <span class="badge" style="background: rgba(255,255,255,0.1); color: #fff;">${stageLeads.length}</span>
             </div>
             <div class="kanban-col-body">
-              ${cardsHtml.length > 0 ? cardsHtml : '<div style="text-align: center; color: #64748b; padding: 20px 0; font-size: 0.72rem;">Sin leads en esta etapa</div>'}
+              ${cardsHtml.length > 0 ? (cardsHtml + extraNote) : '<div style="text-align: center; color: #64748b; padding: 20px 0; font-size: 0.72rem;">Sin leads en esta etapa</div>'}
             </div>
           </div>
         `;
