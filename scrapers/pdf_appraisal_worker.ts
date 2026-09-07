@@ -24,16 +24,16 @@ export async function runPdfAppraisalWorker() {
   }
 
   try {
-    // 1. Seleccionar registros que tengan PDF y les falte el valor del avalúo (appraisal_value)
+    // 1. Seleccionar registros que tengan PDF y les falte avalúo o deuda
     const pendingAuctions = await db.execute(`
-      SELECT auction_id, case_number, address, pdf_url, appraisal_value, debt_amount
+      SELECT auction_id, case_number, address, pdf_url, appraisal_value, debt_amount, needs_manual_review
       FROM foreclosure_auctions
-      WHERE pdf_url IS NOT NULL AND (appraisal_value IS NULL OR appraisal_value = 0)
-      LIMIT 15
+      WHERE pdf_url IS NOT NULL AND pdf_url != ''
+        AND ((appraisal_value IS NULL OR appraisal_value = 0) OR (debt_amount IS NULL OR debt_amount = 0))
     `);
 
     const rows = pendingAuctions.rows;
-    console.log(`[PDF WORKER] Encontrados ${rows.length} expedientes con PDF pendiente de tasación.`);
+    console.log(`[PDF WORKER] Encontrados ${rows.length} expedientes con PDF judicial pendiente de extracción completa.`);
 
     const models = ["gemini-3.1-pro-preview", "gemini-3.8-flash"];
 
@@ -69,14 +69,14 @@ export async function runPdfAppraisalWorker() {
 
       const base64Pdf = pdfBuffer.toString("base64");
 
-      // Prompt para Gemini
-      const prompt = `Instrucción: Analiza el documento judicial de tasación (appraisal/evaluation) adjunto y extrae los siguientes datos clave:
-1. El valor de tasación del inmueble (Appraisal Value / Evaluated Value). Suele aparecer etiquetado como "appraised value", "appraisal amount", "evaluated at", "fair cash value" o "appraised at".
-2. Si se menciona, el monto de la deuda o juicio reclamado por el demandante (Judgment Debt / Principal Debt).
+      // Prompt para Gemini Flagship
+      const prompt = `Instrucción: Eres un auditor legal de subastas judiciales en Kentucky.
+Analiza minuciosamente el documento judicial adjunto (Master Commissioner Appraisal / Evaluation Report / Judgment) y extrae:
+1. appraisalValue: El valor de tasación oficial del inmueble (Appraisal Value / Evaluated Value / Fair Cash Value). Suele aparecer como "appraised value", "appraisal amount", "evaluated at" o "appraised at". Si no contiene tasación numérica, null.
+2. judgmentDebt: Si se menciona en el documento, el monto de la deuda o juicio reclamado por el demandante (Judgment Debt / Principal Debt / Claim). Si no se menciona, null.
 
 REGLAS:
-- Si el documento es un formulario en blanco, una orden de cancelación o no contiene un valor numérico de tasación para la propiedad, devuelve null.
-- Responde únicamente en formato JSON válido con las siguientes claves:
+- Responde únicamente en formato JSON válido con esta estructura:
 {
   "appraisalValue": number o null,
   "judgmentDebt": number o null,
@@ -133,29 +133,37 @@ REGLAS:
         const extDebt = result.judgmentDebt ? parseFloat(result.judgmentDebt) : null;
         const explanation = result.explanation || "";
 
-        console.log(`  [GEMINI RESULT] Appraisal: $${extAppraisal?.toLocaleString() || "No encontrado"} | Debt: $${extDebt?.toLocaleString() || "No encontrado"}`);
+        console.log(`  [GEMINI RESULT (${usedModel})] Appraisal: $${extAppraisal?.toLocaleString() || "No encontrado"} | Debt: $${extDebt?.toLocaleString() || "No encontrado"}`);
         console.log(`  Detalles: ${explanation}`);
 
-        if (extAppraisal && extAppraisal > 0) {
-          const finalDebt = (extDebt && extDebt > 0) ? extDebt : (row.debt_amount as number || 0);
-          const isHighYield = (finalDebt > 0 && isHighYieldProperty(extAppraisal, finalDebt, 0, 0, 0.20)) ? 1 : 0;
+        if ((extAppraisal && extAppraisal > 0) || (extDebt && extDebt > 0)) {
+          const currentAppraisal = (row.appraisal_value as number) || 0;
+          const currentDebt = (row.debt_amount as number) || 0;
+          const finalAppraisal = (extAppraisal && extAppraisal > 0) ? extAppraisal : currentAppraisal;
+          const finalDebt = (extDebt && extDebt > 0) ? extDebt : currentDebt;
+          const isHighYield = (finalAppraisal > 0 && finalDebt > 0 && isHighYieldProperty(finalAppraisal, finalDebt, 0, 0, 0.20)) ? 1 : 0;
+          const needsManual = (finalDebt > 0 && finalAppraisal > 0) ? 0 : (row.needs_manual_review as number || 0);
 
-          // Actualizar en base de datos
-          if (extDebt && extDebt > 0 && (!row.debt_amount || row.debt_amount === 0)) {
-            await db.execute({
-              sql: "UPDATE foreclosure_auctions SET appraisal_value = ?, debt_amount = ?, is_high_yield = ? WHERE auction_id = ?",
-              args: [extAppraisal, extDebt, isHighYield, auctionId]
-            });
-            console.log(`  [DB UPDATE] Actualizados appraisal_value ($${extAppraisal.toLocaleString()}), debt_amount ($${extDebt.toLocaleString()}) y is_high_yield (${isHighYield}) para caso ${caseNumber}.`);
-          } else {
-            await db.execute({
-              sql: "UPDATE foreclosure_auctions SET appraisal_value = ?, is_high_yield = ? WHERE auction_id = ?",
-              args: [extAppraisal, isHighYield, auctionId]
-            });
-            console.log(`  [DB UPDATE] Actualizado appraisal_value ($${extAppraisal.toLocaleString()}) y is_high_yield (${isHighYield}) para caso ${caseNumber}.`);
-          }
+          await db.execute({
+            sql: `
+              UPDATE foreclosure_auctions SET
+                appraisal_value = CASE WHEN ? > 0 THEN ? ELSE appraisal_value END,
+                debt_amount = CASE WHEN ? > 0 THEN ? ELSE debt_amount END,
+                is_high_yield = ?,
+                needs_manual_review = ?
+              WHERE auction_id = ?
+            `,
+            args: [
+              extAppraisal || 0, extAppraisal || 0,
+              extDebt || 0, extDebt || 0,
+              isHighYield,
+              needsManual,
+              auctionId
+            ]
+          });
+          console.log(`  [DB UPDATE SUCCESS] Caso ${caseNumber} actualizado en Turso. Appraisal: $${finalAppraisal.toLocaleString()} | Debt: $${finalDebt.toLocaleString()} | HighYield: ${isHighYield}`);
         } else {
-          console.log(`  [PDF WORKER SKIP] No se extrajo un valor de tasación válido.`);
+          console.log(`  [PDF WORKER SKIP] No se extrajeron cifras monetarias válidas del documento.`);
         }
 
       } catch (geminiErr: any) {
@@ -171,7 +179,8 @@ REGLAS:
   }
 }
 
-// Ejecutar si se corre directamente
-if (require.main === module) {
+if (typeof require !== "undefined" && require.main === module) {
+  runPdfAppraisalWorker().catch(console.error);
+} else if (process.argv[1] && process.argv[1].includes("pdf_appraisal_worker")) {
   runPdfAppraisalWorker().catch(console.error);
 }
