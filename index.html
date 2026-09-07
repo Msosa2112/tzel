@@ -4115,6 +4115,19 @@
             </div>
           </div>
 
+          <!-- DIAGNÓSTICO & HISTORIA FORENSE (GEMINI PRO) -->
+          <div id="acq-forensic-story-card" class="acq-card" style="border: 1px solid rgba(245, 158, 11, 0.45); background: linear-gradient(180deg, rgba(245, 158, 11, 0.1) 0%, rgba(15, 23, 42, 0.8) 100%); display: none; box-shadow: 0 4px 20px rgba(245, 158, 11, 0.08);">
+            <div class="acq-card-title" style="display: flex; align-items: center; justify-content: space-between;">
+              <span style="display: flex; align-items: center; gap: 7px; color: #fbbf24; font-weight: 800; letter-spacing: 0.3px;">
+                <i data-lucide="book-open-check" style="width: 15px; height: 15px; color: #fbbf24;"></i>
+                DIAGNÓSTICO &amp; HISTORIA FORENSE (GEMINI PRO)
+              </span>
+              <span class="badge" style="background: rgba(245, 158, 11, 0.25); color: #fbbf24; font-size: 0.62rem; font-weight: 800; border: 1px solid rgba(245, 158, 11, 0.4);">AUTOPSY DOSSIER</span>
+            </div>
+            <div id="acq-forensic-story-text" style="font-size: 0.76rem; color: #f8fafc; line-height: 1.55; margin-top: 8px; background: rgba(0,0,0,0.38); padding: 12px; border-radius: 8px; border: 1px solid rgba(245, 158, 11, 0.2);">
+            </div>
+          </div>
+
           <!-- PROPERTY INTELLIGENCE DOSSIER -->
           <div class="acq-card">
             <div class="acq-card-title">
@@ -4165,19 +4178,6 @@
                 <span class="prop-info-label">Inventario Landbank</span>
                 <span class="prop-info-value" id="acq-dossier-landbank">No (Propiedad privada)</span>
               </div>
-            </div>
-          </div>
-
-          <!-- DIAGNÓSTICO & HISTORIA FORENSE (GEMINI PRO) -->
-          <div id="acq-forensic-story-card" class="acq-card" style="border: 1px solid rgba(245, 158, 11, 0.45); background: linear-gradient(180deg, rgba(245, 158, 11, 0.1) 0%, rgba(15, 23, 42, 0.8) 100%); display: none; box-shadow: 0 4px 20px rgba(245, 158, 11, 0.08);">
-            <div class="acq-card-title" style="display: flex; align-items: center; justify-content: space-between;">
-              <span style="display: flex; align-items: center; gap: 7px; color: #fbbf24; font-weight: 800; letter-spacing: 0.3px;">
-                <i data-lucide="book-open-check" style="width: 15px; height: 15px; color: #fbbf24;"></i>
-                DIAGNÓSTICO &amp; HISTORIA FORENSE (GEMINI PRO)
-              </span>
-              <span class="badge" style="background: rgba(245, 158, 11, 0.25); color: #fbbf24; font-size: 0.62rem; font-weight: 800; border: 1px solid rgba(245, 158, 11, 0.4);">AUTOPSY DOSSIER</span>
-            </div>
-            <div id="acq-forensic-story-text" style="font-size: 0.76rem; color: #f8fafc; line-height: 1.55; margin-top: 8px; background: rgba(0,0,0,0.38); padding: 12px; border-radius: 8px; border: 1px solid rgba(245, 158, 11, 0.2);">
             </div>
           </div>
 
@@ -5439,6 +5439,7 @@
         
         if (json.status === 'success') {
           allLeads = json.data;
+          window.allLeads = allLeads;
           renderUI();
           const kanbanBadge = document.getElementById('kanban-badge-count');
           if (kanbanBadge) kanbanBadge.textContent = allLeads.length;
