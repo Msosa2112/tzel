@@ -420,7 +420,7 @@ app.get("/api/prospectos", async (req, res) => {
         mailing_address, absentee_owner, sqft, beds, baths, hidden_mortgages, hidden_liens_amount, photo_urls,
         title_check_status, next_retry_date, forensic_legal_story
       FROM foreclosure_auctions
-      WHERE (status IS NULL OR status = 'active' OR status = '') AND (mls_status IS NULL OR mls_status != 'resolved')`,
+      WHERE (mls_status IS NULL OR mls_status != 'resolved')`,
       // 1. code_violations
       `SELECT 
         violation_id, case_number, address, violation_type, report_date, status, 
