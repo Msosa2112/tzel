@@ -11,6 +11,10 @@ import { calculateMAO, calculateRehab } from "./underwriting/underwriter";
 
 chromium.use(stealthPlugin());
 
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('[UNHANDLED REJECTION CAUGHT]', reason);
+});
+
 dotenv.config();
 
 
@@ -102,7 +106,7 @@ async function scrapeCountyClerk(ownerName: string, county: string, state: strin
 
     await page.goto(`https://lite.duckduckgo.com/lite/?q=${encodeURIComponent(query)}`, {
       waitUntil: "networkidle",
-      timeout: 15000
+      timeout: 3000
     });
 
     const bodyText = await page.evaluate(() => {
@@ -355,7 +359,7 @@ export async function runTitleLienCheck(auctionsOnly: boolean = false) {
   console.log("\n[FIN] Módulo de Verificación de Títulos y Deudas Ocultas finalizado.");
   
   // Ejecutar bucle de reintentos
-  await retryFailedTitleChecks(3, auctionsOnly);
+  await retryFailedTitleChecks(0, auctionsOnly);
 }
 
 /**

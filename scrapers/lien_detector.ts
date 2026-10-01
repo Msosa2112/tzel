@@ -40,7 +40,7 @@ async function scrapeClerkPortal(
     
     await page.goto(`https://lite.duckduckgo.com/lite/?q=${encodeURIComponent(query)}`, {
       waitUntil: "networkidle",
-      timeout: 15000
+      timeout: 3000
     });
 
     bodyText = await page.evaluate(() => {

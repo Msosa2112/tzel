@@ -246,27 +246,14 @@ export async function performSkipTrace(
 
   console.log(`[WATERFALL SKIP TRACE] Iniciando skip-tracing para "${defendant}" (Nombre limpio para búsqueda: "${cleanDefendant}")...`);
   let batchDataOutOfFunds = false;
+  let foundInBatchData = false;
+  const finalPhones: string[] = [];
+  const finalEmails: string[] = [];
 
-  // 1. Paso 1: Ejecutar la nueva búsqueda gratuita en OSINT
-  try {
-    console.log(`[WATERFALL SKIP TRACE] Paso 1: Buscando contactos vía OSINT para "${cleanDefendant}"...`);
-    const osintResult = await searchOSINTContacts(cleanDefendant, rawAddress, state, county);
-    
-    // Paso 2: Si el motor OSINT devuelve contactos válidos, terminar el proceso (Costo: $0)
-    if (osintResult && (osintResult.phones.length > 0 || osintResult.emails.length > 0)) {
-      console.log(`[WATERFALL SKIP TRACE] Paso 2: OSINT gratuito exitoso para "${cleanDefendant}". Evitando BatchData.`);
-      const phones = osintResult.phones.map(p => `OSINT: ${p}`);
-      const emails = osintResult.emails.map(e => `OSINT: ${e}`);
-      return { phones, emails };
-    }
-  } catch (err: any) {
-    console.error(`[WATERFALL SKIP TRACE ERR] OSINT failed for ${cleanDefendant}:`, err.message);
-  }
-
-  // 2. Paso 3 (Fallback): Solo si el motor OSINT falló o devolvió null/vacío, usar la llamada a la API de BatchData
+  // 1. Paso 1: Priorizar BatchData API para obtener contactos reales y activos (Teléfonos)
   if (process.env.SKIP_TRACE_PROVIDER === "batchdata") {
     try {
-      console.log(`[WATERFALL SKIP TRACE] Paso 3: Fallback a BatchData API para "${cleanDefendant}"...`);
+      console.log(`[WATERFALL SKIP TRACE] Paso 1: Consultando BatchData API (Premium) para "${cleanDefendant}"...`);
       const parsed = parseAddress(rawAddress, state, county);
       const batchRes = await batchDataClient.skipTrace(cleanDefendant, {
         street: parsed.street,
@@ -276,26 +263,44 @@ export async function performSkipTrace(
       });
 
       if (batchRes.success && (batchRes.phones.length > 0 || batchRes.emails.length > 0)) {
-        const phones: string[] = [];
-        const emails: string[] = [];
-        
         batchRes.phones.forEach(p => {
           const dncLabel = p.isDNC ? " [DNC]" : "";
-          phones.push(`BatchData (${p.type}${dncLabel}): ${p.number}`);
+          finalPhones.push(`BatchData (${p.type}${dncLabel}): ${p.number}`);
         });
         batchRes.emails.forEach(e => {
-          emails.push(`BatchData: ${e.email}`);
+          finalEmails.push(`BatchData: ${e.email}`);
         });
-        
-        return { phones, emails };
+        foundInBatchData = true;
+        console.log(`[WATERFALL SKIP TRACE] Paso 1 Exitoso: Se encontraron contactos en BatchData.`);
       }
 
       if (batchRes.outOfFunds) {
         batchDataOutOfFunds = true;
+        console.warn(`[WATERFALL SKIP TRACE] ADVERTENCIA: BatchData informa falta de fondos (outOfFunds).`);
       }
     } catch (err: any) {
       console.error(`[WATERFALL SKIP TRACE ERR] BatchData failed for ${cleanDefendant}:`, err.message);
     }
+  }
+
+  // 2. Paso 2 (Fallback): Solo si BatchData falló, no tiene fondos, o no se encontró nada, usar OSINT gratuito
+  if (!foundInBatchData) {
+    try {
+      console.log(`[WATERFALL SKIP TRACE] Paso 2: Fallback a búsqueda OSINT gratuita para "${cleanDefendant}"...`);
+      const osintResult = await searchOSINTContacts(cleanDefendant, rawAddress, state, county);
+      
+      if (osintResult && (osintResult.phones.length > 0 || osintResult.emails.length > 0)) {
+        console.log(`[WATERFALL SKIP TRACE] Paso 2: OSINT encontró resultados de respaldo.`);
+        osintResult.phones.forEach(p => finalPhones.push(`OSINT: ${p}`));
+        osintResult.emails.forEach(e => finalEmails.push(`OSINT: ${e}`));
+      }
+    } catch (err: any) {
+      console.error(`[WATERFALL SKIP TRACE ERR] OSINT failed for ${cleanDefendant}:`, err.message);
+    }
+  }
+
+  if (finalPhones.length > 0 || finalEmails.length > 0) {
+    return { phones: finalPhones, emails: finalEmails };
   }
 
   // 3. Generar enlaces de búsqueda para TruePeopleSearch, Whitepages, etc.
@@ -338,7 +343,7 @@ async function runSkipTracing() {
     `);
   } catch (dbErr: any) {
     console.error("[DB ERROR] Error al consultar deudores pendientes:", dbErr.message);
-    process.exit(1);
+    return;
   }
 
   const leads = leadsRes.rows;
@@ -406,7 +411,7 @@ async function runSkipTracing() {
     `);
   } catch (dbErr: any) {
     console.error("[DB ERROR] Error al consultar violaciones de código pendientes de skip trace:", dbErr.message);
-    process.exit(1);
+    return;
   }
 
   const violations = violationsRes.rows;
@@ -469,7 +474,7 @@ async function runSkipTracing() {
     `);
   } catch (dbErr: any) {
     console.error("[DB ERROR] Error al consultar sucesiones pendientes de skip trace:", dbErr.message);
-    process.exit(1);
+    return;
   }
 
   const pendingProbates = probatesRes.rows;
@@ -528,7 +533,7 @@ async function runSkipTracing() {
     `);
   } catch (dbErr: any) {
     console.error("[DB ERROR] Error al consultar divorcios pendientes de skip trace:", dbErr.message);
-    process.exit(1);
+    return;
   }
 
   const pendingDivorces = divorcesRes.rows;

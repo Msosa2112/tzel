@@ -752,7 +752,7 @@ async function runIndianaCrawler() {
         if (debt && debt > 0 && benchmarkValue > 0) {
           const discountPct = ((benchmarkValue - debt) / benchmarkValue) * 100;
           console.log(`[MATCH SCORING] Deuda: $${debt.toLocaleString("en-US")} vs MCA/Valor: $${benchmarkValue.toLocaleString("en-US")} | Margen: ${discountPct.toFixed(1)}%`);
-          if (isHighYieldProperty(benchmarkValue, debt, hiddenMortgages, 0, 0.20)) {
+          if (isHighYieldProperty(benchmarkValue, debt, hiddenMortgages, 0, 50000)) {
             isHighYield = 1;
             console.log(`[HIGH YIELD] ¡Propiedad marcada como alta rentabilidad (Margen Real >= 20% sobre MCA/Valor)!`);
           }

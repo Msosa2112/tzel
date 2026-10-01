@@ -12,7 +12,22 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-app.use(express.static(path.join(__dirname, ".")));
+// Security: Only serve specific safe files instead of the entire project directory
+app.get("/", (req, res) => {
+  res.sendFile(path.join(__dirname, "index.html"));
+});
+// Block access to sensitive file types before static middleware processes them
+app.use((req, res, next) => {
+  const blockedExtensions = /\.(ts|js|sql|env|md|yml|yaml|lock|log|sh|bat)$/i;
+  const allowedPaths = ['/telephony_scripts.json'];
+  if (blockedExtensions.test(req.path) && !allowedPaths.includes(req.path)) {
+    return res.status(403).end();
+  }
+  next();
+});
+app.use(express.static(path.join(__dirname, "."), {
+  dotfiles: 'deny'
+}));
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ limit: "50mb", extended: true }));
 
@@ -2061,8 +2076,24 @@ Responde estrictamente en formato JSON válido con esta estructura:
 
     // Actualizar en base de datos si tenemos auctionId, caseNumber o address
     let updatedDb = false;
-    const debt = responseJson.judgmentDebt && !isNaN(Number(responseJson.judgmentDebt)) ? Number(responseJson.judgmentDebt) : null;
-    const appraisal = responseJson.appraisalValue && !isNaN(Number(responseJson.appraisalValue)) ? Number(responseJson.appraisalValue) : null;
+
+    // Guardrails: Reject hallucinated values outside realistic range ($1k - $5M)
+    const MIN_VALID_RANGE = 1000;
+    const MAX_VALID_RANGE = 5000000;
+
+    const rawDebt = responseJson.judgmentDebt && !isNaN(Number(responseJson.judgmentDebt)) ? Number(responseJson.judgmentDebt) : null;
+    const rawAppraisal = responseJson.appraisalValue && !isNaN(Number(responseJson.appraisalValue)) ? Number(responseJson.appraisalValue) : null;
+
+    const debt = (rawDebt && rawDebt >= MIN_VALID_RANGE && rawDebt <= MAX_VALID_RANGE) ? rawDebt : null;
+    const appraisal = (rawAppraisal && rawAppraisal >= MIN_VALID_RANGE && rawAppraisal <= MAX_VALID_RANGE) ? rawAppraisal : null;
+
+    if (rawDebt && !debt) {
+      console.warn(`[AUDIT DOC API GUARDRAIL] Deuda rechazada por fuera de rango: $${rawDebt.toLocaleString()} (rango válido: $${MIN_VALID_RANGE.toLocaleString()}-$${MAX_VALID_RANGE.toLocaleString()})`);
+    }
+    if (rawAppraisal && !appraisal) {
+      console.warn(`[AUDIT DOC API GUARDRAIL] Avalúo rechazado por fuera de rango: $${rawAppraisal.toLocaleString()} (rango válido: $${MIN_VALID_RANGE.toLocaleString()}-$${MAX_VALID_RANGE.toLocaleString()})`);
+    }
+
     const secondaryLiens = Number(responseJson.secondaryLiensAmount || 0);
 
     if (auctionId || caseNumber || address) {

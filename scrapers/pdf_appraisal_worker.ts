@@ -130,9 +130,22 @@ REGLAS:
         const match = responseText.match(/\{[\s\S]*\}/);
         const cleanJson = match ? match[0] : responseText;
         const result = JSON.parse(cleanJson);
-        const extAppraisal = result.appraisalValue ? parseFloat(result.appraisalValue) : null;
-        const extDebt = result.judgmentDebt ? parseFloat(result.judgmentDebt) : null;
+        const rawAppraisal = result.appraisalValue ? parseFloat(result.appraisalValue) : null;
+        const rawDebt = result.judgmentDebt ? parseFloat(result.judgmentDebt) : null;
         const explanation = result.explanation || "";
+
+        // Guardrails: Reject hallucinated values outside realistic range ($1k - $5M)
+        const MIN_VALID = 1000;
+        const MAX_VALID = 5000000;
+        const extAppraisal = (rawAppraisal && rawAppraisal >= MIN_VALID && rawAppraisal <= MAX_VALID) ? rawAppraisal : null;
+        const extDebt = (rawDebt && rawDebt >= MIN_VALID && rawDebt <= MAX_VALID) ? rawDebt : null;
+
+        if (rawAppraisal && !extAppraisal) {
+          console.warn(`  [PDF WORKER GUARDRAIL] Valor de avalúo rechazado por fuera de rango: $${rawAppraisal.toLocaleString()} (rango válido: $${MIN_VALID.toLocaleString()}-$${MAX_VALID.toLocaleString()})`);
+        }
+        if (rawDebt && !extDebt) {
+          console.warn(`  [PDF WORKER GUARDRAIL] Valor de deuda rechazado por fuera de rango: $${rawDebt.toLocaleString()} (rango válido: $${MIN_VALID.toLocaleString()}-$${MAX_VALID.toLocaleString()})`);
+        }
 
         console.log(`  [GEMINI RESULT (${usedModel})] Appraisal: $${extAppraisal?.toLocaleString() || "No encontrado"} | Debt: $${extDebt?.toLocaleString() || "No encontrado"}`);
         console.log(`  Detalles: ${explanation}`);
@@ -142,7 +155,7 @@ REGLAS:
           const currentDebt = (row.debt_amount as number) || 0;
           const finalAppraisal = (extAppraisal && extAppraisal > 0) ? extAppraisal : currentAppraisal;
           const finalDebt = (extDebt && extDebt > 0) ? extDebt : currentDebt;
-          const isHighYield = (finalAppraisal > 0 && finalDebt > 0 && isHighYieldProperty(finalAppraisal, finalDebt, 0, 0, 0.20)) ? 1 : 0;
+          const isHighYield = (finalAppraisal > 0 && finalDebt > 0 && isHighYieldProperty(finalAppraisal, finalDebt, 0, 0, 50000)) ? 1 : 0;
           const needsManual = (finalDebt > 0 && finalAppraisal > 0) ? 0 : (row.needs_manual_review as number || 0);
 
           await db.execute({

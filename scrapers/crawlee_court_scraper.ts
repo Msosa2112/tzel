@@ -116,7 +116,6 @@ export async function scrapeIndianaCaseWithCrawlee(caseNumber: string): Promise<
     },
     launchContext: {
       launcher: customLauncher,
-      userAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
       launchOptions: {
         headless: process.env.HEADLESS ? process.env.HEADLESS === "true" : false,
       }
@@ -141,7 +140,7 @@ export async function scrapeIndianaCaseWithCrawlee(caseNumber: string): Promise<
       // Detección y manejo defensivo del desafío de Cloudflare / Turnstile
       const cfIframe = page.locator('iframe[src*="challenges.cloudflare.com"]');
       const count = await cfIframe.count();
-      if (count > 0 || title.includes("Just a moment") || title.includes("Cloudflare") || title.includes("Attention Required")) {
+      if (count > 0 || title.includes("Just a moment") || title.includes("Cloudflare") || title.includes("Attention Required") || title.includes("Unsupported Browser")) {
         log.warning("Desafío de Cloudflare detectado. Intentando bypass con FlareSolverr...");
         const context = page.context();
         const bypassed = await applyFlareSolverrBypass(context, "https://public.courts.in.gov/mycase/");
