@@ -82,7 +82,7 @@ export const financialAuditWorker = new Worker(
       const hiddenMortgages = specRow ? (specRow.hidden_mortgages as number || 0) : 0;
 
       // Calcular MAO ajustado
-      const rehab = calculateRehab(sqft, []);
+      const rehab = calculateRehab(sqft, [], arv);
       const adjustedMao = calculateMAO(arv, rehab, hiddenMortgages, hiddenLiensAmount);
 
       // Actualizar base de datos

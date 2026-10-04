@@ -122,7 +122,8 @@ export async function extractNoticeDetails(rawText: string): Promise<{
     const axios = require("axios");
     const geminiApiKey = process.env.GEMINI_API_KEY;
     if (geminiApiKey) {
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiApiKey}`;
+      const model = process.env.GEMINI_MODEL || "gemini-3.8-flash";
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiApiKey}`;
       const geminiRes = await axios.post(url, {
         contents: [{
           parts: [{

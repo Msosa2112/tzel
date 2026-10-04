@@ -330,7 +330,7 @@ export async function scoreAllProperties(targetTables?: string[]) {
         if (unifiedRow.violation_type) violationKeywords.push(unifiedRow.violation_type);
         if (unifiedRow.distress_type) violationKeywords.push(unifiedRow.distress_type);
 
-        const rehab = calculateRehab(unifiedRow.sqft || null, violationKeywords);
+        const rehab = calculateRehab(unifiedRow.sqft || null, violationKeywords, unifiedRow.mls_estimated_value || 0);
         const mao = calculateMAO(unifiedRow.mls_estimated_value, rehab, unifiedRow.hidden_mortgages, unifiedRow.hidden_liens_amount);
 
         const isHighYield = unifiedRow.is_high_yield === 1;
@@ -455,7 +455,7 @@ export async function scoreAllProperties(targetTables?: string[]) {
                 const mlsVal = propRow.mls_estimated_value as number || 0;
                 const hiddenMort = propRow.hidden_mortgages as number || 0;
                 const hiddenLien = propRow.hidden_liens_amount as number || 0;
-                const rehab = calculateRehab(sqft || null, []);
+                const rehab = calculateRehab(sqft || null, [], mlsVal);
                 clusterMao = calculateMAO(mlsVal, rehab, hiddenMort, hiddenLien);
               }
               if (hasCountyCol && propRow.county && (clusterCounty === "Jefferson" || clusterCounty === "Unknown")) {

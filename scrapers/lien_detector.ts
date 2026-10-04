@@ -67,7 +67,8 @@ export async function analyzeLienTextWithGemini(rawText: string): Promise<LienDe
     return runLienRuleBasedFallback(rawText);
   }
 
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${apiKey}`;
+  const model = process.env.GEMINI_MODEL || "gemini-3.8-flash";
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
   const prompt = `Instrucción: Eres un analista de títulos inmobiliarios experto. Analiza el siguiente texto de registros públicos del secretario del condado (county clerk) para una propiedad/propietario y determina si existen gravámenes secundarios (junior liens), hipotecas adicionales (mortgages), deudas de impuestos (Tax Liens, IRS) o juicios civiles (Judgments) vigentes.
 
 REGLAS DE EXTRACCIÓN:

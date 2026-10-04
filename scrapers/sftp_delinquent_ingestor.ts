@@ -20,11 +20,14 @@ const db = createClient({
 export async function runSftpDelinquentIngestor() {
   const sftp = new Client();
   const config = {
-    host: "206.196.1.139",
-    port: 22,
-    username: "jcco",
-    password: "J6UueqeaYhN2",
+    host: process.env.JCCO_SFTP_HOST || "206.196.1.139",
+    port: Number(process.env.JCCO_SFTP_PORT || 22),
+    username: process.env.JCCO_SFTP_USER || "jcco",
+    password: process.env.JCCO_SFTP_PASSWORD || "",
   };
+  if (!config.password) {
+    throw new Error("[SFTP] JCCO_SFTP_PASSWORD no está configurada en .env");
+  }
 
   const remoteDir = "/Delinquent Tax";
   const localTempDir = path.join(__dirname, "../storage/temp_sftp");

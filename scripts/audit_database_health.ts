@@ -4,7 +4,7 @@ import * as dotenv from "dotenv";
 dotenv.config();
 
 const url = "https://ddwyutisxymuvofkjhpz.supabase.co";
-const key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRkd3l1dGlzeHltdXZvZmtqaHB6Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NzA1MzM5NSwiZXhwIjoyMDkyNjI5Mzk1fQ.cJQgzQsy1TUa4Yk01qkBedrmM8HxYqnH3VqzVLKpUDY";
+const key = (process.env.SUPABASE_SERVICE_ROLE_KEY || "");
 const sb = createClient(url, key);
 
 async function auditDatabase() {

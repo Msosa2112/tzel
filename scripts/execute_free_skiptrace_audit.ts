@@ -10,7 +10,7 @@ dotenv.config();
 chromium.use(stealthPlugin());
 
 const url = "https://ddwyutisxymuvofkjhpz.supabase.co";
-const serviceKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRkd3l1dGlzeHltdXZvZmtqaHB6Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NzA1MzM5NSwiZXhwIjoyMDkyNjI5Mzk1fQ.cJQgzQsy1TUa4Yk01qkBedrmM8HxYqnH3VqzVLKpUDY";
+const serviceKey = (process.env.SUPABASE_SERVICE_ROLE_KEY || "");
 const sb = createClient(url, serviceKey);
 
 export interface SkipAuditResult {

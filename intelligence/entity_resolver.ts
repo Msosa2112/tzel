@@ -117,7 +117,8 @@ async function askGeminiIfSameEntity(
     return false;
   }
 
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiApiKey}`;
+  const model = process.env.GEMINI_MODEL || "gemini-3.8-flash";
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiApiKey}`;
   const prompt = `Instrucción: Eres un experto en resolución de entidades y análisis de beneficiarios reales (UBO) en bienes raíces.
 Determina si las siguientes dos entidades/personas representan a la misma entidad legal o beneficiario final físico detrás de una propiedad, basándote en la similitud de nombres y las direcciones fiscales de correo.
 

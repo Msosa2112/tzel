@@ -30,4 +30,5 @@ storage/
 # Local venv and temporary files
 .venv_scrapegraph/
 *.pdf
+*.ps1
 browser_profiles/

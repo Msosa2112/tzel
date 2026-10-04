@@ -22,8 +22,19 @@ const ALLOWED_CATEGORIES: ConstructionTradeCategory[] = [
 function isJobOrPromotion(text: string): { isRejected: boolean; reason: string } {
   const lower = text.toLowerCase();
 
-  // 1. Ofertas de Empleo / Mano de Obra
+  // 1. Ofertas de Empleo / Mano de Obra / Jornaleros buscando trabajo
   if (
+    lower.includes("busco trabajo") ||
+    lower.includes("buscando trabajo") ||
+    lower.includes("estoy buscando trabajo") ||
+    lower.includes("busco empleo") ||
+    lower.includes("buscando empleo") ||
+    lower.includes("looking for work") ||
+    lower.includes("need a job") ||
+    lower.includes("looking for a job") ||
+    lower.includes("tengo herramientas") ||
+    lower.includes("tengo herramienta y troca") ||
+    lower.includes("have tools and truck") ||
     lower.includes("looking for subcontractors") ||
     lower.includes("skilled laborers") ||
     lower.includes("now hiring") ||
@@ -39,10 +50,10 @@ function isJobOrPromotion(text: string): { isRejected: boolean; reason: string }
     lower.includes("search group") ||
     lower.includes("employment opportunity")
   ) {
-    return { isRejected: true, reason: "Oferta de empleo o reclutamiento de mano de obra." };
+    return { isRejected: true, reason: "Oferta de empleo, jornalero buscando trabajo o reclutamiento de mano de obra." };
   }
 
-  // 2. Promociones de Contratistas / Showcases
+  // 2. Promociones de Contratistas / Showcases / Anuncios
   if (
     lower.includes("re-bath") ||
     lower.includes("we re-roofed") ||
@@ -55,7 +66,11 @@ function isJobOrPromotion(text: string): { isRejected: boolean; reason: string }
     lower.includes("tu techo sufrio") ||
     lower.includes("servicios de remodelacion garantizados") ||
     lower.includes("not all water damage is") ||
-    lower.includes("and well, disaster")
+    lower.includes("and well, disaster") ||
+    lower.includes("built strong. built right") ||
+    lower.includes("ready to enjoy call") ||
+    lower.includes("free estimates call") ||
+    lower.includes("estimados gratis al")
   ) {
     return { isRejected: true, reason: "Auto-promoción o anuncio publicitario de otro contratista." };
   }
@@ -66,16 +81,21 @@ function isJobOrPromotion(text: string): { isRejected: boolean; reason: string }
     lower.includes("engine") ||
     lower.includes("oil change") ||
     lower.includes("software") ||
-    lower.includes("janitorial")
+    lower.includes("janitorial") ||
+    lower.includes("plomero") ||
+    lower.includes("plomería") ||
+    lower.includes("plumbing") ||
+    lower.includes("electricista") ||
+    lower.includes("electrician")
   ) {
-    return { isRejected: true, reason: "Servicio vehicular, mecánico o TI no calificado." };
+    return { isRejected: true, reason: "Servicio no calificado, vehicular, plomería o electricidad pura fuera de alcance." };
   }
 
   return { isRejected: false, reason: "" };
 }
 
 /**
- * Clasificador impulsado por Google Gemini Flash para el Módulo de Construcción.
+ * Clasificador impulsado por Google Gemini 3.8 Flash para el Módulo de Construcción (Barba Construction).
  */
 export async function classifyConstructionItem(
   title: string,
@@ -92,61 +112,61 @@ export async function classifyConstructionItem(
 
   const apiKey = process.env.GEMINI_API_KEY;
 
-  // Fallback heurístico básico si no hay API key
   if (!apiKey) {
     return {
-      isValidConstruction: true,
-      category: "RENOVATION_REMODEL",
-      urgency: "NORMAL",
-      summarySpanish: title
+      isValidConstruction: false,
+      rejectedReason: "GEMINI_API_KEY no configurada. Descartado por seguridad."
     };
   }
 
-  const prompt = `Eres el Auditor Experto de Licitaciones y Obras del Módulo de Construcción de TZEL.
-Tu trabajo es evaluar una oportunidad pública o lead de construcción y determinar si es una DEMANDA REAL DE UN CLIENTE o LICITACIÓN OFICIAL.
+  const prompt = `Eres el Auditor Táctico de Obras y Leads de Barba Construction en Kentucky (Louisville / Jefferson County) e Indiana.
+Tu misión es evaluar publicaciones o licitaciones y determinar ÚNICAMENTE si corresponden a un CLIENTE, PROPIETARIO O INVERSIONISTA REAL que busca contratar obras o reformas para su propiedad.
 
-REGLAS DE CLASIFICACIÓN ESTRICTAS:
-1. CATEGORÍAS VÁLIDAS APROBADAS (isValidConstruction = true):
-   - Sólo cuando un CLIENTE/PROPIETARIO solicita un trabajo o una ENTIDAD PÚBLICA licita una obra:
-   - NEW_CONSTRUCTION_GROUND_UP (Edificación nueva de casas, edificios, naves o anexos)
-   - RENOVATION_REMODEL (Remodelaciones de cocinas, baños, oficinas, albañilería, interiores)
-   - ROOFING_SIDING_GUTTERS (Techos, tejados, tejas, membranas TPO, canaletas, siding)
-   - FOUNDATION_WATERPROOFING (Cimentaciones, grietas en concreto, impermeabilización de sótanos, drenajes)
-   - CONCRETE_ASPHALT_PAVING (Pavimentación de calles, banquetas, entradas de autos, concreto estampado)
-   - FENCE_PERIMETER_SECURITY (Cercas perimetrales de madera, malla o hierro, portones)
-   - DEMOLITION_SITE_PREP (Demoliciones, limpieza y preparación de terrenos para construir)
-   - FIRE_WATER_REBUILD (Reconstrucción y restauración de daños por agua, humo o incendio)
-   - CIVIL_INFRASTRUCTURE_PUBLIC (Puentes, obras hidráulicas, parques, drenajes públicos)
+REGLAS DE EVALUACIÓN ESTRICTAS:
+1. LEAD VÁLIDO (isValidConstruction = true):
+   - Un dueño de casa, negocio o inversionista solicitando activamente cotizaciones, recomendaciones o reportando daños urgentes en su propiedad.
+   - Categorías aprobadas:
+     * NEW_CONSTRUCTION_GROUND_UP (Edificación nueva, adiciones de cuartos, garages)
+     * RENOVATION_REMODEL (Remodelación cocina, baño, sótanos, drywall, pisos, pintura)
+     * ROOFING_SIDING_GUTTERS (Reparación/cambio de techos, tejas, goteras, canaletas, siding)
+     * FOUNDATION_WATERPROOFING (Cimentación, grietas en concreto, impermeabilización sótano)
+     * CONCRETE_ASPHALT_PAVING (Driveways, losas, patios de concreto, aceras)
+     * FENCE_PERIMETER_SECURITY (Cercas de madera, vinilo, portones)
+     * DEMOLITION_SITE_PREP (Demolición, preparación de lote)
+     * FIRE_WATER_REBUILD (Restauración tras tormenta, incendio, ramas caídas)
+     * CIVIL_INFRASTRUCTURE_PUBLIC (Licitaciones públicas oficiales de obra civil)
 
-2. CATEGORÍAS ESTRICTAMENTE RECHAZADAS (isValidConstruction = false):
-   - OFERTAS DE TRABAJO / EMPLEO: Reclutamiento de albañiles, carpinteros, subcontratistas asalariados o peones.
-   - AUTO-PROMOCIONES DE CONTRATISTAS: Empresas vendiendo sus servicios ("Llámanos para cotizar", "Somos expertos", fotos de trabajos que ya hicieron).
-   - MECÁNICA / VEHÍCULOS: Reparación de camiones, patrullas, mantenimiento de flotas, motores.
-   - SERVICIOS GENERALES: Limpieza de oficinas (janitorial), software, suministros médicos/papelería.
+2. RECHAZAR OBLIGATORIAMENTE (isValidConstruction = false):
+   - Personas buscando empleo ("busco trabajo", "cuadrilla disponible", "tengo troca").
+   - Contratistas o empresas promocionándose ("ofrecemos", "llámanos", "fotos de nuestros trabajos", "free estimate").
+   - Ofertas de empleo o staffing ("se busca ayudante", "now hiring").
+   - Plomería o electricidad pura (salvo que sea parte de una remodelación integral).
+   - Venta de autos, alquiler de cuartos, muebles o servicios no relacionados.
 
 3. DATOS DE ENTRADA:
    - Título: "${title}"
-   - Contexto/Fuente: "${sourceContext}"
-   - Descripción completa:
-   """${rawDescription.substring(0, 3000)}"""
+   - Fuente/Contexto: "${sourceContext}"
+   - Texto del lead:
+   """${rawDescription.substring(0, 2500)}"""
 
-Por favor responde ÚNICAMENTE en formato JSON con la siguiente estructura:
+Responde ÚNICAMENTE en formato JSON estricto con los siguientes campos:
 {
   "isValidConstruction": true o false,
-  "rejectedReason": "Explicación si fue rechazada (ej. Es una oferta de trabajo de una agencia)",
+  "rejectedReason": "Motivo conciso si fue rechazado (ej. Jornalero buscando trabajo / Anuncio de contratista)",
   "category": "Una de las 9 categorías válidas aprobadas",
-  "estimatedValue": número estimado en USD o 0 si no se menciona,
+  "estimatedValue": número estimado en USD o 0,
   "urgency": "NORMAL", "HIGH" o "CRITICAL",
-  "summarySpanish": "Resumen ejecutivo claro y conciso de 2 líneas en español explicando exactamente en qué consiste la obra",
-  "bondingRequired": true o false (si requiere fianza de licitación / bid bond),
-  "deadline": "Fecha límite en formato YYYY-MM-DD o 'Sin especificar'"
+  "summarySpanish": "Resumen ejecutivo en español de 2 líneas describiendo exactamente el trabajo solicitado",
+  "bondingRequired": false,
+  "deadline": "Fecha límite o 'Sin especificar'",
+  "suggestedResponse": "Respuesta profesional en inglés de 2 a 3 líneas lista para que Barba Construction comente o contacte por DM al cliente, destacando seguro, licencia en KY/IN y ofreciendo estimado sin costo."
 }`;
 
-  let attempts = 0;
-  while (attempts < 2) {
-    attempts++;
+  const models = [process.env.GEMINI_MODEL || "gemini-3.8-flash", "gemini-3.1-flash-lite"];
+
+  for (const model of models) {
     try {
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
       const response = await axios.post(
         url,
         {
@@ -156,36 +176,27 @@ Por favor responde ÚNICAMENTE en formato JSON con la siguiente estructura:
             temperature: 0.1
           }
         },
-        { timeout: 10000 }
+        { timeout: 8000 }
       );
 
       const textRes = response.data?.candidates?.[0]?.content?.parts?.[0]?.text;
-      if (!textRes) throw new Error("Respuesta vacía de Gemini");
+      if (!textRes) continue;
 
       const parsed: ClassifierResult = JSON.parse(textRes);
-      
+
       if (!ALLOWED_CATEGORIES.includes(parsed.category as ConstructionTradeCategory)) {
         parsed.category = "RENOVATION_REMODEL";
       }
 
       return parsed;
     } catch (err: any) {
-      if (attempts >= 2) {
-        console.warn(`[CONSTRUCTION CLASSIFIER ERR] Fallback heurístico: ${err.message}`);
-        return {
-          isValidConstruction: true,
-          category: "RENOVATION_REMODEL",
-          urgency: "NORMAL",
-          summarySpanish: title
-        };
-      }
+      console.warn(`[CONSTRUCTION CLASSIFIER] Error con ${model}: ${err.message}`);
     }
   }
 
+  // Fallback seguro: si la IA falló, NO permitir que basura entre a la base de datos
   return {
-    isValidConstruction: true,
-    category: "RENOVATION_REMODEL",
-    urgency: "NORMAL",
-    summarySpanish: title
+    isValidConstruction: false,
+    rejectedReason: "Fallo temporal de API en clasificación por IA (rechazado por precaución)"
   };
 }

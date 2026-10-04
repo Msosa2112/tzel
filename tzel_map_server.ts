@@ -1,5 +1,7 @@
+import { parseAddress, getUnitInfo, getGroupingKey, buildPropertyId } from "./utils/address_key";
 import express from "express";
 import axios from "axios";
+import * as crypto from "crypto";
 import { db } from "./db";
 import * as dotenv from "dotenv";
 import * as path from "path";
@@ -10,103 +12,69 @@ dotenv.config();
 
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = Number(process.env.PORT || 3000);
+// Por defecto solo escucha en loopback. Usa HOST=0.0.0.0 explícitamente si necesitas acceso LAN (requerirá TZEL_API_KEY).
+const HOST = process.env.HOST || "127.0.0.1";
+const API_KEY = process.env.TZEL_API_KEY || "";
 
-// Security: Only serve specific safe files instead of the entire project directory
-app.get("/", (req, res) => {
-  res.sendFile(path.join(__dirname, "index.html"));
+// Security: whitelist estricta de archivos estáticos. NUNCA servir el directorio del proyecto
+// (contiene browser_profiles/ con cookies de sesión, dumps de entorno, PDFs judiciales, etc.).
+const STATIC_WHITELIST: Record<string, string> = {
+  "/": "index.html",
+  "/index.html": "index.html",
+  "/lands": "lands.html",
+  "/lands.html": "lands.html",
+  "/terrenos": "lands.html",
+  "/terrenos.html": "lands.html",
+  "/logo.jpg": "logo.jpg",
+  "/zillow-icon.png": "zillow-icon.png",
+  "/street-view-icon.png": "street-view-icon.png",
+  "/telephony_scripts.json": "telephony_scripts.json",
+  // Motor de ofertas compartido servidor/navegador (AGENTS.md §3.5)
+  "/offer_engine.js": "underwriting/offer_engine.js",
+};
+for (const [route, file] of Object.entries(STATIC_WHITELIST)) {
+  app.get(route, (req, res) => {
+    res.sendFile(path.join(__dirname, file));
+  });
+}
+
+function isLoopbackRequest(req: express.Request): boolean {
+  if (process.env.VERCEL) return false; // En Vercel siempre se exige API key
+  const ip = req.socket.remoteAddress || "";
+  return ip === "127.0.0.1" || ip === "::1" || ip === "::ffff:127.0.0.1";
+}
+
+function isValidApiKey(provided: string): boolean {
+  if (!API_KEY || !provided) return false;
+  const a = Buffer.from(provided);
+  const b = Buffer.from(API_KEY);
+  return a.length === b.length && crypto.timingSafeEqual(a, b);
+}
+
+// Auth: localhost pasa libre; cualquier otro cliente (LAN, Vercel) necesita header x-tzel-key.
+// Si TZEL_API_KEY no está definida, los clientes remotos quedan bloqueados (fail-closed).
+// EXCEPCIÓN PÚBLICA: /api/lands es accesible públicamente para el portal independiente de terrenos.
+app.use("/api", (req, res, next) => {
+  if (req.path === "/lands" || req.path.startsWith("/lands")) return next();
+  if (isLoopbackRequest(req) || isValidApiKey(req.get("x-tzel-key") || "")) return next();
+  return res.status(401).json({ status: "error", message: "No autorizado: falta o es inválida la API key (x-tzel-key)." });
 });
-// Block access to sensitive file types before static middleware processes them
-app.use((req, res, next) => {
-  const blockedExtensions = /\.(ts|js|sql|env|md|yml|yaml|lock|log|sh|bat)$/i;
-  const allowedPaths = ['/telephony_scripts.json'];
-  if (blockedExtensions.test(req.path) && !allowedPaths.includes(req.path)) {
-    return res.status(403).end();
-  }
-  next();
-});
-app.use(express.static(path.join(__dirname, "."), {
-  dotfiles: 'deny'
-}));
+
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ limit: "50mb", extended: true }));
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-const NOISE_WORDS = new Set([
-  "st", "street", "ave", "avenue", "rd", "road", "ln", "lane", "dr", "drive", 
-  "ct", "court", "blvd", "boulevard", "way", "pl", "place", "hwy", "highway", 
-  "rte", "route", "cir", "circle", "ter", "terrace", "trl", "trail", "pkwy", "parkway",
-  "apt", "apartment", "unit", "ste", "suite", "fl", "floor", 
-  "n", "north", "s", "south", "e", "east", "w", "west", 
-  "ky", "in", "jefferson", "clark", "floyd"
-]);
-
-const UNIT_INDICATORS = ["apt", "unit", "ste", "suite", "#", "apartment"];
-
-function parseAddress(address: string): { houseNumber: string | null; coreWords: string[] } {
-  let part1 = address.split(",")[0].trim().toLowerCase();
-  
-  for (const indicator of UNIT_INDICATORS) {
-    const idx = part1.indexOf(indicator);
-    if (idx !== -1) {
-      part1 = part1.substring(0, idx).trim();
-    }
+function safeJsonParse<T = any>(raw: string | null | undefined): T | null {
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw) as T;
+  } catch {
+    return null;
   }
-  
-  part1 = part1.replace(/[^a-z0-9\s]/g, " ");
-  
-  const words = part1.split(/\s+/).filter(w => w.length > 0);
-  if (words.length === 0) {
-    return { houseNumber: null, coreWords: [] };
-  }
-  
-  let houseNumber: string | null = null;
-  let streetStartIndex = 0;
-  
-  if (/^\d+/.test(words[0])) {
-    houseNumber = words[0];
-    streetStartIndex = 1;
-  }
-  
-  const coreWords: string[] = [];
-  for (let i = streetStartIndex; i < words.length; i++) {
-    const w = words[i];
-    if (NOISE_WORDS.has(w)) continue;
-    if (/^\d{5}$/.test(w)) continue;
-    coreWords.push(w);
-  }
-  
-  return { houseNumber, coreWords };
 }
 
-/**
- * Extrae y normaliza la información de la unidad/departamento para evitar colisiones.
- */
-function getUnitInfo(address: string): string {
-  const cleanAddress = address.toLowerCase();
-  for (const indicator of ["apt", "unit", "ste", "suite", "#", "apartment"]) {
-    const idx = cleanAddress.indexOf(indicator);
-    if (idx !== -1) {
-      const rest = cleanAddress.substring(idx);
-      const parts = rest.split(",");
-      const unitPart = parts[0].trim().replace(/[^a-z0-9]/g, "");
-      if (unitPart) return unitPart;
-    }
-  }
-  return "";
-}
-
-function getGroupingKey(address: string): string {
-  const parsed = parseAddress(address);
-  const unit = getUnitInfo(address);
-  if (!parsed.houseNumber) {
-    const base = address.toLowerCase().replace(/[^a-z0-9]/g, "");
-    return unit ? `${base}_${unit}` : base;
-  }
-  const baseKey = `${parsed.houseNumber}_${parsed.coreWords.join("_")}`;
-  return unit ? `${baseKey}_${unit}` : baseKey;
-}
 
 function cleanLegalOwnerName(rawName: string | null | undefined): string {
   if (!rawName) return "";
@@ -171,10 +139,20 @@ function getDaysRemaining(dateStr: string): number | null {
       const dayAndYear = parts[1].trim();
       const dayYearParts = dayAndYear.split(" ");
       const day = parseInt(dayYearParts[0]);
-      const year = parseInt(dayYearParts[1] || "2026");
+      const explicitYear = parseInt(dayYearParts[1]);
       
       if (months[monthName] !== undefined && !isNaN(day)) {
-        dateObj = new Date(year, months[monthName], day);
+        if (!isNaN(explicitYear)) {
+          dateObj = new Date(explicitYear, months[monthName], day);
+        } else {
+          // Sin año: usar el año actual, salvo que la fecha quede >6 meses en el pasado (ej. "Jan/ 15" visto en octubre → año siguiente).
+          const now = new Date();
+          dateObj = new Date(now.getFullYear(), months[monthName], day);
+          const sixMonthsMs = 183 * 24 * 60 * 60 * 1000;
+          if (now.getTime() - dateObj.getTime() > sixMonthsMs) {
+            dateObj = new Date(now.getFullYear() + 1, months[monthName], day);
+          }
+        }
       }
     }
     else {
@@ -236,6 +214,113 @@ interface GroupedLead {
   landbankInfo?: any;
   acquisitionState?: any;
   forensicLegalStory?: string;
+}
+
+type LeadBucket =
+  | "auctions" | "violations" | "probates" | "divorces" | "bankruptcies"
+  | "physicalDistress" | "financialDistress" | "lifeEvents" | "preForeclosures" | "taxSales";
+
+interface LeadMergeSpec {
+  bucket: LeadBucket;
+  owner: (row: any) => string | null | undefined;
+  ownerFallback: string;
+  phones: (row: any) => string[];
+  emails: (row: any) => string[];
+  defaultState?: string;
+  defaultCounty?: string;
+  /** false: nunca reemplaza el titular existente con el de esta fuente. */
+  mergeOwner?: boolean;
+  /** false: no sustituye displayAddress por la variante más larga de esta fuente. */
+  preferLongerAddress?: boolean;
+}
+
+function splitContacts(...values: unknown[]): string[] {
+  return values
+    .flatMap(v => String(v || "").split(/,\s*|;\s*/))
+    .map(s => s.trim())
+    .filter(Boolean);
+}
+
+function appendPhotoUrls(lead: GroupedLead, raw: unknown): void {
+  if (!raw) return;
+  const parsed = safeJsonParse(raw as string);
+  if (!Array.isArray(parsed)) return;
+  for (const url of parsed) {
+    if (typeof url === "string" && url && !lead.photoUrls.includes(url)) lead.photoUrls.push(url);
+  }
+}
+
+/**
+ * Agrupa una fila de cualquier fuente (subastas, violaciones, probates, ...) en el lead de su dirección.
+ * Las columnas que una fuente no tiene llegan como undefined y no alteran el lead.
+ */
+function mergeLeadRow(groupedMap: Map<string, GroupedLead>, row: any, spec: LeadMergeSpec): void {
+  const address = row.address as string;
+  const key = getGroupingKey(address);
+  const rowPhones = spec.phones(row);
+  const rowEmails = spec.emails(row);
+  const rowOwner = spec.owner(row) || undefined;
+
+  let lead = groupedMap.get(key);
+  if (!lead) {
+    lead = {
+      groupingKey: key,
+      displayAddress: address,
+      state: (row.state as string) || spec.defaultState || "KY",
+      county: (row.county as string) || spec.defaultCounty || "Jefferson",
+      ownerName: rowOwner || spec.ownerFallback,
+      phones: new Set(rowPhones),
+      emails: new Set(rowEmails),
+      mlsValue: Number(row.mls_estimated_value) || 0,
+      mlsId: (row.mls_id as string) || "N/A",
+      auctions: [],
+      violations: [],
+      probates: [],
+      divorces: [],
+      bankruptcies: [],
+      physicalDistress: [],
+      financialDistress: [],
+      lifeEvents: [],
+      preForeclosures: [],
+      taxSales: [],
+      hiddenMortgages: Number(row.hidden_mortgages) || 0,
+      hiddenLiensAmount: Number(row.hidden_liens_amount) || 0,
+      titleCheckStatus: (row.title_check_status as string) || "pending",
+      nextRetryDate: (row.next_retry_date as string) || undefined,
+      mailingAddress: (row.mailing_address as string) || undefined,
+      isAbsentee: Number(row.absentee_owner) === 1,
+      sqft: Number(row.sqft) || undefined,
+      beds: Number(row.beds) || undefined,
+      baths: Number(row.baths) || undefined,
+      photoUrls: [],
+      forensicLegalStory: (row.forensic_legal_story as string) || undefined
+    };
+    groupedMap.set(key, lead);
+  } else {
+    if (spec.mergeOwner !== false && !isValidOwnerName(lead.ownerName) && isValidOwnerName(rowOwner)) {
+      lead.ownerName = rowOwner as string;
+    }
+    if (row.forensic_legal_story && !lead.forensicLegalStory) lead.forensicLegalStory = row.forensic_legal_story as string;
+    const rowMls = Number(row.mls_estimated_value) || 0;
+    if (rowMls > lead.mlsValue) lead.mlsValue = rowMls;
+    if (row.mls_id && row.mls_id !== "N/A") lead.mlsId = row.mls_id as string;
+    if (!lead.mailingAddress && row.mailing_address) lead.mailingAddress = row.mailing_address as string;
+    if (Number(row.absentee_owner) === 1) lead.isAbsentee = true;
+    if (!lead.sqft && row.sqft) lead.sqft = Number(row.sqft);
+    if (!lead.beds && row.beds) lead.beds = Number(row.beds);
+    if (!lead.baths && row.baths) lead.baths = Number(row.baths);
+    lead.hiddenMortgages = Math.max(lead.hiddenMortgages, Number(row.hidden_mortgages) || 0);
+    lead.hiddenLiensAmount = Math.max(lead.hiddenLiensAmount, Number(row.hidden_liens_amount) || 0);
+    if (row.title_check_status && row.title_check_status !== "pending") lead.titleCheckStatus = row.title_check_status as string;
+    if (row.next_retry_date) lead.nextRetryDate = row.next_retry_date as string;
+    rowPhones.forEach(p => lead!.phones.add(p));
+    rowEmails.forEach(e => lead!.emails.add(e));
+    if (spec.preferLongerAddress !== false && address.length > lead.displayAddress.length) lead.displayAddress = address;
+  }
+
+  appendPhotoUrls(lead, row.photo_urls);
+  const bucket = (lead[spec.bucket] ||= []) as any[];
+  bucket.push(row);
 }
 
 let rateLimitCooldownUntil = 0;
@@ -465,9 +550,7 @@ app.get("/api/prospectos", async (req, res) => {
       `SELECT * FROM tzel_encumbrances ORDER BY priority ASC`,
       // 14. tzel_opportunity_scores
       `SELECT * FROM tzel_opportunity_scores`,
-      // 15. landbank_inventory
-      `SELECT parcel_id, address, asking_price, estimated_value, property_type, program_name, county, state, is_high_yield FROM landbank_inventory`,
-      // 16. tzel_acquisition_state
+      // 15. tzel_acquisition_state
       `SELECT * FROM tzel_acquisition_state`
     ], "read");
 
@@ -486,8 +569,22 @@ app.get("/api/prospectos", async (req, res) => {
     const eventsRes = batchRes[12];
     const encumbrancesRes = batchRes[13];
     const opportunityScoresRes = batchRes[14];
-    const landbankRes = batchRes[15];
-    const acquisitionStateRes = batchRes[16];
+    const acquisitionStateRes = batchRes[15];
+
+    // Defensa: una sola fila con address NULL/vacío tumbaba todo el endpoint (getGroupingKey(null)).
+    const LEAD_TABLE_INDEXES = [0, 1, 2, 3, 4, 5, 6, 7, 10, 11];
+    let droppedNoAddress = 0;
+    for (const idx of LEAD_TABLE_INDEXES) {
+      const rows = batchRes[idx].rows;
+      const kept = rows.filter(r => typeof r.address === "string" && r.address.trim().length > 0);
+      if (kept.length !== rows.length) {
+        droppedNoAddress += rows.length - kept.length;
+        rows.splice(0, rows.length, ...kept);
+      }
+    }
+    if (droppedNoAddress > 0) {
+      console.warn(`[API] /api/prospectos: ${droppedNoAddress} filas descartadas por no tener dirección.`);
+    }
 
     // Filter auctions to next 60 days or Indiana manual reviews
     const opportunities = auctionsRes.rows.filter(row => {
@@ -535,663 +632,111 @@ app.get("/api/prospectos", async (req, res) => {
     // Grouping map
     const groupedMap = new Map<string, GroupedLead>();
 
-    // A. Group foreclosures
+    // A–J. Agrupar todas las fuentes por dirección normalizada con un único merge (antes: 10 bloques copiados).
     for (const row of opportunities) {
-      const address = row.address as string;
-      const key = getGroupingKey(address);
-      const rowPhones = (row.defendant_phones as string || "").split(/,\s*|;\s*/).map(p => p.trim()).filter(Boolean);
-      const rowEmails = (row.defendant_emails as string || "").split(/,\s*|;\s*/).map(e => e.trim()).filter(Boolean);
-
-      if (!groupedMap.has(key)) {
-        groupedMap.set(key, {
-          groupingKey: key,
-          displayAddress: address,
-          state: row.state as string || "KY",
-          county: row.county as string || "Jefferson",
-          ownerName: row.defendant as string || "No especificado",
-          phones: new Set(rowPhones),
-          emails: new Set(rowEmails),
-          mlsValue: row.mls_estimated_value as number || 0,
-          mlsId: row.mls_id as string || "N/A",
-          auctions: [],
-          violations: [],
-          probates: [],
-          divorces: [],
-          bankruptcies: [],
-          physicalDistress: [],
-          financialDistress: [],
-          lifeEvents: [],
-          hiddenMortgages: row.hidden_mortgages as number || 0,
-          hiddenLiensAmount: row.hidden_liens_amount as number || 0,
-          titleCheckStatus: row.title_check_status as string || "pending",
-          nextRetryDate: row.next_retry_date as string || undefined,
-          mailingAddress: row.mailing_address as string || undefined,
-          isAbsentee: (row.absentee_owner as number) === 1,
-          sqft: row.sqft as number || undefined,
-          beds: row.beds as number || undefined,
-          baths: row.baths as number || undefined,
-          photoUrls: [],
-          forensicLegalStory: row.forensic_legal_story as string || undefined
-        });
-      } else {
-        const existing = groupedMap.get(key)!;
-        if (row.forensic_legal_story && !existing.forensicLegalStory) {
-          existing.forensicLegalStory = row.forensic_legal_story as string;
-        }
-        if (row.mls_estimated_value && (row.mls_estimated_value as number) > existing.mlsValue) {
-          existing.mlsValue = row.mls_estimated_value as number;
-        }
-        if (row.mls_id && row.mls_id !== "N/A") existing.mlsId = row.mls_id as string;
-        if (!isValidOwnerName(existing.ownerName) && isValidOwnerName(row.defendant as string)) existing.ownerName = row.defendant as string;
-        if (!existing.mailingAddress && row.mailing_address) existing.mailingAddress = row.mailing_address as string;
-        if ((row.absentee_owner as number) === 1) existing.isAbsentee = true;
-        if (!existing.sqft && row.sqft) existing.sqft = row.sqft as number;
-        if (!existing.beds && row.beds) existing.beds = row.beds as number;
-        if (!existing.baths && row.baths) existing.baths = row.baths as number;
-        const rowHidden = row.hidden_mortgages as number || 0;
-        if (rowHidden > existing.hiddenMortgages) {
-          existing.hiddenMortgages = rowHidden;
-        }
-        const rowLiens = row.hidden_liens_amount as number || 0;
-        if (rowLiens > existing.hiddenLiensAmount) {
-          existing.hiddenLiensAmount = rowLiens;
-        }
-        if (row.title_check_status && row.title_check_status !== "pending") {
-          existing.titleCheckStatus = row.title_check_status as string;
-        }
-        if (row.next_retry_date) {
-          existing.nextRetryDate = row.next_retry_date as string;
-        }
-        rowPhones.forEach(p => existing.phones.add(p));
-        rowEmails.forEach(e => existing.emails.add(e));
-        if (address.length > existing.displayAddress.length) existing.displayAddress = address;
-      }
-
-      const lead = groupedMap.get(key)!;
-      if (row.photo_urls) {
-        try {
-          const parsed = JSON.parse(row.photo_urls as string);
-          if (Array.isArray(parsed)) {
-            parsed.forEach((url: string) => {
-              if (url && !lead.photoUrls.includes(url)) lead.photoUrls.push(url);
-            });
-          }
-        } catch (e) {}
-      }
-
-      lead.auctions.push(row);
+      mergeLeadRow(groupedMap, row, {
+        bucket: "auctions",
+        owner: r => r.defendant,
+        ownerFallback: "No especificado",
+        phones: r => splitContacts(r.defendant_phones),
+        emails: r => splitContacts(r.defendant_emails)
+      });
     }
 
-    // B. Group violations
     for (const row of violations) {
-      const address = row.address as string;
-      const key = getGroupingKey(address);
-      const rowPhones = (row.defendant_phones as string || "").split(/,\s*|;\s*/).map(p => p.trim()).filter(Boolean);
-      const rowEmails = (row.defendant_emails as string || "").split(/,\s*|;\s*/).map(e => e.trim()).filter(Boolean);
-
-      if (!groupedMap.has(key)) {
-        groupedMap.set(key, {
-          groupingKey: key,
-          displayAddress: address,
-          state: "KY",
-          county: "Jefferson",
-          ownerName: row.owner_name as string || "DUEÑO DESCONOCIDO",
-          phones: new Set(rowPhones),
-          emails: new Set(rowEmails),
-          mlsValue: row.mls_estimated_value as number || 0,
-          mlsId: row.mls_id as string || "N/A",
-          auctions: [],
-          violations: [],
-          probates: [],
-          divorces: [],
-          bankruptcies: [],
-          physicalDistress: [],
-          financialDistress: [],
-          lifeEvents: [],
-          hiddenMortgages: row.hidden_mortgages as number || 0,
-          hiddenLiensAmount: row.hidden_liens_amount as number || 0,
-          titleCheckStatus: row.title_check_status as string || "pending",
-          nextRetryDate: undefined,
-          mailingAddress: row.mailing_address as string || undefined,
-          isAbsentee: (row.absentee_owner as number) === 1,
-          sqft: row.sqft as number || undefined,
-          beds: row.beds as number || undefined,
-          baths: row.baths as number || undefined,
-          photoUrls: []
-        });
-      } else {
-        const existing = groupedMap.get(key)!;
-        if (!isValidOwnerName(existing.ownerName) && isValidOwnerName(row.owner_name as string)) {
-          existing.ownerName = row.owner_name as string;
-        }
-        if (row.mls_estimated_value && (row.mls_estimated_value as number) > existing.mlsValue) {
-          existing.mlsValue = row.mls_estimated_value as number;
-        }
-        if (row.mls_id && row.mls_id !== "N/A") existing.mlsId = row.mls_id as string;
-        if (!existing.mailingAddress && row.mailing_address) existing.mailingAddress = row.mailing_address as string;
-        if ((row.absentee_owner as number) === 1) existing.isAbsentee = true;
-        if (!existing.sqft && row.sqft) existing.sqft = row.sqft as number;
-        if (!existing.beds && row.beds) existing.beds = row.beds as number;
-        if (!existing.baths && row.baths) existing.baths = row.baths as number;
-        const rowHidden = row.hidden_mortgages as number || 0;
-        if (rowHidden > existing.hiddenMortgages) {
-          existing.hiddenMortgages = rowHidden;
-        }
-        const rowLiens = row.hidden_liens_amount as number || 0;
-        if (rowLiens > existing.hiddenLiensAmount) {
-          existing.hiddenLiensAmount = rowLiens;
-        }
-        if (row.title_check_status && row.title_check_status !== "pending") {
-          existing.titleCheckStatus = row.title_check_status as string;
-        }
-        rowPhones.forEach(p => existing.phones.add(p));
-        rowEmails.forEach(e => existing.emails.add(e));
-        if (address.length > existing.displayAddress.length) existing.displayAddress = address;
-      }
-
-      const lead = groupedMap.get(key)!;
-      if (row.photo_urls) {
-        try {
-          const parsed = JSON.parse(row.photo_urls as string);
-          if (Array.isArray(parsed)) {
-            parsed.forEach((url: string) => {
-              if (url && !lead.photoUrls.includes(url)) lead.photoUrls.push(url);
-            });
-          }
-        } catch (e) {}
-      }
-
-      lead.violations.push(row);
+      mergeLeadRow(groupedMap, row, {
+        bucket: "violations",
+        owner: r => r.owner_name,
+        ownerFallback: "DUEÑO DESCONOCIDO",
+        phones: r => splitContacts(r.defendant_phones),
+        emails: r => splitContacts(r.defendant_emails)
+      });
     }
 
-    // C. Group probates
     for (const row of probates) {
-      const address = row.address as string;
-      const key = getGroupingKey(address);
-      const rowPhones = (row.heir_phones as string || "").split(/,\s*|;\s*/).map(p => p.trim()).filter(Boolean);
-      const rowEmails = (row.heir_emails as string || "").split(/,\s*|;\s*/).map(e => e.trim()).filter(Boolean);
-
-      if (!groupedMap.has(key)) {
-        groupedMap.set(key, {
-          groupingKey: key,
-          displayAddress: address,
-          state: row.state as string || "KY",
-          county: row.county as string || "Jefferson",
-          ownerName: row.heir_name as string || "Heredero Desconocido",
-          phones: new Set(rowPhones),
-          emails: new Set(rowEmails),
-          mlsValue: 0,
-          mlsId: "N/A",
-          auctions: [],
-          violations: [],
-          probates: [],
-          divorces: [],
-          bankruptcies: [],
-          physicalDistress: [],
-          financialDistress: [],
-          lifeEvents: [],
-          hiddenMortgages: 0,
-          hiddenLiensAmount: 0,
-          titleCheckStatus: "pending",
-          nextRetryDate: undefined,
-          isAbsentee: false,
-          photoUrls: []
-        });
-      } else {
-        const existing = groupedMap.get(key)!;
-        if (!isValidOwnerName(existing.ownerName) && isValidOwnerName(row.heir_name as string)) {
-          existing.ownerName = row.heir_name as string;
-        }
-        rowPhones.forEach(p => existing.phones.add(p));
-        rowEmails.forEach(e => existing.emails.add(e));
-      }
-      groupedMap.get(key)!.probates.push(row);
+      mergeLeadRow(groupedMap, row, {
+        bucket: "probates",
+        owner: r => r.heir_name,
+        ownerFallback: "Heredero Desconocido",
+        phones: r => splitContacts(r.heir_phones),
+        emails: r => splitContacts(r.heir_emails),
+        preferLongerAddress: false
+      });
     }
 
-    // D. Group divorces
     for (const row of divorces) {
-      const address = row.address as string;
-      const key = getGroupingKey(address);
-      const rowPhones = [
-        ...(row.spouse_a_phones as string || "").split(/,\s*|;\s*/),
-        ...(row.spouse_b_phones as string || "").split(/,\s*|;\s*/)
-      ].map(p => p.trim()).filter(Boolean);
-      const rowEmails = [
-        ...(row.spouse_a_emails as string || "").split(/,\s*|;\s*/),
-        ...(row.spouse_b_emails as string || "").split(/,\s*|;\s*/)
-      ].map(e => e.trim()).filter(Boolean);
-
-      if (!groupedMap.has(key)) {
-        groupedMap.set(key, {
-          groupingKey: key,
-          displayAddress: address,
-          state: row.state as string || "KY",
-          county: row.county as string || "Jefferson",
-          ownerName: `${row.spouse_a} & ${row.spouse_b}`,
-          phones: new Set(rowPhones),
-          emails: new Set(rowEmails),
-          mlsValue: 0,
-          mlsId: "N/A",
-          auctions: [],
-          violations: [],
-          probates: [],
-          divorces: [],
-          bankruptcies: [],
-          physicalDistress: [],
-          financialDistress: [],
-          lifeEvents: [],
-          hiddenMortgages: 0,
-          hiddenLiensAmount: 0,
-          titleCheckStatus: "pending",
-          nextRetryDate: undefined,
-          isAbsentee: false,
-          photoUrls: []
-        });
-      } else {
-        const existing = groupedMap.get(key)!;
-        rowPhones.forEach(p => existing.phones.add(p));
-        rowEmails.forEach(e => existing.emails.add(e));
-      }
-      groupedMap.get(key)!.divorces.push(row);
+      mergeLeadRow(groupedMap, row, {
+        bucket: "divorces",
+        owner: r => [r.spouse_a, r.spouse_b].filter(Boolean).join(" & "),
+        ownerFallback: "No especificado",
+        phones: r => splitContacts(r.spouse_a_phones, r.spouse_b_phones),
+        emails: r => splitContacts(r.spouse_a_emails, r.spouse_b_emails),
+        mergeOwner: false,
+        preferLongerAddress: false
+      });
     }
 
-    // E. Group bankruptcies
     for (const row of bankruptcies) {
-      const address = row.address as string;
-      const key = getGroupingKey(address);
-      const rowPhones = (row.debtor_phones as string || "").split(/,\s*|;\s*/).map(p => p.trim()).filter(Boolean);
-      const rowEmails = (row.debtor_emails as string || "").split(/,\s*|;\s*/).map(e => e.trim()).filter(Boolean);
-
-      if (!groupedMap.has(key)) {
-        groupedMap.set(key, {
-          groupingKey: key,
-          displayAddress: address,
-          state: row.state as string || "KY",
-          county: row.county as string || "Jefferson",
-          ownerName: row.debtor_name as string || "Deudor Desconocido",
-          phones: new Set(rowPhones),
-          emails: new Set(rowEmails),
-          mlsValue: 0,
-          mlsId: "N/A",
-          auctions: [],
-          violations: [],
-          probates: [],
-          divorces: [],
-          bankruptcies: [],
-          physicalDistress: [],
-          financialDistress: [],
-          lifeEvents: [],
-          hiddenMortgages: 0,
-          hiddenLiensAmount: 0,
-          titleCheckStatus: "pending",
-          nextRetryDate: undefined,
-          isAbsentee: false,
-          photoUrls: []
-        });
-      } else {
-        const existing = groupedMap.get(key)!;
-        if (!isValidOwnerName(existing.ownerName) && isValidOwnerName(row.debtor_name as string)) {
-          existing.ownerName = row.debtor_name as string;
-        }
-        rowPhones.forEach(p => existing.phones.add(p));
-        rowEmails.forEach(e => existing.emails.add(e));
-      }
-      groupedMap.get(key)!.bankruptcies.push(row);
+      mergeLeadRow(groupedMap, row, {
+        bucket: "bankruptcies",
+        owner: r => r.debtor_name,
+        ownerFallback: "Deudor Desconocido",
+        phones: r => splitContacts(r.debtor_phones),
+        emails: r => splitContacts(r.debtor_emails),
+        preferLongerAddress: false
+      });
     }
 
-    // F. Group physical distress
     for (const row of physicalDistressList) {
-      const address = row.address as string;
-      const key = getGroupingKey(address);
-      const rowPhones = (row.defendant_phones as string || "").split(/,\s*|;\s*/).map(p => p.trim()).filter(Boolean);
-      const rowEmails = (row.defendant_emails as string || "").split(/,\s*|;\s*/).map(e => e.trim()).filter(Boolean);
-
-      if (!groupedMap.has(key)) {
-        groupedMap.set(key, {
-          groupingKey: key,
-          displayAddress: address,
-          state: row.state as string || "KY",
-          county: row.county as string || "Jefferson",
-          ownerName: row.owner_name as string || "DUEÑO DESCONOCIDO",
-          phones: new Set(rowPhones),
-          emails: new Set(rowEmails),
-          mlsValue: row.mls_estimated_value as number || 0,
-          mlsId: row.mls_id as string || "N/A",
-          auctions: [],
-          violations: [],
-          probates: [],
-          divorces: [],
-          bankruptcies: [],
-          physicalDistress: [],
-          financialDistress: [],
-          lifeEvents: [],
-          hiddenMortgages: row.hidden_mortgages as number || 0,
-          hiddenLiensAmount: row.hidden_liens_amount as number || 0,
-          titleCheckStatus: "pending",
-          nextRetryDate: undefined,
-          mailingAddress: row.mailing_address as string || undefined,
-          isAbsentee: (row.absentee_owner as number) === 1,
-          sqft: row.sqft as number || undefined,
-          beds: row.beds as number || undefined,
-          baths: row.baths as number || undefined,
-          photoUrls: []
-        });
-      } else {
-        const existing = groupedMap.get(key)!;
-        if (!isValidOwnerName(existing.ownerName) && isValidOwnerName(row.owner_name as string)) {
-          existing.ownerName = row.owner_name as string;
-        }
-        if (row.mls_estimated_value && (row.mls_estimated_value as number) > existing.mlsValue) {
-          existing.mlsValue = row.mls_estimated_value as number;
-        }
-        if (row.mls_id && row.mls_id !== "N/A") existing.mlsId = row.mls_id as string;
-        if (!existing.mailingAddress && row.mailing_address) existing.mailingAddress = row.mailing_address as string;
-        if ((row.absentee_owner as number) === 1) existing.isAbsentee = true;
-        if (!existing.sqft && row.sqft) existing.sqft = row.sqft as number;
-        if (!existing.beds && row.beds) existing.beds = row.beds as number;
-        if (!existing.baths && row.baths) existing.baths = row.baths as number;
-        const rowHidden = row.hidden_mortgages as number || 0;
-        if (rowHidden > existing.hiddenMortgages) {
-          existing.hiddenMortgages = rowHidden;
-        }
-        const rowLiens = row.hidden_liens_amount as number || 0;
-        if (rowLiens > existing.hiddenLiensAmount) {
-          existing.hiddenLiensAmount = rowLiens;
-        }
-        rowPhones.forEach(p => existing.phones.add(p));
-        rowEmails.forEach(e => existing.emails.add(e));
-        if (address.length > existing.displayAddress.length) existing.displayAddress = address;
-      }
-
-      const lead = groupedMap.get(key)!;
-      if (row.photo_urls) {
-        try {
-          const parsed = JSON.parse(row.photo_urls as string);
-          if (Array.isArray(parsed)) {
-            parsed.forEach((url: string) => {
-              if (url && !lead.photoUrls.includes(url)) lead.photoUrls.push(url);
-            });
-          }
-        } catch (e) {}
-      }
-
-      lead.physicalDistress.push(row);
+      mergeLeadRow(groupedMap, row, {
+        bucket: "physicalDistress",
+        owner: r => r.owner_name,
+        ownerFallback: "DUEÑO DESCONOCIDO",
+        phones: r => splitContacts(r.defendant_phones),
+        emails: r => splitContacts(r.defendant_emails)
+      });
     }
 
-    // G. Group financial distress
     for (const row of financialDistressList) {
-      const address = row.address as string;
-      const key = getGroupingKey(address);
-      const rowPhones = (row.defendant_phones as string || "").split(/,\s*|;\s*/).map(p => p.trim()).filter(Boolean);
-      const rowEmails = (row.defendant_emails as string || "").split(/,\s*|;\s*/).map(e => e.trim()).filter(Boolean);
-
-      if (!groupedMap.has(key)) {
-        groupedMap.set(key, {
-          groupingKey: key,
-          displayAddress: address,
-          state: row.state as string || "KY",
-          county: row.county as string || "Jefferson",
-          ownerName: row.owner_name as string || "DUEÑO DESCONOCIDO",
-          phones: new Set(rowPhones),
-          emails: new Set(rowEmails),
-          mlsValue: row.mls_estimated_value as number || 0,
-          mlsId: row.mls_id as string || "N/A",
-          auctions: [],
-          violations: [],
-          probates: [],
-          divorces: [],
-          bankruptcies: [],
-          physicalDistress: [],
-          financialDistress: [],
-          lifeEvents: [],
-          hiddenMortgages: row.hidden_mortgages as number || 0,
-          hiddenLiensAmount: row.hidden_liens_amount as number || 0,
-          titleCheckStatus: "pending",
-          nextRetryDate: undefined,
-          mailingAddress: row.mailing_address as string || undefined,
-          isAbsentee: (row.absentee_owner as number) === 1,
-          sqft: row.sqft as number || undefined,
-          beds: row.beds as number || undefined,
-          baths: row.baths as number || undefined,
-          photoUrls: []
-        });
-      } else {
-        const existing = groupedMap.get(key)!;
-        if (!isValidOwnerName(existing.ownerName) && isValidOwnerName(row.owner_name as string)) {
-          existing.ownerName = row.owner_name as string;
-        }
-        if (row.mls_estimated_value && (row.mls_estimated_value as number) > existing.mlsValue) {
-          existing.mlsValue = row.mls_estimated_value as number;
-        }
-        if (row.mls_id && row.mls_id !== "N/A") existing.mlsId = row.mls_id as string;
-        if (!existing.mailingAddress && row.mailing_address) existing.mailingAddress = row.mailing_address as string;
-        if ((row.absentee_owner as number) === 1) existing.isAbsentee = true;
-        if (!existing.sqft && row.sqft) existing.sqft = row.sqft as number;
-        if (!existing.beds && row.beds) existing.beds = row.beds as number;
-        if (!existing.baths && row.baths) existing.baths = row.baths as number;
-        const rowHidden = row.hidden_mortgages as number || 0;
-        if (rowHidden > existing.hiddenMortgages) {
-          existing.hiddenMortgages = rowHidden;
-        }
-        const rowLiens = row.hidden_liens_amount as number || 0;
-        if (rowLiens > existing.hiddenLiensAmount) {
-          existing.hiddenLiensAmount = rowLiens;
-        }
-        rowPhones.forEach(p => existing.phones.add(p));
-        rowEmails.forEach(e => existing.emails.add(e));
-        if (address.length > existing.displayAddress.length) existing.displayAddress = address;
-      }
-
-      const lead = groupedMap.get(key)!;
-      if (row.photo_urls) {
-        try {
-          const parsed = JSON.parse(row.photo_urls as string);
-          if (Array.isArray(parsed)) {
-            parsed.forEach((url: string) => {
-              if (url && !lead.photoUrls.includes(url)) lead.photoUrls.push(url);
-            });
-          }
-        } catch (e) {}
-      }
-
-      lead.financialDistress.push(row);
+      mergeLeadRow(groupedMap, row, {
+        bucket: "financialDistress",
+        owner: r => r.owner_name,
+        ownerFallback: "DUEÑO DESCONOCIDO",
+        phones: r => splitContacts(r.defendant_phones),
+        emails: r => splitContacts(r.defendant_emails)
+      });
     }
 
-    // H. Group life events
     for (const row of lifeEventsList) {
-      const address = row.address as string;
-      const key = getGroupingKey(address);
-      const rowPhones = (row.defendant_phones as string || "").split(/,\s*|;\s*/).map(p => p.trim()).filter(Boolean);
-      const rowEmails = (row.defendant_emails as string || "").split(/,\s*|;\s*/).map(e => e.trim()).filter(Boolean);
-
-      if (!groupedMap.has(key)) {
-        groupedMap.set(key, {
-          groupingKey: key,
-          displayAddress: address,
-          state: row.state as string || "KY",
-          county: row.county as string || "Jefferson",
-          ownerName: row.subject_name as string || "No especificado",
-          phones: new Set(rowPhones),
-          emails: new Set(rowEmails),
-          mlsValue: row.mls_estimated_value as number || 0,
-          mlsId: row.mls_id as string || "N/A",
-          auctions: [],
-          violations: [],
-          probates: [],
-          divorces: [],
-          bankruptcies: [],
-          physicalDistress: [],
-          financialDistress: [],
-          lifeEvents: [],
-          hiddenMortgages: row.hidden_mortgages as number || 0,
-          hiddenLiensAmount: row.hidden_liens_amount as number || 0,
-          titleCheckStatus: "pending",
-          nextRetryDate: undefined,
-          mailingAddress: row.mailing_address as string || undefined,
-          isAbsentee: (row.absentee_owner as number) === 1,
-          sqft: row.sqft as number || undefined,
-          beds: row.beds as number || undefined,
-          baths: row.baths as number || undefined,
-          photoUrls: []
-        });
-      } else {
-        const existing = groupedMap.get(key)!;
-        if (!isValidOwnerName(existing.ownerName) && isValidOwnerName(row.subject_name as string)) {
-          existing.ownerName = row.subject_name as string;
-        }
-        if (row.mls_estimated_value && (row.mls_estimated_value as number) > existing.mlsValue) {
-          existing.mlsValue = row.mls_estimated_value as number;
-        }
-        if (row.mls_id && row.mls_id !== "N/A") existing.mlsId = row.mls_id as string;
-        if (!existing.mailingAddress && row.mailing_address) existing.mailingAddress = row.mailing_address as string;
-        if ((row.absentee_owner as number) === 1) existing.isAbsentee = true;
-        if (!existing.sqft && row.sqft) existing.sqft = row.sqft as number;
-        if (!existing.beds && row.beds) existing.beds = row.beds as number;
-        if (!existing.baths && row.baths) existing.baths = row.baths as number;
-        const rowHidden = row.hidden_mortgages as number || 0;
-        if (rowHidden > existing.hiddenMortgages) {
-          existing.hiddenMortgages = rowHidden;
-        }
-        const rowLiens = row.hidden_liens_amount as number || 0;
-        if (rowLiens > existing.hiddenLiensAmount) {
-          existing.hiddenLiensAmount = rowLiens;
-        }
-        rowPhones.forEach(p => existing.phones.add(p));
-        rowEmails.forEach(e => existing.emails.add(e));
-        if (address.length > existing.displayAddress.length) existing.displayAddress = address;
-      }
-
-      const lead = groupedMap.get(key)!;
-      if (row.photo_urls) {
-        try {
-          const parsed = JSON.parse(row.photo_urls as string);
-          if (Array.isArray(parsed)) {
-            parsed.forEach((url: string) => {
-              if (url && !lead.photoUrls.includes(url)) lead.photoUrls.push(url);
-            });
-          }
-        } catch (e) {}
-      }
-
-      lead.lifeEvents.push(row);
+      mergeLeadRow(groupedMap, row, {
+        bucket: "lifeEvents",
+        owner: r => r.subject_name,
+        ownerFallback: "No especificado",
+        phones: r => splitContacts(r.defendant_phones),
+        emails: r => splitContacts(r.defendant_emails)
+      });
     }
 
-    // I. Group pre_foreclosures
     for (const row of (preForeclosuresRes.rows || [])) {
-      const address = row.address as string;
-      const key = getGroupingKey(address);
-      const rowPhones = (row.defendant_phones as string || "").split(/,\s*|;\s*/).map(p => p.trim()).filter(Boolean);
-      const rowEmails = (row.defendant_emails as string || "").split(/,\s*|;\s*/).map(e => e.trim()).filter(Boolean);
-
-      if (!groupedMap.has(key)) {
-        groupedMap.set(key, {
-          groupingKey: key,
-          displayAddress: address,
-          state: row.state as string || "KY",
-          county: row.county as string || "Jefferson",
-          ownerName: row.defendant as string || "No especificado",
-          phones: new Set(rowPhones),
-          emails: new Set(rowEmails),
-          mlsValue: 0,
-          mlsId: "N/A",
-          auctions: [],
-          violations: [],
-          probates: [],
-          divorces: [],
-          bankruptcies: [],
-          physicalDistress: [],
-          financialDistress: [],
-          lifeEvents: [],
-          preForeclosures: [],
-          taxSales: [],
-          hiddenMortgages: 0,
-          hiddenLiensAmount: 0,
-          titleCheckStatus: "pending",
-          nextRetryDate: undefined,
-          mailingAddress: row.mailing_address as string || undefined,
-          isAbsentee: (row.absentee_owner as number) === 1,
-          sqft: undefined,
-          beds: undefined,
-          baths: undefined,
-          photoUrls: []
-        });
-      } else {
-        const existing = groupedMap.get(key)!;
-        if (!isValidOwnerName(existing.ownerName) && isValidOwnerName(row.defendant as string)) existing.ownerName = row.defendant as string;
-        if (!existing.mailingAddress && row.mailing_address) existing.mailingAddress = row.mailing_address as string;
-        if ((row.absentee_owner as number) === 1) existing.isAbsentee = true;
-        rowPhones.forEach(p => existing.phones.add(p));
-        rowEmails.forEach(e => existing.emails.add(e));
-        if (address.length > existing.displayAddress.length) existing.displayAddress = address;
-      }
-
-      const lead = groupedMap.get(key)!;
-      if (!lead.preForeclosures) lead.preForeclosures = [];
-      lead.preForeclosures.push(row);
-      if (row.photo_urls) {
-        try {
-          const parsed = JSON.parse(row.photo_urls as string);
-          if (Array.isArray(parsed)) {
-            parsed.forEach((url: string) => {
-              if (url && !lead.photoUrls.includes(url)) lead.photoUrls.push(url);
-            });
-          }
-        } catch (e) {}
-      }
+      mergeLeadRow(groupedMap, row, {
+        bucket: "preForeclosures",
+        owner: r => r.defendant,
+        ownerFallback: "No especificado",
+        phones: r => splitContacts(r.defendant_phones),
+        emails: r => splitContacts(r.defendant_emails)
+      });
     }
 
-    // J. Group tax_sales
     for (const row of (taxSalesRes.rows || [])) {
-      const address = row.address as string;
-      const key = getGroupingKey(address);
-      const rowPhones = (row.defendant_phones as string || "").split(/,\s*|;\s*/).map(p => p.trim()).filter(Boolean);
-      const rowEmails = (row.defendant_emails as string || "").split(/,\s*|;\s*/).map(e => e.trim()).filter(Boolean);
-
-      if (!groupedMap.has(key)) {
-        groupedMap.set(key, {
-          groupingKey: key,
-          displayAddress: address,
-          state: row.state as string || "IN",
-          county: row.county as string || "Clark",
-          ownerName: row.owner_name as string || "No especificado",
-          phones: new Set(rowPhones),
-          emails: new Set(rowEmails),
-          mlsValue: 0,
-          mlsId: "N/A",
-          auctions: [],
-          violations: [],
-          probates: [],
-          divorces: [],
-          bankruptcies: [],
-          physicalDistress: [],
-          financialDistress: [],
-          lifeEvents: [],
-          preForeclosures: [],
-          taxSales: [],
-          hiddenMortgages: 0,
-          hiddenLiensAmount: 0,
-          titleCheckStatus: "pending",
-          nextRetryDate: undefined,
-          mailingAddress: row.mailing_address as string || undefined,
-          isAbsentee: (row.absentee_owner as number) === 1,
-          sqft: undefined,
-          beds: undefined,
-          baths: undefined,
-          photoUrls: []
-        });
-      } else {
-        const existing = groupedMap.get(key)!;
-        if (!isValidOwnerName(existing.ownerName) && isValidOwnerName(row.owner_name as string)) {
-          existing.ownerName = row.owner_name as string;
-        }
-        rowPhones.forEach(p => existing.phones.add(p));
-        rowEmails.forEach(e => existing.emails.add(e));
-        if (address.length > existing.displayAddress.length) existing.displayAddress = address;
-      }
-
-      const lead = groupedMap.get(key)!;
-      if (!lead.taxSales) lead.taxSales = [];
-      lead.taxSales.push(row);
+      mergeLeadRow(groupedMap, row, {
+        bucket: "taxSales",
+        owner: r => r.owner_name,
+        ownerFallback: "No especificado",
+        phones: r => splitContacts(r.defendant_phones),
+        emails: r => splitContacts(r.defendant_emails),
+        defaultState: "IN",
+        defaultCounty: "Clark"
+      });
     }
 
     // Pre-cargar la caché de geocodificación en memoria para evitar el problema de consultas N+1
@@ -1223,49 +768,6 @@ app.get("/api/prospectos", async (req, res) => {
       }
     }
 
-    // G. Group landbank inventory
-    for (const row of (landbankRes.rows || [])) {
-      const address = row.address as string;
-      if (!address) continue;
-      const key = getGroupingKey(address);
-      if (!groupedMap.has(key)) {
-        groupedMap.set(key, {
-          groupingKey: key,
-          displayAddress: address,
-          state: (row.state as string) || "KY",
-          county: (row.county as string) || "Jefferson",
-          ownerName: "LOUISVILLE METRO LANDBANK",
-          phones: new Set(),
-          emails: new Set(),
-          mlsValue: (row.estimated_value as number) || 115000,
-          mlsId: "LANDBANK",
-          auctions: [],
-          violations: [],
-          probates: [],
-          divorces: [],
-          bankruptcies: [],
-          physicalDistress: [],
-          financialDistress: [],
-          lifeEvents: [],
-          preForeclosures: [],
-          taxSales: [],
-          landbankInfo: row,
-          hiddenMortgages: 0,
-          hiddenLiensAmount: 0,
-          titleCheckStatus: "clean_municipal",
-          nextRetryDate: undefined,
-          mailingAddress: "444 S 5th St, Louisville, KY 40202",
-          isAbsentee: false,
-          sqft: 1200,
-          beds: 3,
-          baths: 1,
-          photoUrls: []
-        });
-      } else {
-        const existing = groupedMap.get(key)!;
-        existing.landbankInfo = row;
-      }
-    }
 
     // Pre-cargar eventos, encumbrances y opportunity scores del nuevo Grafo
     const eventsMap = new Map<string, any[]>();
@@ -1292,7 +794,7 @@ app.get("/api/prospectos", async (req, res) => {
         accessibilityScore: row.accessibility_score as number,
         legalRiskScore: row.legal_risk_score as number,
         tacticalAction: row.tactical_action as string,
-        underwritingSummary: row.underwriting_summary ? JSON.parse(row.underwriting_summary as string) : null
+        underwritingSummary: safeJsonParse(row.underwriting_summary as string | null)
       });
     }
 
@@ -1315,7 +817,7 @@ app.get("/api/prospectos", async (req, res) => {
 
       // Calcular Underwriting
       const violationKeywords = lead.violations.map(v => v.violation_type as string);
-      const rehab = calculateRehab(lead.sqft || null, violationKeywords);
+      const rehabKeywords = violationKeywords.concat(lead.physicalDistress.map(p => p.distress_type as string)).filter(Boolean);
       const hiddenDebt = lead.hiddenMortgages || 0;
 
       const rawAppraisal = (lead.auctions && lead.auctions.length > 0 && lead.auctions[0].appraisal_value > 0) 
@@ -1328,15 +830,17 @@ app.get("/api/prospectos", async (req, res) => {
         else if (rawAppraisal < rawMls * 0.35) effectiveMarketValue = rawMls;
       }
 
+      const rehab = calculateRehab(lead.sqft || null, rehabKeywords, effectiveMarketValue);
       const mao = calculateMAO(effectiveMarketValue, rehab, hiddenDebt, lead.hiddenLiensAmount);
       const primaryDebt = hasAuctions ? Math.max(...lead.auctions.map(a => (a.debt_amount as number) || 0)) : 0;
       const netEquity = calculateNetEquity(effectiveMarketValue, primaryDebt, hiddenDebt, lead.hiddenLiensAmount);
       const purchasePrice = primaryDebt > 0 ? primaryDebt : mao;
       const { roi, totalCost } = calculateROI(effectiveMarketValue, purchasePrice, rehab);
 
-      // Institutional Multilayer Underwriting
+      // Institutional Multilayer Underwriting (incluye offerTiers del motor único 65/70/75%)
       const totalConsolidatedDebt = primaryDebt + hiddenDebt + (lead.hiddenLiensAmount || 0);
-      const institutionalUW = calculateInstitutionalUnderwriting(effectiveMarketValue, lead.sqft || null, violationKeywords, totalConsolidatedDebt, lead.state);
+      const institutionalUW = calculateInstitutionalUnderwriting(effectiveMarketValue, lead.sqft || null, rehabKeywords, totalConsolidatedDebt, lead.state, rawAppraisal);
+      const offerTiers = institutionalUW.offerTiers;
 
       // Regla de Stacking / Alta Motivación
       let isHighMotivation = false;
@@ -1354,10 +858,11 @@ app.get("/api/prospectos", async (req, res) => {
       const coords = geocodeMap.get(lead.displayAddress) || geocodeKeyMap.get(lead.groupingKey) || null;
 
       // Confidence Radar & Forensic Verification Status
+      // Niveles por evidencia (sin falsa precisión): 100 = verificado, 50-70 = fuente parcial, 0 = sin dato.
       const hasGeocode = coords && coords.lat !== null;
-      const geocodeConf = hasGeocode ? 99.2 : 0;
-      const ownerConf = isValidOwnerName(lead.ownerName) ? 96.0 : 60.0;
-      const debtConf = (lead.titleCheckStatus === 'success' || primaryDebt > 0) ? 98.4 : 85.0;
+      const geocodeConf = hasGeocode ? 100 : 0;
+      const ownerConf = isValidOwnerName(lead.ownerName) ? 100 : 0;
+      const debtConf = lead.titleCheckStatus === 'success' ? 100 : (primaryDebt > 0 ? 70 : 0);
       const overallConf = Math.round((geocodeConf * 0.35) + (ownerConf * 0.35) + (debtConf * 0.30));
 
       let forensicStatus = 'HIGH_CONFIDENCE';
@@ -1377,7 +882,7 @@ app.get("/api/prospectos", async (req, res) => {
         envAttractors: []
       };
 
-      const propertyId = `PROP_${lead.groupingKey.replace(/[^a-z0-9]/g, '_').substring(0, 40)}`;
+      const propertyId = buildPropertyId(lead.groupingKey);
       const propEvents = eventsMap.get(propertyId) || [];
       const propEncumbrances = encumbrancesMap.get(propertyId) || [];
       const scoreObj = scoresMap.get(propertyId) || {
@@ -1387,18 +892,15 @@ app.get("/api/prospectos", async (req, res) => {
 
       let oppScore = scoreObj.opportunityScore;
       let tactAction = scoreObj.tacticalAction;
-      const isUnverifiedOwner = !isValidOwnerName(lead.ownerName);
-      const isCompletelyUnvalued = effectiveMarketValue <= 0 && primaryDebt <= 0;
+      // AGENTS.md §2.A: isUnknownOwner = !ownerName || /desconocido|unknown|no especificado/i (misma regla que el cliente).
+      const isUnverifiedOwner = !isValidOwnerName(lead.ownerName) || /desconocido|unknown|no especificado/i.test(lead.ownerName || "");
 
-      if (isUnverifiedOwner && isCompletelyUnvalued) {
-        oppScore = 20;
+      // AGENTS.md §2.A (invariante): totalDebt === 0 || marketValue <= 0 || isUnknownOwner → score capado a 20.
+      // totalDebt usa la misma definición que el cliente: deuda judicial + hipotecas ocultas + gravámenes.
+      const isIncompleteDocket = totalConsolidatedDebt <= 0 || effectiveMarketValue <= 0 || isUnverifiedOwner;
+      if (isIncompleteDocket) {
+        oppScore = Math.min(typeof oppScore === "number" ? oppScore : 20, 20);
         tactAction = 'EXPEDIENTE INCOMPLETO: AUDITAR EN CORTE';
-      } else if (isCompletelyUnvalued) {
-        oppScore = Math.min(oppScore, 35);
-        tactAction = 'PENDIENTE DE PUBLICACIÓN DE DEUDA/VALOR';
-      } else if (isUnverifiedOwner) {
-        oppScore = Math.min(oppScore, 50);
-        tactAction = 'INVESTIGACIÓN DE TITULARIDAD REQUERIDA';
       }
 
       const zipMatches = lead.displayAddress ? lead.displayAddress.match(/\b\d{5}\b/g) : null;
@@ -1431,6 +933,8 @@ app.get("/api/prospectos", async (req, res) => {
         opportunityScore: oppScore,
         tacticalAction: tactAction,
         institutionalUW,
+        offerTiers,
+        effectiveMarketValue,
         confidenceBreakdown: {
           geocodeConfidence: geocodeConf,
           ownerConfidence: ownerConf,
@@ -1450,8 +954,8 @@ app.get("/api/prospectos", async (req, res) => {
         roi,
         totalCost,
         isHighMotivation,
-        lat: coords ? coords.lat : null,
-        lon: coords ? coords.lon : null,
+        lat: coords ? coords.lat : (lead.landbankInfo && Number(lead.landbankInfo.lat) ? Number(lead.landbankInfo.lat) : null),
+        lon: coords ? coords.lon : (lead.landbankInfo && Number(lead.landbankInfo.lon) ? Number(lead.landbankInfo.lon) : null),
         photoUrls: lead.photoUrls,
         beds: lead.beds,
         baths: lead.baths,
@@ -1463,6 +967,7 @@ app.get("/api/prospectos", async (req, res) => {
         envStressors: osint.envStressors,
         envAttractors: osint.envAttractors,
         landbankInfo: lead.landbankInfo || null,
+        propertyType: lead.landbankInfo?.property_type || "Single Family",
         acquisitionState: acquisitionMap.get(propertyId) || acquisitionMap.get(lead.groupingKey) || null,
         forensicLegalStory: lead.forensicLegalStory || (lead.auctions && lead.auctions[0] && lead.auctions[0].forensic_legal_story) || undefined
       });
@@ -1583,9 +1088,9 @@ app.post("/api/acquisition-state", async (req, res) => {
           property_id, stage, motivation, estimated_motivation, asking_price, debt,
           negotiation_position, next_action, follow_up_date, offer_conservative,
           offer_target, offer_max, disposition, notes, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+        ) VALUES (?, COALESCE(?, 'NEW'), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
         ON CONFLICT(property_id) DO UPDATE SET
-          stage = COALESCE(excluded.stage, tzel_acquisition_state.stage),
+          stage = COALESCE(?, tzel_acquisition_state.stage),
           motivation = COALESCE(excluded.motivation, tzel_acquisition_state.motivation),
           estimated_motivation = COALESCE(excluded.estimated_motivation, tzel_acquisition_state.estimated_motivation),
           asking_price = COALESCE(excluded.asking_price, tzel_acquisition_state.asking_price),
@@ -1602,7 +1107,7 @@ app.post("/api/acquisition-state", async (req, res) => {
       `,
       args: [
         property_id,
-        stage || 'NEW',
+        stage || null, // INSERT: COALESCE → 'NEW' solo en la primera inserción
         motivation || null,
         estimated_motivation || null,
         asking_price || null,
@@ -1614,7 +1119,8 @@ app.post("/api/acquisition-state", async (req, res) => {
         offer_target || null,
         offer_max || null,
         disposition || null,
-        notes || null
+        notes || null,
+        stage || null // UPDATE: sin stage explícito se conserva la etapa actual (antes se reseteaba a NEW)
       ]
     });
 
@@ -1627,6 +1133,7 @@ app.post("/api/acquisition-state", async (req, res) => {
       }).catch(() => {});
     }
 
+    cachedProspectos = null; // la etapa/disposición forma parte de /api/prospectos
     console.log(`[ACQUISITION STATE SAVED] ${property_id} -> Stage: ${stage || 'unchanged'} | Disp: ${disposition || 'none'}`);
     res.json({ status: "success", property_id });
   } catch (err: any) {
@@ -1652,6 +1159,129 @@ app.get("/api/surplus", async (req, res) => {
   }
 });
 
+// Louisville Lands & Vacant Lots Discovery Hub (Strictly pure vacant lots)
+app.get("/api/lands", async (req, res) => {
+  console.log("[API] /api/lands requested");
+  try {
+    const { buildable, status, zip, search, minPrice, maxPrice, sort } = req.query;
+
+    let query = `
+      SELECT parcel_id, address, asking_price, estimated_value, property_type,
+             program_name, buildable_lot, council_district, category, property_status,
+             sqft, acres, lat, lon, county, state, is_high_yield, created_at
+      FROM landbank_inventory
+      WHERE property_type = 'Lot'
+    `;
+    const conditions: string[] = [];
+    const args: any[] = [];
+
+    // Filter by buildability
+    if (buildable === 'yes') {
+      conditions.push("(buildable_lot = 'Yes' OR buildable_lot = 'yes')");
+    } else if (buildable === 'no') {
+      conditions.push("(buildable_lot = 'No' OR buildable_lot = 'no')");
+    }
+
+    // Filter by availability status
+    if (status === 'available') {
+      conditions.push("(property_status = 'Available' OR category LIKE '%Available%')");
+    }
+
+    if (zip && typeof zip === 'string' && zip.trim().length > 0) {
+      conditions.push("address LIKE ?");
+      args.push(`%${zip.trim()}%`);
+    }
+
+    if (search && typeof search === 'string' && search.trim().length > 0) {
+      conditions.push("(address LIKE ? OR parcel_id LIKE ?)");
+      args.push(`%${search.trim()}%`, `%${search.trim()}%`);
+    }
+
+    if (minPrice && !isNaN(Number(minPrice))) {
+      conditions.push("asking_price >= ?");
+      args.push(Number(minPrice));
+    }
+    if (maxPrice && !isNaN(Number(maxPrice))) {
+      conditions.push("asking_price <= ?");
+      args.push(Number(maxPrice));
+    }
+
+    if (conditions.length > 0) {
+      query += " AND " + conditions.join(" AND ");
+    }
+
+    if (sort === 'price_asc') {
+      query += " ORDER BY asking_price ASC, parcel_id ASC";
+    } else if (sort === 'price_desc') {
+      query += " ORDER BY asking_price DESC";
+    } else if (sort === 'value_desc') {
+      query += " ORDER BY estimated_value DESC";
+    } else if (sort === 'sqft_desc') {
+      query += " ORDER BY sqft DESC";
+    } else if (sort === 'zip') {
+      query += " ORDER BY address ASC";
+    } else {
+      query += " ORDER BY CASE WHEN (buildable_lot = 'Yes' OR buildable_lot = 'yes') THEN 0 ELSE 1 END, estimated_value DESC, asking_price ASC";
+    }
+
+    const result = await db.execute({ sql: query, args });
+
+    // Key Performance Indicators (KPIs)
+    const kpiRes = await db.execute(`
+      SELECT 
+        COUNT(*) as total_lots,
+        SUM(CASE WHEN (buildable_lot = 'Yes' OR buildable_lot = 'yes') THEN 1 ELSE 0 END) as buildable_lots,
+        SUM(CASE WHEN (property_status = 'Available' OR category LIKE '%Available%') THEN 1 ELSE 0 END) as available_lots,
+        SUM(CASE WHEN asking_price <= 500 THEN 1 ELSE 0 END) as dollar_lots,
+        SUM(CASE WHEN is_high_yield = 1 THEN 1 ELSE 0 END) as high_yield_lots
+      FROM landbank_inventory
+      WHERE property_type = 'Lot'
+    `);
+
+    // Top Zip codes
+    const zipRes = await db.execute(`
+      SELECT 
+        SUBSTR(address, -5) as zip_code,
+        COUNT(*) as count
+      FROM landbank_inventory
+      WHERE property_type = 'Lot'
+      GROUP BY zip_code
+      ORDER BY count DESC
+      LIMIT 8
+    `);
+
+    res.json({
+      status: "success",
+      count: result.rows.length,
+      kpis: kpiRes.rows[0] || {},
+      topZips: zipRes.rows || [],
+      data: result.rows
+    });
+  } catch (err: any) {
+    console.error("[API ERROR] /api/lands failed:", err.message);
+    res.status(500).json({ status: "error", message: err.message });
+  }
+});
+
+app.post("/api/lands/refresh", async (req, res) => {
+  try {
+    const { scrapeLandbank } = await import("./scrapers/scrape_landbank");
+    scrapeLandbank().then(count => {
+      console.log(`[LANDBANK SCRAPER TRIGGERED] Ingestados ${count} registros.`);
+      cachedProspectos = null;
+    }).catch(err => {
+      console.error("[LANDBANK SCRAPER ERROR]", err.message);
+    });
+
+    res.json({
+      status: "success",
+      message: "Actualización de terrenos del Louisville Landbank iniciada en segundo plano."
+    });
+  } catch (err: any) {
+    res.status(500).json({ status: "error", message: err.message });
+  }
+});
+
 app.get("/api/guiones", async (req, res) => {
   console.log("[API] /api/guiones requested");
   try {
@@ -1672,7 +1302,9 @@ app.get("/api/guiones", async (req, res) => {
 
 app.get("/api/mca", async (req, res) => {
   const address = req.query.address as string;
-  const state = (req.query.state as string || "KY").toUpperCase();
+  const rawState = (req.query.state as string || "KY").toUpperCase();
+  const state = rawState === "IN" ? "IN" : "KY"; // whitelist: evita inyección en el filtro OData
+  const odataLiteral = (v: string) => String(v).replace(/'/g, "''");
 
   if (!address) {
     return res.status(400).json({ status: "error", message: "Falta el parámetro address" });
@@ -1710,8 +1342,10 @@ app.get("/api/mca", async (req, res) => {
     const tables = ["foreclosure_auctions", "code_violations", "physical_distress", "financial_distress", "life_events"];
     for (const table of tables) {
       try {
-        const queryStr = `SELECT address, beds, baths, sqft, mls_id, appraisal_value, county FROM ${table} WHERE address LIKE '%${houseNumber}%'`;
-        const resDb = await db.execute(queryStr);
+        const resDb = await db.execute({
+          sql: `SELECT address, beds, baths, sqft, mls_id, appraisal_value, county FROM ${table} WHERE address LIKE ?`,
+          args: [`%${houseNumber}%`]
+        });
         for (const row of resDb.rows) {
           const rowAddr = row.address as string;
           if (rowAddr && getGroupingKey(rowAddr) === targetKey) {
@@ -1743,7 +1377,7 @@ app.get("/api/mca", async (req, res) => {
     console.log(`[MCA API] Buscando propiedad objetivo: "${address}" (${state})`);
     let odataFilter = "";
     if (dbSpecs.mls_id) {
-      odataFilter = `ListingId eq '${dbSpecs.mls_id}'`;
+      odataFilter = `ListingId eq '${odataLiteral(dbSpecs.mls_id)}'`;
     } else {
       odataFilter = `contains(UnparsedAddress, '${houseNumber}') and StateOrProvince eq '${state}'`;
       const zipMatches = address.match(/\b\d{5}\b/g);
@@ -1781,8 +1415,13 @@ app.get("/api/mca", async (req, res) => {
               }
             }
             if (!targetProfile) {
-              const validRecords = records.filter((r: any) => r.LivingArea > 0 || r.BedroomsTotal > 0);
-              targetProfile = validRecords.length > 0 ? validRecords[0] : records[0];
+              // Coincidencia estricta: mismo número de casa y todas las palabras núcleo de la calle presentes.
+              // (Antes se tomaba records[0]: cualquier casa con ese número en el ZIP → specs de otra propiedad.)
+              targetProfile = records.find((r: any) => {
+                const recParsed = parseAddress(String(r.UnparsedAddress || "").replace(/,/g, " "));
+                if (recParsed.houseNumber !== houseNumber) return false;
+                return coreWords.length > 0 && coreWords.every(w => recParsed.coreWords.includes(w));
+              }) || null;
             }
           }
         }
@@ -1854,13 +1493,17 @@ app.get("/api/mca", async (req, res) => {
       }
     }
 
-    let beds = (targetProfile && targetProfile.BedroomsTotal) ? targetProfile.BedroomsTotal : (dbSpecs.beds || 3);
-    let baths = (targetProfile && targetProfile.BathroomsTotalDecimal) ? targetProfile.BathroomsTotalDecimal : (dbSpecs.baths || 2);
-    let sqft = (targetProfile && targetProfile.LivingArea) ? targetProfile.LivingArea : (dbSpecs.sqft || 1200);
-
-    if (!beds || beds === 0) beds = dbSpecs.beds || 3;
-    if (!baths || baths === 0) baths = dbSpecs.baths || 2;
-    if (!sqft || sqft === 0) sqft = dbSpecs.sqft || 1200;
+    // Sin valores inventados (AGENTS.md §2.A): si no se conocen, quedan null y no se usan como filtro de comps.
+    const pickPositive = (...vals: any[]): number | null => {
+      for (const v of vals) {
+        const n = Number(v);
+        if (Number.isFinite(n) && n > 0) return n;
+      }
+      return null;
+    };
+    const beds = pickPositive(targetProfile?.BedroomsTotal, dbSpecs.beds);
+    const baths = pickPositive(targetProfile?.BathroomsTotalDecimal, dbSpecs.baths);
+    const sqft = pickPositive(targetProfile?.LivingArea, dbSpecs.sqft);
 
     let comps: any[] = [];
     if (zip) {
@@ -1868,7 +1511,10 @@ app.get("/api/mca", async (req, res) => {
       date180DaysAgo.setDate(date180DaysAgo.getDate() - 180);
       const date180Str = date180DaysAgo.toISOString().split("T")[0];
 
-      const compsFilter = `PostalCode eq '${zip}' and StandardStatus eq 'Closed' and ClosePrice gt 20000 and BedroomsTotal ge ${beds - 1} and BedroomsTotal le ${beds + 1} and LivingArea ge ${sqft - 350} and LivingArea le ${sqft + 350} and CloseDate ge ${date180Str}`;
+      const specFilter =
+        (beds !== null ? ` and BedroomsTotal ge ${beds - 1} and BedroomsTotal le ${beds + 1}` : "") +
+        (sqft !== null ? ` and LivingArea ge ${sqft - 350} and LivingArea le ${sqft + 350}` : "");
+      const compsFilter = `PostalCode eq '${zip}' and StandardStatus eq 'Closed' and ClosePrice gt 20000${specFilter} and CloseDate ge ${date180Str}`;
 
       try {
         const compsParams = {
@@ -1885,7 +1531,7 @@ app.get("/api/mca", async (req, res) => {
           date365DaysAgo.setDate(date365DaysAgo.getDate() - 365);
           const date365Str = date365DaysAgo.toISOString().split("T")[0];
 
-          const compsFilter365 = `PostalCode eq '${zip}' and StandardStatus eq 'Closed' and ClosePrice gt 20000 and BedroomsTotal ge ${beds - 1} and BedroomsTotal le ${beds + 1} and LivingArea ge ${sqft - 350} and LivingArea le ${sqft + 350} and CloseDate ge ${date365Str}`;
+          const compsFilter365 = `PostalCode eq '${zip}' and StandardStatus eq 'Closed' and ClosePrice gt 20000${specFilter} and CloseDate ge ${date365Str}`;
 
           const compsParams365 = {
             "$filter": compsFilter365,
@@ -1901,9 +1547,11 @@ app.get("/api/mca", async (req, res) => {
     }
 
     let mcaArv = 0;
-    if (comps.length > 0) {
-      const sum = comps.reduce((acc: number, c: any) => acc + (c.ClosePrice || 0), 0);
-      mcaArv = Math.round(sum / comps.length);
+    const compPrices = comps.map((c: any) => Number(c.ClosePrice)).filter((p: number) => Number.isFinite(p) && p > 0).sort((a: number, b: number) => a - b);
+    if (compPrices.length > 0) {
+      // Mediana: robusta a comps atípicos (ventas de lujo o distressed)
+      const mid = Math.floor(compPrices.length / 2);
+      mcaArv = Math.round(compPrices.length % 2 ? compPrices[mid] : (compPrices[mid - 1] + compPrices[mid]) / 2);
     } else if (dbSpecs.appraisal_value && dbSpecs.appraisal_value > 0) {
       mcaArv = dbSpecs.appraisal_value;
     }
@@ -1935,41 +1583,10 @@ app.get("/api/mca", async (req, res) => {
 
   } catch (err: any) {
     console.error("[MCA API ERROR]", err.message);
-    return res.json({
-      status: "success",
-      target: {
-        address,
-        zip: "N/A",
-        beds: 3,
-        baths: 2,
-        sqft: 1200,
-        lastClosedPrice: null,
-        lastClosedDate: null,
-        status: "Off Market"
-      },
-      mcaArv: 0,
-      compsCount: 0,
-      comps: [],
-      note: "Propiedad privada Off-Market sin indexación pública en MLS GLAR."
+    return res.status(502).json({
+      status: "error",
+      message: `No se pudo calcular el MCA: ${err.message}`
     });
-  }
-});
-
-app.get("/api/guiones", async (req, res) => {
-  console.log("[API] /api/guiones requested");
-  try {
-    const fs = require("fs");
-    const path = require("path");
-    const scriptsPath = path.resolve("./telephony_scripts.json");
-    if (fs.existsSync(scriptsPath)) {
-      const data = JSON.parse(fs.readFileSync(scriptsPath, "utf-8"));
-      res.json(data);
-    } else {
-      res.status(404).json({ status: "error", message: "Telephony scripts file not found" });
-    }
-  } catch (err: any) {
-    console.error("[API ERROR] Failed to load telephony scripts:", err.message);
-    res.status(500).json({ status: "error", message: err.message });
   }
 });
 
@@ -2020,8 +1637,8 @@ Responde estrictamente en formato JSON válido con esta estructura:
   "actionableAdvice": string
 }`;
 
-    // Priority: gemini-3.1-pro-preview primero, fallback a gemini-3.8-flash
-    const models = ["gemini-3.1-pro-preview", "gemini-3.8-flash"];
+    // Priority: gemini-3.8-flash primero para respuesta inmediata, fallback a gemini-3.1-pro-preview
+    const models = [process.env.GEMINI_MODEL || "gemini-3.8-flash", "gemini-3.1-pro-preview"];
     let responseJson: any = null;
     let usedModel = "";
 
@@ -2094,10 +1711,57 @@ Responde estrictamente en formato JSON válido con esta estructura:
       console.warn(`[AUDIT DOC API GUARDRAIL] Avalúo rechazado por fuera de rango: $${rawAppraisal.toLocaleString()} (rango válido: $${MIN_VALID_RANGE.toLocaleString()}-$${MAX_VALID_RANGE.toLocaleString()})`);
     }
 
-    const secondaryLiens = Number(responseJson.secondaryLiensAmount || 0);
+    const rawSecondary = Number(responseJson.secondaryLiensAmount || 0);
+    const secondaryLiens = Number.isFinite(rawSecondary) && rawSecondary > 0 && rawSecondary <= MAX_VALID_RANGE ? rawSecondary : 0;
 
-    if (auctionId || caseNumber || address) {
+    // Resolución estricta del registro objetivo (antes: WHERE ... OR case_number = '' OR address LIKE '%..%'
+    // podía sobrescribir múltiples remates no relacionados).
+    let targetAuctionIds: any[] = [];
+    let matchMethod = "none";
+    try {
+      const cleanCase = typeof caseNumber === "string" ? caseNumber.trim() : "";
+      const aiCase = typeof responseJson.caseNumber === "string" ? responseJson.caseNumber.trim() : "";
+      if (auctionId) {
+        const r = await db.execute({ sql: "SELECT auction_id FROM foreclosure_auctions WHERE auction_id = ?", args: [auctionId] });
+        targetAuctionIds = r.rows.map(row => row.auction_id);
+        matchMethod = "auction_id";
+      }
+      if (targetAuctionIds.length === 0 && cleanCase) {
+        const r = await db.execute({ sql: "SELECT auction_id FROM foreclosure_auctions WHERE case_number = ?", args: [cleanCase] });
+        targetAuctionIds = r.rows.map(row => row.auction_id);
+        matchMethod = "case_number";
+      }
+      if (targetAuctionIds.length === 0 && typeof address === "string" && address.trim()) {
+        const targetKey = getGroupingKey(address);
+        const { houseNumber } = parseAddress(address);
+        if (targetKey && houseNumber) {
+          const r = await db.execute({
+            sql: "SELECT auction_id, address FROM foreclosure_auctions WHERE address LIKE ?",
+            args: [`${houseNumber} %`]
+          });
+          targetAuctionIds = r.rows.filter(row => getGroupingKey(row.address as string) === targetKey).map(row => row.auction_id);
+          matchMethod = "address_key";
+        }
+      }
+      // Último recurso: número de caso extraído por la IA, solo con coincidencia exacta.
+      if (targetAuctionIds.length === 0 && !auctionId && !cleanCase && aiCase) {
+        const r = await db.execute({ sql: "SELECT auction_id FROM foreclosure_auctions WHERE case_number = ?", args: [aiCase] });
+        targetAuctionIds = r.rows.map(row => row.auction_id);
+        matchMethod = "ai_case_number";
+      }
+    } catch (lookupErr: any) {
+      console.error(`[AUDIT DOC API DB LOOKUP ERROR]: ${lookupErr.message}`);
+    }
+
+    const MAX_TARGET_ROWS = 3; // duplicados del mismo expediente; más que esto indica ambigüedad
+    if (targetAuctionIds.length > MAX_TARGET_ROWS) {
+      console.warn(`[AUDIT DOC API] Coincidencia ambigua (${targetAuctionIds.length} filas vía ${matchMethod}). No se actualiza la BD.`);
+      targetAuctionIds = [];
+    }
+
+    if (targetAuctionIds.length > 0) {
       try {
+        const placeholders = targetAuctionIds.map(() => "?").join(", ");
         const updateRes = await db.execute({
           sql: `
             UPDATE foreclosure_auctions SET
@@ -2108,30 +1772,30 @@ Responde estrictamente en formato JSON válido con esta estructura:
               defendant = CASE WHEN ? IS NOT NULL AND ? != '' THEN ? ELSE defendant END,
               forensic_legal_story = CASE WHEN ? IS NOT NULL AND ? != '' THEN ? ELSE forensic_legal_story END,
               needs_manual_review = CASE WHEN ? > 0 THEN 0 ELSE needs_manual_review END
-            WHERE auction_id = ? OR (case_number IS NOT NULL AND case_number = ?) OR (address IS NOT NULL AND address LIKE ?)
+            WHERE auction_id IN (${placeholders})
           `,
           args: [
             debt, debt,
             appraisal, appraisal,
             secondaryLiens, secondaryLiens,
-            responseJson.plaintiff, responseJson.plaintiff, responseJson.plaintiff,
-            responseJson.defendant, responseJson.defendant, responseJson.defendant,
-            responseJson.explanation, responseJson.explanation, responseJson.explanation,
+            responseJson.plaintiff ?? null, responseJson.plaintiff ?? null, responseJson.plaintiff ?? null,
+            responseJson.defendant ?? null, responseJson.defendant ?? null, responseJson.defendant ?? null,
+            responseJson.explanation ?? null, responseJson.explanation ?? null, responseJson.explanation ?? null,
             debt,
-            auctionId || "",
-            caseNumber || responseJson.caseNumber || "",
-            address ? `%${address.split(",")[0].trim()}%` : ""
+            ...targetAuctionIds
           ]
         });
 
         if (updateRes.rowsAffected > 0) {
           updatedDb = true;
           cachedProspectos = null; // invalidar caché del mapa
-          console.log(`[AUDIT DOC API SUCCESS] Registro en Turso actualizado (${updateRes.rowsAffected} filas). Deuda: $${debt?.toLocaleString()}`);
+          console.log(`[AUDIT DOC API SUCCESS] ${updateRes.rowsAffected} fila(s) actualizada(s) vía ${matchMethod}. Deuda: $${debt?.toLocaleString()}`);
         }
       } catch (dbErr: any) {
         console.error(`[AUDIT DOC API DB ERROR]: ${dbErr.message}`);
       }
+    } else if (auctionId || caseNumber || address) {
+      console.warn(`[AUDIT DOC API] Sin coincidencia exacta para auctionId=${auctionId || "-"} case=${caseNumber || "-"} address=${address || "-"}. BD sin cambios.`);
     }
 
     return res.json({
@@ -2276,6 +1940,16 @@ async function startBackgroundGeocoding() {
     const bankruptcies = await db.execute("SELECT DISTINCT address FROM bankruptcies");
     bankruptcies.rows.forEach(r => { if (r.address) addresses.add(r.address as string); });
 
+    // Tablas que antes se omitían (sus leads nunca recibían pin en el mapa)
+    for (const table of ["pre_foreclosures", "tax_sales", "physical_distress", "financial_distress", "life_events", "landbank_inventory"]) {
+      try {
+        const extra = await db.execute(`SELECT DISTINCT address FROM ${table}`);
+        extra.rows.forEach(r => { if (r.address) addresses.add(r.address as string); });
+      } catch (tableErr: any) {
+        console.warn(`[BACKGROUND GEOCODER] No se pudo leer ${table}: ${tableErr.message}`);
+      }
+    }
+
     // Filtrar las direcciones que ya están en caché (consulta en lote para evitar consultas N+1 y sobrecargar Turso)
     const cacheRes = await db.execute("SELECT address FROM geocode_cache");
     const cachedSet = new Set(cacheRes.rows.map(r => r.address as string).filter(Boolean));
@@ -2341,10 +2015,13 @@ async function initializeServer() {
   }
 
   if (!process.env.VERCEL) {
-    app.listen(PORT, () => {
+    app.listen(PORT, HOST, () => {
       console.log(`\n========================================================`);
-      console.log(`🚀 TZEL TACTICAL MAP SERVER STARTED ON PORT ${PORT}`);
+      console.log(`🚀 TZEL TACTICAL MAP SERVER STARTED ON ${HOST}:${PORT}`);
       console.log(`👉 Open http://localhost:${PORT} in your browser`);
+      if (HOST !== "127.0.0.1" && !API_KEY) {
+        console.warn(`⚠️  HOST=${HOST} sin TZEL_API_KEY: los clientes remotos recibirán 401.`);
+      }
       console.log(`========================================================\n`);
     });
   }

@@ -10,6 +10,10 @@
       "use": "@vercel/static"
     },
     {
+      "src": "lands.html",
+      "use": "@vercel/static"
+    },
+    {
       "src": "logo.jpg",
       "use": "@vercel/static"
     },
@@ -20,12 +24,32 @@
     {
       "src": "street-view-icon.png",
       "use": "@vercel/static"
+    },
+    {
+      "src": "underwriting/offer_engine.js",
+      "use": "@vercel/static"
     }
   ],
   "routes": [
     {
       "src": "/api/(.*)",
       "dest": "tzel_map_server.ts"
+    },
+    {
+      "src": "/lands",
+      "dest": "lands.html"
+    },
+    {
+      "src": "/lands.html",
+      "dest": "lands.html"
+    },
+    {
+      "src": "/terrenos",
+      "dest": "lands.html"
+    },
+    {
+      "src": "/terrenos.html",
+      "dest": "lands.html"
     },
     {
       "src": "/logo.jpg",
@@ -38,6 +62,10 @@
     {
       "src": "/street-view-icon.png",
       "dest": "street-view-icon.png"
+    },
+    {
+      "src": "/offer_engine.js",
+      "dest": "underwriting/offer_engine.js"
     },
     {
       "src": "/(.*)",

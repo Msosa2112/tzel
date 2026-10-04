@@ -1,7 +1,7 @@
 import { createClient } from "@supabase/supabase-js";
 
 const url = "https://ddwyutisxymuvofkjhpz.supabase.co";
-const anonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRkd3l1dGlzeHltdXZvZmtqaHB6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcwNTMzOTUsImV4cCI6MjA5MjYyOTM5NX0.MUsRX_h5TZJ2LeS-iXFpdQK3bIV6GOBO2-DW1m9MdsA";
+const anonKey = (process.env.SUPABASE_ANON_KEY || "");
 const sb = createClient(url, anonKey);
 
 function parseNotes(notesText: string, lead: any) {

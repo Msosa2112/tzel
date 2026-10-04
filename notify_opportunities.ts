@@ -1117,7 +1117,7 @@ async function notifyOpportunities(mode?: 'legal' | 'physical') {
 
     // --- CÁLCULOS FINANCIEROS (UNDERWRITING) ---
     const violationKeywords = lead.violations.map(v => v.violation_type as string);
-    const rehab = calculateRehab(lead.sqft || null, violationKeywords);
+    const rehab = calculateRehab(lead.sqft || null, violationKeywords, lead.mlsValue || 0);
     const hiddenDebt = lead.hiddenMortgages || 0;
     
     // MAO restando deudas ocultas

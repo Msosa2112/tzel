@@ -4,6 +4,8 @@
   "description": "OSINT Real Estate engine for Surplus Funds and Distressed Properties",
   "main": "dist/fetch_osint.js",
   "scripts": {
+    "test": "bun test tests",
+    "typecheck": "tsc --noEmit -p .",
     "pipeline:realestate": "bun run_pipeline.ts",
     "pipeline:legal": "bun run_pipeline_legal.ts",
     "pipeline:physical": "bun run_pipeline_physical.ts",

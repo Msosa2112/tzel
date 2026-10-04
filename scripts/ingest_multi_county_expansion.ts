@@ -1,68 +1,7 @@
+import { parseAddress, getUnitInfo, getGroupingKey, buildPropertyId } from "../utils/address_key";
 import { db } from '../db';
 import { calculateInstitutionalUnderwriting } from '../underwriting/underwriter';
 
-const NOISE_WORDS = new Set([
-  "st", "street", "ave", "avenue", "rd", "road", "ln", "lane", "dr", "drive", 
-  "ct", "court", "blvd", "boulevard", "way", "pl", "place", "hwy", "highway", 
-  "rte", "route", "cir", "circle", "ter", "terrace", "trl", "trail", "pkwy", "parkway",
-  "apt", "apartment", "unit", "ste", "suite", "fl", "floor", 
-  "n", "north", "s", "south", "e", "east", "w", "west", 
-  "ky", "in", "jefferson", "clark", "floyd", "fayette", "kenton", "boone", "marion"
-]);
-
-const UNIT_INDICATORS = ["apt", "unit", "ste", "suite", "#", "apartment"];
-
-function parseAddress(address: string): { houseNumber: string | null; coreWords: string[] } {
-  let part1 = address.split(",")[0].trim().toLowerCase();
-  for (const indicator of UNIT_INDICATORS) {
-    const idx = part1.indexOf(indicator);
-    if (idx !== -1) {
-      part1 = part1.substring(0, idx).trim();
-    }
-  }
-  part1 = part1.replace(/[^a-z0-9\s]/g, " ");
-  const words = part1.split(/\s+/).filter(w => w.length > 0);
-  if (words.length === 0) return { houseNumber: null, coreWords: [] };
-  let houseNumber: string | null = null;
-  let streetStartIndex = 0;
-  if (/^\d+/.test(words[0])) {
-    houseNumber = words[0];
-    streetStartIndex = 1;
-  }
-  const coreWords: string[] = [];
-  for (let i = streetStartIndex; i < words.length; i++) {
-    const w = words[i];
-    if (NOISE_WORDS.has(w)) continue;
-    if (/^\d{5}$/.test(w)) continue;
-    coreWords.push(w);
-  }
-  return { houseNumber, coreWords };
-}
-
-function getUnitInfo(address: string): string {
-  const cleanAddress = address.toLowerCase();
-  for (const indicator of ["apt", "unit", "ste", "suite", "#", "apartment"]) {
-    const idx = cleanAddress.indexOf(indicator);
-    if (idx !== -1) {
-      const rest = cleanAddress.substring(idx);
-      const parts = rest.split(",");
-      const unitPart = parts[0].trim().replace(/[^a-z0-9]/g, "");
-      if (unitPart) return unitPart;
-    }
-  }
-  return "";
-}
-
-function getGroupingKey(address: string): string {
-  const parsed = parseAddress(address);
-  const unit = getUnitInfo(address);
-  if (!parsed.houseNumber) {
-    const base = address.toLowerCase().replace(/[^a-z0-9]/g, "");
-    return unit ? `${base}_${unit}` : base;
-  }
-  const baseKey = `${parsed.houseNumber}_${parsed.coreWords.join("_")}`;
-  return unit ? `${baseKey}_${unit}` : baseKey;
-}
 
 // Expanded Regional Court Data Feeds (Fayette, Kenton, Boone, Marion)
 const EXPANDED_COURT_LEADS = [
@@ -238,7 +177,7 @@ async function ingestMultiCountyExpansion() {
 
   for (const lead of EXPANDED_COURT_LEADS) {
     const normKey = getGroupingKey(lead.address);
-    const propertyId = `PROP_${normKey.replace(/[^a-z0-9]/g, '_').substring(0, 40)}`;
+    const propertyId = buildPropertyId(normKey);
     const auctionId = `AUC_EXP_${lead.case_number.replace(/[^a-z0-9]/gi, '_')}`;
     const personId = `PER_${normKey.substring(0, 15)}_${lead.defendant.replace(/[^a-z0-9]/gi, '_').substring(0, 20)}`;
     const eventId = `EV_AUC_${auctionId}`;

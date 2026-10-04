@@ -35,7 +35,7 @@ export async function runPdfAppraisalWorker() {
     const rows = pendingAuctions.rows;
     console.log(`[PDF WORKER] Encontrados ${rows.length} expedientes con PDF judicial pendiente de extracción completa.`);
 
-    const models = ["gemini-3.1-pro-preview", "gemini-3.8-flash"];
+    const models = [process.env.GEMINI_MODEL || "gemini-3.8-flash", "gemini-3.1-pro-preview"];
 
     for (let i = 0; i < rows.length; i++) {
       const row = rows[i];

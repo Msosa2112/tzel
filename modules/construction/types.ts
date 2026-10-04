@@ -73,6 +73,7 @@ export interface ConstructionLead {
   permitNumber?: string;
   insurancePayerLikely?: boolean;
   telegramSent?: boolean;
+  suggestedResponse?: string;
   createdAt?: string;
 }
 
@@ -85,4 +86,5 @@ export interface ClassifierResult {
   summarySpanish?: string;
   bondingRequired?: boolean;
   deadline?: string;
+  suggestedResponse?: string;
 }

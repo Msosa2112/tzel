@@ -3315,6 +3315,270 @@
     .source-perf-table tr:hover td {
       background: rgba(255, 255, 255, 0.03);
     }
+
+    /* ========================================================================= */
+    /* LOUISVILLE LAND & LOT FINDER STYLES                                      */
+    /* ========================================================================= */
+    .lands-vault-btn {
+      width: 100%;
+      background: linear-gradient(135deg, rgba(16, 185, 129, 0.15) 0%, rgba(6, 78, 59, 0.3) 100%);
+      border: 1px solid rgba(16, 185, 129, 0.4);
+      color: #34d399;
+      padding: 12px;
+      border-radius: 30px;
+      font-size: 0.88rem;
+      font-family: 'Inter', sans-serif;
+      font-weight: 700;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      box-shadow: 0 2px 10px rgba(16, 185, 129, 0.15);
+      transition: all 0.25s ease;
+      outline: none;
+    }
+    .lands-vault-btn:hover {
+      background: linear-gradient(135deg, rgba(16, 185, 129, 0.25) 0%, rgba(6, 78, 59, 0.45) 100%);
+      border-color: #34d399;
+      box-shadow: 0 0 15px rgba(16, 185, 129, 0.35);
+      transform: translateY(-1px);
+    }
+    body.dark-mode .lands-vault-btn {
+      background: rgba(16, 185, 129, 0.15);
+      border-color: rgba(16, 185, 129, 0.35);
+      color: #34d399;
+    }
+
+    .lands-hud-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+    .lands-kpi-card {
+      background: rgba(15, 23, 42, 0.7);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 10px;
+      padding: 14px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      position: relative;
+      overflow: hidden;
+      backdrop-filter: blur(10px);
+    }
+    .lands-kpi-card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0; height: 2px;
+      background: linear-gradient(90deg, #10b981, #06b6d4);
+    }
+    .lands-kpi-num {
+      font-size: 1.5rem;
+      font-weight: 900;
+      color: #fff;
+      font-family: 'Space Grotesk', 'Inter', sans-serif;
+    }
+    .lands-kpi-label {
+      font-size: 0.72rem;
+      color: #94a3b8;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      font-weight: 700;
+    }
+
+    .lands-filter-bar {
+      background: rgba(15, 23, 42, 0.85);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 10px;
+      padding: 12px 16px;
+      margin-bottom: 16px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+    }
+    .lands-search-input {
+      flex: 1;
+      min-width: 220px;
+      background: rgba(0, 0, 0, 0.4);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 6px;
+      padding: 8px 12px;
+      color: #fff;
+      font-size: 0.82rem;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    .lands-search-input:focus {
+      border-color: #10b981;
+      box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.2);
+    }
+    .lands-select {
+      background: rgba(0, 0, 0, 0.4);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 6px;
+      padding: 8px 10px;
+      color: #e2e8f0;
+      font-size: 0.78rem;
+      outline: none;
+      cursor: pointer;
+    }
+    .lands-select:focus {
+      border-color: #10b981;
+    }
+
+    .lands-cards-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+      gap: 14px;
+      padding-bottom: 30px;
+    }
+    .land-card {
+      background: rgba(15, 23, 42, 0.8);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 10px;
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      transition: all 0.2s ease;
+      position: relative;
+    }
+    .land-card:hover {
+      border-color: rgba(16, 185, 129, 0.5);
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5), 0 0 15px rgba(16, 185, 129, 0.15);
+      transform: translateY(-2px);
+    }
+    .land-card.buildable {
+      border-left: 3px solid #10b981;
+    }
+    .land-card.unbuildable {
+      border-left: 3px solid #64748b;
+    }
+    .land-badge-buildable {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 0.68rem;
+      font-weight: 800;
+      padding: 3px 8px;
+      border-radius: 4px;
+      background: rgba(16, 185, 129, 0.15);
+      color: #34d399;
+      border: 1px solid rgba(16, 185, 129, 0.3);
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+    }
+    .land-badge-sideyard {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 0.68rem;
+      font-weight: 800;
+      padding: 3px 8px;
+      border-radius: 4px;
+      background: rgba(100, 116, 139, 0.15);
+      color: #94a3b8;
+      border: 1px solid rgba(100, 116, 139, 0.3);
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+    }
+    .land-price-tag {
+      font-size: 1.15rem;
+      font-weight: 900;
+      color: #10b981;
+      font-family: 'Space Grotesk', sans-serif;
+    }
+    .land-value-tag {
+      font-size: 0.78rem;
+      color: #94a3b8;
+    }
+    .land-actions {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px;
+      margin-top: 6px;
+    }
+    .land-btn {
+      padding: 6px 10px;
+      border-radius: 6px;
+      font-size: 0.72rem;
+      font-weight: 700;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 5px;
+      transition: all 0.2s;
+      border: none;
+      text-decoration: none;
+    }
+    .land-btn-map {
+      background: rgba(16, 185, 129, 0.15);
+      color: #34d399;
+      border: 1px solid rgba(16, 185, 129, 0.3);
+    }
+    .land-btn-map:hover {
+      background: #10b981;
+      color: #0f172a;
+    }
+    .land-btn-calc {
+      background: rgba(6, 182, 212, 0.15);
+      color: #22d3ee;
+      border: 1px solid rgba(6, 182, 212, 0.3);
+    }
+    .land-btn-calc:hover {
+      background: #06b6d4;
+      color: #0f172a;
+    }
+    .land-btn-pva {
+      background: rgba(255, 255, 255, 0.05);
+      color: #cbd5e1;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+    .land-btn-pva:hover {
+      background: rgba(255, 255, 255, 0.12);
+      color: #fff;
+    }
+    .land-btn-crm {
+      background: rgba(245, 158, 11, 0.15);
+      color: #fbbf24;
+      border: 1px solid rgba(245, 158, 11, 0.3);
+    }
+    .land-btn-crm:hover {
+      background: #f59e0b;
+      color: #0f172a;
+    }
+
+    /* Modal Calculadora Infill */
+    .infill-modal-backdrop {
+      display: none;
+      position: fixed;
+      top: 0; left: 0; width: 100vw; height: 100vh;
+      background: rgba(0, 0, 0, 0.78);
+      backdrop-filter: blur(8px);
+      z-index: 10000;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      box-sizing: border-box;
+    }
+    .infill-modal-backdrop.active {
+      display: flex;
+    }
+    .infill-modal-box {
+      background: #0c121e;
+      border: 1px solid rgba(16, 185, 129, 0.4);
+      border-radius: 14px;
+      width: 100%;
+      max-width: 680px;
+      max-height: 90vh;
+      overflow-y: auto;
+      padding: 24px;
+      box-shadow: 0 20px 50px rgba(0,0,0,0.8), 0 0 30px rgba(16, 185, 129, 0.2);
+    }
   </style>
 </head>
 <body>
@@ -3488,8 +3752,9 @@
         </div>
       </div>
 
+
       <!-- Surplus Funds Action Button -->
-      <div class="sidebar-section" id="investment-surplus-section">
+      <div class="sidebar-section" style="padding-top: 0;" id="investment-surplus-section">
         <button id="btn-surplus-vault" class="surplus-vault-btn">
           <i data-lucide="dollar-sign"></i> <span data-i18n="btn_surplus_vault">Bóveda de Excedentes</span>
         </button>
@@ -3751,7 +4016,7 @@
             </div>
             <div class="uw-item">
               <span class="uw-label" data-i18n="uw_wholesale_fee_label">Wholesale Fee Proyectado</span>
-              <span class="uw-value" id="uw-wholesale-fee" style="color: var(--color-radar-green); font-weight: 800;">+$15,000</span>
+              <span class="uw-value" id="uw-wholesale-fee" style="color: var(--color-radar-green); font-weight: 800;">-</span>
             </div>
           </div>
           <div class="uw-alert-banner" id="uw-alert" style="display: none;">
@@ -4429,41 +4694,42 @@
             <!-- Variables breakdown (Verified vs Estimated vs Assumptions) -->
             <div style="display: flex; flex-direction: column; gap: 4px; font-size: 0.72rem; background: rgba(0,0,0,0.25); padding: 8px; border-radius: 6px;">
               <div style="display: flex; justify-content: space-between; align-items: center;">
-                <span>ARV Mercado: <strong id="acq-offer-var-arv">$280,000</strong></span>
+                <span>ARV Mercado: <strong id="acq-offer-var-arv">-</strong></span>
                 <span class="var-tag estimated">Estimated</span>
               </div>
               <div style="display: flex; justify-content: space-between; align-items: center;">
-                <span>Reparaciones Estimadas: <strong id="acq-offer-var-repairs">$45,000</strong></span>
+                <span>Reparaciones Estimadas: <strong id="acq-offer-var-repairs">-</strong></span>
                 <span class="var-tag estimated">Estimated</span>
               </div>
               <div style="display: flex; justify-content: space-between; align-items: center;">
-                <span>Costos Cierre / Holding: <strong id="acq-offer-var-costs">$18,000</strong></span>
+                <span>Base del Rehab: <strong id="acq-offer-var-costs">-</strong></span>
                 <span class="var-tag assumption">Assumption</span>
               </div>
               <div style="display: flex; justify-content: space-between; align-items: center;">
-                <span>Deuda / Gravámenes Registrados: <strong id="acq-offer-var-debt" style="color: #f87171;">$82,000</strong></span>
+                <span>Deuda / Gravámenes Registrados: <strong id="acq-offer-var-debt" style="color: #f87171;">-</strong></span>
                 <span class="var-tag verified">Verified</span>
               </div>
             </div>
 
-            <!-- 3 Offer Boxes -->
+            <!-- 3 Offer Boxes (AGENTS.md §3.5: 65% / 70% / 75% ARV − Rehab) -->
             <div class="offer-range-grid">
               <div class="offer-box cons">
-                <span class="offer-lbl">Conservative</span>
-                <span class="offer-val" id="acq-offer-cons">$92,000</span>
-                <span style="font-size: 0.6rem; color: #94a3b8;">Wholesale / Max Safety</span>
+                <span class="offer-lbl">Conservadora</span>
+                <span class="offer-val" id="acq-offer-cons">-</span>
+                <span style="font-size: 0.6rem; color: #94a3b8;">65% ARV − Rehab</span>
               </div>
               <div class="offer-box target">
-                <span class="offer-lbl">Target Win-Win</span>
-                <span class="offer-val" id="acq-offer-target">$108,000</span>
-                <span style="font-size: 0.6rem; color: #94a3b8;">Ideal Acquisition</span>
+                <span class="offer-lbl">Target</span>
+                <span class="offer-val" id="acq-offer-target">-</span>
+                <span style="font-size: 0.6rem; color: #94a3b8;">70% ARV − Rehab</span>
               </div>
               <div class="offer-box max">
-                <span class="offer-lbl">Max MAO</span>
-                <span class="offer-val" id="acq-offer-max">$125,000</span>
-                <span style="font-size: 0.6rem; color: #94a3b8;">Hard Ceiling Limit</span>
+                <span class="offer-lbl">MAO</span>
+                <span class="offer-val" id="acq-offer-max">-</span>
+                <span style="font-size: 0.6rem; color: #94a3b8;">75% ARV − Rehab</span>
               </div>
             </div>
+            <div id="acq-offer-warning" style="display: none; font-size: 0.68rem; color: #fbbf24; margin-top: 6px; line-height: 1.4;"></div>
           </div>
 
           <!-- FOLLOW-UP ENGINE & TIMELINE -->
@@ -4596,13 +4862,142 @@
     </div>
   </div>
 
+
   <!-- Leaflet JS CDN -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
-  <!-- Lucide Icons CDN -->
-  <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- Lucide Icons CDN (versión fijada: @latest puede romper la UI sin aviso) -->
+  <script src="https://unpkg.com/lucide@0.469.0/dist/umd/lucide.min.js"></script>
+  <!-- Motor de ofertas único (AGENTS.md §3.5), compartido con el servidor -->
+  <script src="/offer_engine.js"></script>
   
   <!-- Client Dashboard Code -->
   <script>
+    // ===== Seguridad: API key para /api/* cuando el cliente no es localhost (p.ej. Vercel) =====
+    (function installTzelApiAuth() {
+      const nativeFetch = window.fetch.bind(window);
+      const KEY_STORAGE = 'tzel_api_key';
+      const isApiUrl = (input) => {
+        const url = typeof input === 'string' ? input : (input && input.url) || '';
+        return url.startsWith('/api/') || url.startsWith(window.location.origin + '/api/');
+      };
+      const withKey = (init) => {
+        const key = localStorage.getItem(KEY_STORAGE);
+        if (!key) return init || {};
+        const headers = new Headers((init && init.headers) || {});
+        headers.set('x-tzel-key', key);
+        return Object.assign({}, init || {}, { headers });
+      };
+      window.fetch = async function (input, init) {
+        if (!isApiUrl(input)) return nativeFetch(input, init);
+        let res = await nativeFetch(input, withKey(init));
+        if (res.status === 401) {
+          const entered = window.prompt('TZEL: introduce la API key de acceso (TZEL_API_KEY)');
+          if (entered && entered.trim()) {
+            localStorage.setItem(KEY_STORAGE, entered.trim());
+            res = await nativeFetch(input, withKey(init));
+          }
+        }
+        return res;
+      };
+    })();
+
+    // ===== Helpers compartidos =====
+    // Escapa texto proveniente de scrapers / IA antes de interpolarlo en innerHTML.
+    function escapeHtml(value) {
+      if (value === null || value === undefined) return '';
+      return String(value)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+    window.escapeHtml = escapeHtml;
+
+    // Argumento string seguro dentro de un atributo onclick="fn(...)" (soporta O'BRIEN, comillas, etc.).
+    function jsAttrArg(value) {
+      return escapeHtml(JSON.stringify(value === null || value === undefined ? '' : String(value)));
+    }
+    window.jsAttrArg = jsAttrArg;
+
+    // Texto de IA/expedientes: escapa todo y solo reintroduce saltos de línea y **negritas**.
+    function formatAiText(text) {
+      return escapeHtml(text || '')
+        .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+        .replace(/\r?\n/g, '<br>');
+    }
+
+    // AGENTS.md §2.A: isUnknownOwner = !ownerName || /desconocido|unknown|no especificado/i (el servidor aplica la misma regla al score).
+    const UNKNOWN_OWNER_EXACT = new Set(['', 'no especificado', 'dueño desconocido', 'unknown', 'unknown defendant', 'unknown plaintiff', 'propietario inmueble', 'deudor desconocido', 'heredero desconocido', 'n/a', 'na', 'null', 'none', 'undefined']);
+    function isUnknownOwnerName(name) {
+      if (!name) return true;
+      const lower = String(name).trim().toLowerCase();
+      if (UNKNOWN_OWNER_EXACT.has(lower)) return true;
+      if (/desconocido|unknown|no especificado/.test(lower)) return true;
+      return false;
+    }
+    window.isUnknownOwnerName = isUnknownOwnerName;
+
+    // ===== Ofertas: motor único 65/70/75% ARV − Rehab (underwriting/offer_engine.js) =====
+    function getLeadTotalDebt(lead) {
+      if (!lead) return 0;
+      return (lead.primaryDebt || 0) + (lead.hiddenMortgages || 0) + (lead.hiddenLiensAmount || 0);
+    }
+
+    // AGENTS.md §2.A: expediente incompleto → ofertas en "Pendiente Valor".
+    function isIncompleteLead(lead, marketValueOverride) {
+      const mv = typeof marketValueOverride === 'number' ? marketValueOverride : getMarketValue(lead);
+      return getLeadTotalDebt(lead) === 0 || mv <= 0 || isUnknownOwnerName(lead && lead.ownerName);
+    }
+
+    // arvOverride: recalcular con otro ARV (p.ej. MCA cuando no hay avalúo PVA).
+    function getOfferTiers(lead, arvOverride) {
+      if (!lead) return null;
+      const arv = typeof arvOverride === 'number' ? arvOverride : getMarketValue(lead);
+      const engine = window.TzelOfferEngine;
+      if (!engine) {
+        return (lead.offerTiers && lead.offerTiers.arv === Math.round(arv)) ? lead.offerTiers : null;
+      }
+      const keywords = []
+        .concat((lead.violations || []).map(v => v.violation_type), (lead.physicalDistress || []).map(p => p.distress_type))
+        .filter(Boolean);
+      const appraisal = (lead.auctions && lead.auctions[0] && Number(lead.auctions[0].appraisal_value)) || 0;
+      return engine.computeOfferTiers({
+        arv,
+        sqft: lead.sqft,
+        keywords,
+        totalDebt: getLeadTotalDebt(lead),
+        state: lead.state,
+        courtAppraisal: appraisal
+      });
+    }
+
+    // Devuelve { text, color, title } listo para pintar un nivel de oferta sin inventar valores.
+    function formatOfferTier(tiers, field, opts) {
+      const dict = (typeof translations !== 'undefined' && (translations[currentLang] || translations.es)) || {};
+      const options = opts || {};
+      if (options.incomplete || !tiers || !tiers.hasValue) {
+        return { text: dict.offer_pending_value || 'Pendiente Valor', color: '#64748b', title: '' };
+      }
+      const amount = tiers[field] || 0;
+      if (amount <= 0) {
+        return { text: dict.offer_not_viable || 'No viable', color: '#ef4444', title: 'El rehab estimado supera el descuento sobre el ARV' };
+      }
+      return {
+        text: '$' + amount.toLocaleString() + (tiers.belowDebt ? ' ⚠' : ''),
+        color: tiers.belowDebt ? '#f59e0b' : 'var(--color-radar-green)',
+        title: tiers.belowDebt ? (dict.offer_below_debt || 'La oferta máxima no cubre la deuda registrada (requiere negociación / short sale)') : ''
+      };
+    }
+
+    function describeRehabBasis(tiers) {
+      if (!tiers || !tiers.hasValue) return '-';
+      const sev = { cosmetic: 'cosmético', moderate: 'moderado', severe: 'severo' }[tiers.severity] || tiers.severity;
+      if (tiers.rehabBasis === 'sqft') return `Por SqFt real (${sev})`;
+      if (tiers.rehabBasis === 'arv_pct') return `% del ARV sin SqFt (${sev}) — verificar en inspección`;
+      return 'Requiere inspección';
+    }
+
     const SVG_ICONS = {
       star: `<svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>`,
       shieldAlert: `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 9.7a1 1 0 0 1-.68 0C7.5 20.5 4 18 4 13V6a1 1 0 0 1 .76-.97l8-2a1 1 0 0 1 .48 0l8 2A1 1 0 0 1 20 6z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>`,
@@ -4612,7 +5007,8 @@
       user: `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>`,
       tornado: `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 4H3"/><path d="M19 8H5"/><path d="M17 12H7"/><path d="M15 16H9"/><path d="M13 20h-2"/></svg>`,
       cloudLightning: `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 16.9A5 5 0 0 0 18 7h-1.26a8 8 0 1 0-11.62 8.58M13 11l-4 6h6l-3 5"/></svg>`,
-      landmark: `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="22" x2="21" y2="22"/><line x1="6" y1="18" x2="6" y2="11"/><line x1="10" y1="18" x2="10" y2="11"/><line x1="14" y1="18" x2="14" y2="11"/><line x1="18" y1="18" x2="18" y2="11"/><polygon points="12 2 20 7 4 7"/></svg>`
+      landmark: `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="22" x2="21" y2="22"/><line x1="6" y1="18" x2="6" y2="11"/><line x1="10" y1="18" x2="10" y2="11"/><line x1="14" y1="18" x2="14" y2="11"/><line x1="18" y1="18" x2="18" y2="11"/><polygon points="12 2 20 7 4 7"/></svg>`,
+      trees: `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 10v.2A3 3 0 0 1 8.9 16H5a3 3 0 0 1-1-5.8V10a3 3 0 0 1 6 0Z"/><path d="M7 16v6"/><path d="M13 19v3"/><path d="M12 19h8.3a1 1 0 0 0 .7-1.7L18 14h.3a1 1 0 0 0 .7-1.7L16 9h.2a1 1 0 0 0 .8-1.7L13 3l-1.4 1.8"/></svg>`
     };
 
     let map;
@@ -4647,10 +5043,12 @@
         pill_others: "Otros",
         pill_multidistress: "Multi-Distress",
         pill_favorites: "Favoritos",
+        pill_lands: "Terrenos",
         financial_status_title: "Estatus Financiero",
         btn_deals: "BUENOS DEALS",
         btn_underwater: "BAJO EL AGUA",
         btn_unvalued: "ESPERANDO POR DEUDA",
+        btn_lands_vault: "Buscador de Terrenos (808)",
         btn_surplus_vault: "Bóveda de Excedentes",
         btn_zerodebt_vault: "Bóveda de Deuda Cero",
         targets_list_title: "Lista de Objetivos",
@@ -4693,12 +5091,12 @@
         conf_owner: "Titular Legal",
         conf_debt: "Gravámenes",
         underwriting_title: "Underwriting Multicapa & Precios Objetivo",
-        uw_arv_label: "ARV Proyectado",
+        uw_arv_label: "ARV (Valor de Mercado)",
         uw_rehab_label: "Rehab Estimado",
-        uw_target_contract_label: "Target Contract Price",
-        uw_walkaway_label: "Walk-Away Price (Límite)",
-        uw_auction_maxbid_label: "Auction Max Bid",
-        uw_wholesale_fee_label: "Wholesale Fee Proyectado",
+        uw_target_contract_label: "Oferta Target (70% ARV − Rehab)",
+        uw_walkaway_label: "MAO / Límite (75% ARV − Rehab)",
+        uw_auction_maxbid_label: "Conservadora / Puja Subasta (65%)",
+        uw_wholesale_fee_label: "Margen Wholesale (MAO − Target)",
         uw_search_commercial_value: "Buscar valor comercial:",
         mca_comps_title: "Comparables de Mercado (MCA)",
         mca_suggested_label: "ARV MCA Sugerido:",
@@ -4745,7 +5143,12 @@
         comp_view_tactical: "Ver Ficha Táctica",
         card_pva_val: "Valor PVA",
         card_total_debt: "Deuda Total",
-        card_mpo_offer: "Oferta MPO",
+        card_mpo_offer: "Oferta Target (70%)",
+        offer_pending_value: "Pendiente Valor",
+        lbl_beds: "hab.",
+        lbl_baths: "baños",
+        offer_not_viable: "No viable",
+        offer_below_debt: "La oferta máxima no cubre la deuda registrada (requiere negociación / short sale)",
         card_equity: "Equidad",
         card_waiting_debt: "Por publicar",
         card_compare_chk: "Comparar",
@@ -4778,10 +5181,12 @@
         pill_others: "Others",
         pill_multidistress: "Multi-Distress",
         pill_favorites: "Favorites",
+        pill_lands: "Vacant Lots",
         financial_status_title: "Financial Status",
         btn_deals: "GOOD DEALS",
         btn_underwater: "UNDERWATER",
         btn_unvalued: "WAITING FOR DEBT",
+        btn_lands_vault: "Land Finder (808)",
         btn_surplus_vault: "Surplus Funds Vault",
         btn_zerodebt_vault: "Zero Debt Vault",
         targets_list_title: "Target List",
@@ -4824,12 +5229,12 @@
         conf_owner: "Legal Title",
         conf_debt: "Encumbrances",
         underwriting_title: "Multilayer Underwriting & Target Pricing",
-        uw_arv_label: "Projected ARV",
+        uw_arv_label: "ARV (Market Value)",
         uw_rehab_label: "Estimated Rehab",
-        uw_target_contract_label: "Target Contract Price",
-        uw_walkaway_label: "Walk-Away Price (Limit)",
-        uw_auction_maxbid_label: "Auction Max Bid",
-        uw_wholesale_fee_label: "Projected Wholesale Fee",
+        uw_target_contract_label: "Target Offer (70% ARV − Rehab)",
+        uw_walkaway_label: "MAO / Limit (75% ARV − Rehab)",
+        uw_auction_maxbid_label: "Conservative / Auction Bid (65%)",
+        uw_wholesale_fee_label: "Wholesale Margin (MAO − Target)",
         uw_search_commercial_value: "Search commercial value:",
         mca_comps_title: "Market Comparison Analysis (MCA)",
         mca_suggested_label: "Suggested MCA ARV:",
@@ -4876,7 +5281,12 @@
         comp_view_tactical: "View Tactical Card",
         card_pva_val: "PVA Value",
         card_total_debt: "Total Debt",
-        card_mpo_offer: "MPO Offer",
+        card_mpo_offer: "Target Offer (70%)",
+        offer_pending_value: "Pending Value",
+        lbl_beds: "beds",
+        lbl_baths: "baths",
+        offer_not_viable: "Not viable",
+        offer_below_debt: "Max offer does not cover recorded debt (requires negotiation / short sale)",
         card_equity: "Equity",
         card_waiting_debt: "Pending publication",
         card_compare_chk: "Compare",
@@ -5558,10 +5968,19 @@
           const dayAndYear = parts[1].trim();
           const dayYearParts = dayAndYear.split(" ");
           const day = parseInt(dayYearParts[0]);
-          const year = parseInt(dayYearParts[1] || "2026");
+          const explicitYear = parseInt(dayYearParts[1]);
           
           if (months[monthName] !== undefined && !isNaN(day)) {
-            dateObj = new Date(year, months[monthName], day);
+            if (!isNaN(explicitYear)) {
+              dateObj = new Date(explicitYear, months[monthName], day);
+            } else {
+              // Sin año: año actual, o el siguiente si la fecha quedaría >6 meses en el pasado (igual que el servidor)
+              const now = new Date();
+              dateObj = new Date(now.getFullYear(), months[monthName], day);
+              if (now.getTime() - dateObj.getTime() > 183 * 24 * 60 * 60 * 1000) {
+                dateObj = new Date(now.getFullYear() + 1, months[monthName], day);
+              }
+            }
           }
         }
         else {
@@ -5635,7 +6054,7 @@
         }
 
         // Filtro Financiero (Buenos Deals vs Bajo el Agua vs Esperando por Deuda)
-        const isUnknownOwner = !lead.ownerName || /desconocido|unknown|no especificado/i.test(lead.ownerName.trim());
+        const isUnknownOwner = isUnknownOwnerName(lead.ownerName);
         const isWaitingDebt = totalDebt === 0 || marketValue <= 0 || isUnknownOwner;
         const isUnderwater = marketValue > 0 && totalDebt > marketValue;
         
@@ -5687,8 +6106,6 @@
                           (lead.divorces && lead.divorces.length > 0) || 
                           (lead.bankruptcies && lead.bankruptcies.length > 0);
 
-        if (showStackOnly && !lead.isHighMotivation) return false;
-        
         // Check if it matches any of the active category filters
         let matchesCategory = false;
         if (showExecution && hasAuctions) matchesCategory = true;
@@ -5718,8 +6135,8 @@
         const totalDebt = (lead.primaryDebt || 0) + (lead.hiddenMortgages || 0) + (lead.hiddenLiensAmount || 0);
         const marketValue = getMarketValue(lead);
         const equitySpread = marketValue - totalDebt;
-        const df = lead.state === 'KY' ? 0.66 : (lead.isHighMotivation ? 0.70 : 0.75);
-        const mpo = Math.max(0, Math.round((marketValue * df) - totalDebt));
+        const offerTiers = getOfferTiers(lead, marketValue);
+        const targetOffer = formatOfferTier(offerTiers, 'target', { incomplete: isIncompleteLead(lead, marketValue) });
 
         // Render marker on Map (only if geocoded successfully)
         if (hasCoords && !isNaN(lead.lat) && !isNaN(lead.lon)) {
@@ -5727,17 +6144,23 @@
           let svgIconKey = 'scale';
           let markerClass = 'others';
 
+          const isLot = lead.propertyType === 'Lot' || (lead.landbankInfo && lead.landbankInfo.property_type === 'Lot');
           const hasAuctions = lead.auctions && lead.auctions.length > 0;
           const hasScheduledAuction = hasAuctions && lead.auctions.some(auc => getDaysRemaining(auc.auction_date) !== null);
           const hasPhysical = (lead.physicalDistress && lead.physicalDistress.length > 0) || (lead.violations && lead.violations.length > 0);
           const isFav = favoriteKeys.includes(lead.groupingKey);
-          const isUnknownOwner = !lead.ownerName || /desconocido|unknown|no especificado/i.test(lead.ownerName.trim());
+          const isUnknownOwner = isUnknownOwnerName(lead.ownerName);
           const isUnvaluedOrIncomplete = totalDebt === 0 || marketValue <= 0 || isUnknownOwner;
 
           if (isFav) {
             markerColor = '#fbbf24';
             svgIconKey = 'star';
             markerClass = 'favorite-marker';
+          } else if (isLot) {
+            // TERRENO / LOTE VACÍO OFICIAL (PIN ESMERALDA)
+            markerColor = '#10b981';
+            svgIconKey = 'trees';
+            markerClass = 'lot-marker';
           } else if (isUnvaluedOrIncomplete) {
             // EXPEDIENTE INCOMPLETO / ESPERANDO VALOR O DEUDA (PIN RELOJ SLATE)
             markerColor = '#64748b';
@@ -5791,18 +6214,18 @@
 
           const popupPhotoUrl = lead.photoUrls && lead.photoUrls.length > 0 ? lead.photoUrls[0] : null;
           const popupPhotoHtml = popupPhotoUrl
-            ? `<img class="popup-photo" src="${popupPhotoUrl}" alt="Foto Propiedad">`
+            ? `<img class="popup-photo" src="${escapeHtml(popupPhotoUrl)}" alt="Foto Propiedad">`
             : '';
 
           // Popup Content
           const popupContent = `
             <div style="position: relative; overflow: visible; width: 100%;">
-              <div class="popup-title">${lead.displayAddress}</div>
+              <div class="popup-title">${escapeHtml(lead.displayAddress)}</div>
               <div class="popup-body">
                 ${popupPhotoHtml}
                 <div class="popup-row">
                   <span class="popup-row-label">${dict.prop_owner_label}:</span>
-                  <span class="popup-row-value">${lead.ownerName}</span>
+                  <span class="popup-row-value">${escapeHtml(lead.ownerName)}</span>
                 </div>
                 <div class="popup-row">
                   <span class="popup-row-label">${dict.card_pva_val}:</span>
@@ -5814,11 +6237,11 @@
                 </div>
                 <div class="popup-row">
                   <span class="popup-row-label">${dict.card_equity}:</span>
-                  <span class="popup-row-value" style="color: ${marketValue > 0 ? (equitySpread > 40000 ? 'var(--color-radar-green)' : (equitySpread < 0 ? '#ef4444' : 'var(--text-main)')) : 'var(--text-muted)'}">${marketValue > 0 ? '$' + equitySpread.toLocaleString() : (totalDebt > 0 ? '$' + totalDebt.toLocaleString() : '-')}</span>
+                  <span class="popup-row-value" style="color: ${marketValue > 0 ? (equitySpread > 40000 ? 'var(--color-radar-green)' : (equitySpread < 0 ? '#ef4444' : 'var(--text-main)')) : 'var(--text-muted)'}">${marketValue > 0 ? '$' + equitySpread.toLocaleString() : 'Pendiente Valor PVA'}</span>
                 </div>
                 <div class="popup-row">
                   <span class="popup-row-label">${dict.card_mpo_offer}:</span>
-                  <span class="popup-row-value" style="color: ${mpo > 0 ? 'var(--color-radar-green)' : 'var(--text-muted)'}; font-weight: bold;">${mpo > 0 ? '$' + mpo.toLocaleString() : (totalDebt > 0 ? '$' + totalDebt.toLocaleString() : '-')}</span>
+                  <span class="popup-row-value" style="color: ${targetOffer.color}; font-weight: bold;" title="${escapeHtml(targetOffer.title)}">${targetOffer.text}</span>
                 </div>
                 <button class="popup-btn" onclick="openLeadDrawer('${lead.groupingKey}')">${dict.comp_view_tactical}</button>
               </div>
@@ -5909,8 +6332,8 @@
         const totalDebt = (lead.primaryDebt || 0) + (lead.hiddenMortgages || 0) + (lead.hiddenLiensAmount || 0);
         const marketValue = getMarketValue(lead);
         const equitySpread = marketValue - totalDebt;
-        const df = lead.state === 'KY' ? 0.66 : (lead.isHighMotivation ? 0.70 : 0.75);
-        const mpo = Math.max(0, Math.round((marketValue * df) - totalDebt));
+        const offerTiers = getOfferTiers(lead, marketValue);
+        const targetOffer = formatOfferTier(offerTiers, 'target', { incomplete: isIncompleteLead(lead, marketValue) });
         
         // Badges
         let badgesHtml = '';
@@ -5919,7 +6342,7 @@
         if (hasHibernated) badgesHtml += `<span class="badge" style="background: rgba(139, 92, 246, 0.15); color: #c084fc; border: 1px solid rgba(139, 92, 246, 0.3)"><i data-lucide="bot" class="inline-icon"></i> ${dict.badge_hibernated}</span>`;
         if (hasManualReview) badgesHtml += `<span class="badge" style="background: rgba(239, 68, 68, 0.15); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.3)"><i data-lucide="alert-triangle" class="inline-icon"></i> ${dict.badge_review}</span>`;
         
-        const isUnknownOwner = !lead.ownerName || /desconocido|unknown|no especificado/i.test(lead.ownerName.trim());
+        const isUnknownOwner = isUnknownOwnerName(lead.ownerName);
         const isUnvaluedOrIncomplete = totalDebt === 0 || marketValue <= 0 || isUnknownOwner;
         const cardPhone = (lead.phones && lead.phones.length > 0) || lead.phone || lead.ownerPhone || (lead.skipTrace && lead.skipTrace.phone);
         const cardEmail = (lead.emails && lead.emails.length > 0) || lead.email;
@@ -5986,7 +6409,7 @@
             </div>
             <div class="comp-item">
               <span class="comp-label">${dict.card_mpo_offer}</span>
-              <span class="comp-val" style="color: ${mpo > 0 ? 'var(--color-radar-green)' : 'var(--text-muted)'}; font-weight: bold;">${mpo > 0 ? '$' + mpo.toLocaleString() : (totalDebt > 0 ? '$' + totalDebt.toLocaleString() : '<span style="color: var(--text-muted); font-size: 0.7rem;">-</span>')}</span>
+              <span class="comp-val" style="color: ${targetOffer.color}; font-weight: bold;" title="${escapeHtml(targetOffer.title)}">${targetOffer.text}</span>
             </div>
             <div class="comp-item">
               <span class="comp-label">${dict.card_equity}</span>
@@ -6012,12 +6435,12 @@
           </div>
           <div class="lead-card-body">
             <div class="lead-card-header-row">
-              <div class="lead-address" title="${lead.displayAddress}">${lead.displayAddress}</div>
+              <div class="lead-address" title="${escapeHtml(lead.displayAddress)}">${escapeHtml(lead.displayAddress)}</div>
             </div>
             <div class="lead-badges">${badgesHtml}</div>
             <div class="lead-details">
-              <span><i data-lucide="user" class="inline-icon"></i> ${lead.ownerName}</span>
-              <span><i data-lucide="map-pin" class="inline-icon"></i> ${lead.county}, ${lead.state}</span>
+              <span><i data-lucide="user" class="inline-icon"></i> ${escapeHtml(lead.ownerName)}</span>
+              <span><i data-lucide="map-pin" class="inline-icon"></i> ${escapeHtml(lead.county)}, ${escapeHtml(lead.state)}</span>
             </div>
             ${compsHtml}
           </div>
@@ -6177,7 +6600,7 @@
         } else if (currentTimelineFilter === 'pre') {
           if (!hasPreForeclosures) return;
         } else if (currentTimelineFilter === 'top') {
-          const isUnknownOwner = !lead.ownerName || /desconocido|unknown|no especificado/i.test(lead.ownerName.trim());
+          const isUnknownOwner = isUnknownOwnerName(lead.ownerName);
           const marketValue = getMarketValue(lead);
           const totalDebt = (lead.primaryDebt || 0) + (lead.hiddenMortgages || 0) + (lead.hiddenLiensAmount || 0);
           const equitySpread = marketValue - totalDebt;
@@ -6233,7 +6656,7 @@
         const totalDebt = (lead.primaryDebt || 0) + (lead.hiddenMortgages || 0) + (lead.hiddenLiensAmount || 0);
         const marketValue = getMarketValue(lead);
         const equitySpread = marketValue - totalDebt;
-        const isUnknownOwner = !lead.ownerName || /desconocido|unknown|no especificado/i.test(lead.ownerName.trim());
+        const isUnknownOwner = isUnknownOwnerName(lead.ownerName);
         const isUnvaluedOrIncomplete = totalDebt === 0 || marketValue <= 0 || isUnknownOwner;
         const isUrgent = !isUnvaluedOrIncomplete && item.closestDays !== null && item.closestDays >= 0 && item.closestDays <= 14;
 
@@ -6270,10 +6693,10 @@
             ${oppScoreBadge}
             ${lead.isHighMotivation ? '<span class="badge badge-high" style="font-size: 0.6rem;"><i data-lucide="zap" class="inline-icon"></i> URGENTE</span>' : ''}
           </div>
-          <div class="timeline-card-address" title="${lead.displayAddress}">${lead.displayAddress}</div>
+          <div class="timeline-card-address" title="${escapeHtml(lead.displayAddress)}">${escapeHtml(lead.displayAddress)}</div>
           <div class="timeline-card-owner">
             <i data-lucide="user" style="width: 12px; height: 12px;"></i>
-            <span>${lead.ownerName} &bull; ${lead.county}, ${lead.state}</span>
+            <span>${escapeHtml(lead.ownerName)} &bull; ${escapeHtml(lead.county)}, ${escapeHtml(lead.state)}</span>
           </div>
           <div class="timeline-stats-grid">
             <div class="timeline-stat-item">
@@ -6473,7 +6896,7 @@
       const totalDebt = (lead.primaryDebt || 0) + (lead.hiddenMortgages || 0) + (lead.hiddenLiensAmount || 0);
       const marketValue = getMarketValue(lead);
       const equitySpread = marketValue - totalDebt;
-      const isUnknownOwner = !lead.ownerName || /desconocido|unknown|no especificado/i.test(lead.ownerName.trim());
+      const isUnknownOwner = isUnknownOwnerName(lead.ownerName);
       const isUnvaluedOrIncomplete = totalDebt === 0 || marketValue <= 0 || isUnknownOwner;
 
       if (isFav) {
@@ -6618,7 +7041,7 @@
       let rPva = `<tr><th>Valor PVA</th>`;
       let rMca = `<tr><th>MCA Crudo</th>`;
       let rDebt = `<tr><th>Deuda Total</th>`;
-      let rMpo = `<tr><th>Oferta MPO</th>`;
+      let rMpo = `<tr><th>Oferta Target (70%)</th>`;
       let rSpread = `<tr><th>Equity Spread</th>`;
       let rDistress = `<tr><th>Distress Activo</th>`;
       
@@ -6649,8 +7072,8 @@
             <div class="comp-prop-card">
               <button class="comp-prop-remove" onclick="removeComparedProperty('${lead.groupingKey}')" title="Quitar">&times;</button>
               ${photoHtml}
-              <div style="font-weight: bold; margin-top: 8px; font-size: 0.8rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${lead.displayAddress}">
-                ${lead.displayAddress}
+              <div style="font-weight: bold; margin-top: 8px; font-size: 0.8rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${escapeHtml(lead.displayAddress)}">
+                ${escapeHtml(lead.displayAddress)}
               </div>
             </div>
           </td>
@@ -6658,17 +7081,16 @@
         
         const totalDebt = (lead.primaryDebt || 0) + (lead.hiddenMortgages || 0) + (lead.hiddenLiensAmount || 0);
         const marketValue = getMarketValue(lead);
-        const df = lead.state === 'KY' ? 0.66 : (lead.isHighMotivation ? 0.70 : 0.75);
         const equitySpread = marketValue - totalDebt;
-        const mpo = Math.max(0, Math.round((marketValue * df) - totalDebt));
+        const targetOffer = formatOfferTier(getOfferTiers(lead, marketValue), 'target', { incomplete: isIncompleteLead(lead, marketValue) });
 
-        rOwner += `<td class="comp-col-prop"><strong>${lead.ownerName || 'N/A'}</strong></td>`;
-        rCounty += `<td class="comp-col-prop">${lead.county || 'N/A'}, ${lead.state || ''}</td>`;
-        rPva += `<td class="comp-col-prop">${marketValue > 0 ? '$' + marketValue.toLocaleString() : 'N/A'}</td>`;
+        rOwner += `<td class="comp-col-prop"><strong>${escapeHtml(lead.ownerName || 'N/A')}</strong></td>`;
+        rCounty += `<td class="comp-col-prop">${escapeHtml(lead.county || 'N/A')}, ${escapeHtml(lead.state || '')}</td>`;
+        rPva += `<td class="comp-col-prop">${marketValue > 0 ? '$' + marketValue.toLocaleString() : 'Pendiente Valor PVA'}</td>`;
         rMca += `<td class="comp-col-prop">${lead.mlsValue > 0 ? '$' + lead.mlsValue.toLocaleString() : 'N/A'}</td>`;
-        rDebt += `<td class="comp-col-prop" style="color: #ef4444">$${totalDebt.toLocaleString()}</td>`;
-        rMpo += `<td class="comp-col-prop" style="color: var(--color-radar-green); font-weight: bold;">$${mpo.toLocaleString()}</td>`;
-        rSpread += `<td class="comp-col-prop" style="font-weight: bold; color: ${equitySpread > 40000 ? 'var(--color-radar-green)' : 'var(--text-main)'}">$${equitySpread.toLocaleString()}</td>`;
+        rDebt += `<td class="comp-col-prop" style="color: ${totalDebt > 0 ? '#ef4444' : '#64748b'}">${totalDebt > 0 ? '$' + totalDebt.toLocaleString() : 'Por publicar'}</td>`;
+        rMpo += `<td class="comp-col-prop" style="color: ${targetOffer.color}; font-weight: bold;" title="${escapeHtml(targetOffer.title)}">${targetOffer.text}</td>`;
+        rSpread += `<td class="comp-col-prop" style="font-weight: bold; color: ${marketValue > 0 && equitySpread > 40000 ? 'var(--color-radar-green)' : 'var(--text-main)'}">${marketValue > 0 ? '$' + equitySpread.toLocaleString() : 'Pendiente Valor PVA'}</td>`;
         
         let distressList = [];
         if (lead.auctions && lead.auctions.length > 0) distressList.push('<span class="badge badge-high" style="margin: 2px;"><i data-lucide="shield-alert" class="inline-icon"></i> Ejecución</span>');
@@ -6712,7 +7134,7 @@
       // 0. Hydrate Opportunity Score & Tactical Action
       const leadDebt = (lead.primaryDebt || 0) + (lead.hiddenMortgages || 0) + (lead.hiddenLiensAmount || 0);
       const marketVal = getMarketValue(lead);
-      const isUnknownOwner = !lead.ownerName || /desconocido|unknown|no especificado/i.test(lead.ownerName.trim());
+      const isUnknownOwner = isUnknownOwnerName(lead.ownerName);
       const isUnvaluedOrIncomplete = leadDebt === 0 || marketVal <= 0 || isUnknownOwner;
       const oppScore = lead.opportunityScore !== undefined ? lead.opportunityScore : (isUnvaluedOrIncomplete ? 20 : 50);
       const tacticalAction = lead.tacticalAction || (isUnvaluedOrIncomplete ? 'EXPEDIENTE INCOMPLETO: AUDITAR EN CORTE' : 'REVISIÓN PRELIMINAR DE EXPEDIENTE');
@@ -6807,16 +7229,17 @@
       document.getElementById('prop-sqft').textContent = lead.sqft ? `${lead.sqft.toLocaleString()} SqFt` : 'N/A';
 
       // Confidence Radar & Forensic Verification Status
-      const conf = lead.confidenceBreakdown || { geocodeConfidence: 99.2, ownerConfidence: 96.0, debtConfidence: 98.4, overallConfidence: 98 };
+      const conf = lead.confidenceBreakdown || { geocodeConfidence: 'N/D', ownerConfidence: 'N/D', debtConfidence: 'N/D', overallConfidence: 'N/D' };
+      const fmtConf = (v) => typeof v === 'number' ? `${v}%` : 'N/D';
       const confGeocodeEl = document.getElementById('conf-geocode');
       const confOwnerEl = document.getElementById('conf-owner');
       const confDebtEl = document.getElementById('conf-debt');
       const forensicBadge = document.getElementById('forensic-status-badge');
-      if (confGeocodeEl) confGeocodeEl.textContent = `${conf.geocodeConfidence}%`;
-      if (confOwnerEl) confOwnerEl.textContent = `${conf.ownerConfidence}%`;
-      if (confDebtEl) confDebtEl.textContent = `${conf.debtConfidence}%`;
+      if (confGeocodeEl) confGeocodeEl.textContent = fmtConf(conf.geocodeConfidence);
+      if (confOwnerEl) confOwnerEl.textContent = fmtConf(conf.ownerConfidence);
+      if (confDebtEl) confDebtEl.textContent = fmtConf(conf.debtConfidence);
       if (forensicBadge) {
-        const status = lead.forensicStatus || 'HIGH_CONFIDENCE';
+        const status = lead.forensicStatus || 'NEEDS_REVIEW';
         forensicBadge.textContent = status;
         if (status === 'AUTO_VERIFIED') {
           forensicBadge.style.background = 'rgba(16, 185, 129, 0.15)';
@@ -6830,34 +7253,48 @@
         }
       }
 
-      // Métricas de Adquisición As-Is e Institucional
+      // Métricas de Adquisición As-Is e Institucional (motor único 65/70/75% ARV − Rehab)
       const pvaVal = getMarketValue(lead);
-      const totalDebt = (lead.primaryDebt || 0) + (lead.hiddenMortgages || 0) + (lead.hiddenLiensAmount || 0);
-      const initialMpo = pvaVal > 0 ? Math.max(0, Math.round((pvaVal * (lead.state === 'KY' ? 0.66 : 0.70)) - totalDebt)) : 0;
+      const totalDebt = getLeadTotalDebt(lead);
+      const drawerToken = lead.groupingKey;
+      window.__tzelDrawerKey = drawerToken;
 
-      const uw = lead.institutionalUW || {
-        arv: pvaVal > 0 ? Math.round(pvaVal * 1.15) : 0,
-        rehab: 25000,
-        targetContractPrice: initialMpo,
-        walkAwayPrice: initialMpo + 12000,
-        auctionMaxBid: initialMpo > 0 ? initialMpo : 0,
-        wholesaleProfitSpread: 15000,
-        isUnderwater: totalDebt > pvaVal && pvaVal > 0
+      const renderUwPanel = (arvValue, sourceLabel) => {
+        const tiers = getOfferTiers(lead, arvValue);
+        const incomplete = isIncompleteLead(lead, arvValue);
+        const paint = (id, fmt) => {
+          const el = document.getElementById(id);
+          if (!el) return;
+          if (el.dataset.baseColor === undefined) el.dataset.baseColor = el.style.color || '';
+          el.textContent = fmt.text;
+          el.title = fmt.title || '';
+          el.style.color = (!fmt.color || fmt.color === 'var(--color-radar-green)') ? el.dataset.baseColor : fmt.color;
+        };
+        const hasValue = Boolean(tiers && tiers.hasValue);
+
+        paint('uw-arv-val', { text: hasValue ? `$${tiers.arv.toLocaleString()}${sourceLabel ? ' (' + sourceLabel + ')' : ''}` : 'Pendiente Valor PVA', color: hasValue ? '' : '#64748b' });
+        paint('uw-rehab-val', { text: hasValue ? `$${tiers.rehab.toLocaleString()}` : 'Requiere inspección', title: describeRehabBasis(tiers) });
+        paint('uw-target-contract', formatOfferTier(tiers, 'target', { incomplete }));
+        paint('uw-walkaway-price', formatOfferTier(tiers, 'max', { incomplete }));
+
+        const cons = Object.assign({}, formatOfferTier(tiers, 'conservative', { incomplete }));
+        if (!incomplete && hasValue && tiers.redemptionRisk) {
+          cons.text += ' ⚖';
+          cons.title = `KRS 426.530: puja < 2/3 del avalúo judicial ($${tiers.kyTwoThirdsThreshold.toLocaleString()}) → el deudor conserva derecho de redención`;
+        }
+        paint('uw-auction-maxbid', cons);
+        paint('uw-wholesale-fee', { text: (!incomplete && hasValue && tiers.wholesaleSpread > 0) ? `+$${tiers.wholesaleSpread.toLocaleString()}` : '-' });
+
+        // Underwater check
+        const alertBanner = document.getElementById('uw-alert');
+        const underwater = arvValue > 0 && totalDebt > arvValue;
+        if (alertBanner) {
+          alertBanner.style.display = underwater ? 'flex' : 'none';
+          const alertText = document.getElementById('uw-alert-text');
+          if (underwater && alertText) alertText.textContent = dict.uw_alert_underwater.replace('{debt}', totalDebt.toLocaleString()).replace('{pva}', arvValue.toLocaleString());
+        }
       };
-
-      const arvEl = document.getElementById('uw-arv-val');
-      const rehabEl = document.getElementById('uw-rehab-val');
-      const targetContractEl = document.getElementById('uw-target-contract');
-      const walkAwayEl = document.getElementById('uw-walkaway-price');
-      const auctionMaxBidEl = document.getElementById('uw-auction-maxbid');
-      const wholesaleFeeEl = document.getElementById('uw-wholesale-fee');
-
-      if (arvEl) arvEl.textContent = uw.arv > 0 ? `$${uw.arv.toLocaleString()}` : 'N/A';
-      if (rehabEl) rehabEl.textContent = `$${uw.rehab.toLocaleString()}`;
-      if (targetContractEl) targetContractEl.textContent = uw.targetContractPrice > 0 ? `$${uw.targetContractPrice.toLocaleString()}` : '$0';
-      if (walkAwayEl) walkAwayEl.textContent = uw.walkAwayPrice > 0 ? `$${uw.walkAwayPrice.toLocaleString()}` : '$0';
-      if (auctionMaxBidEl) auctionMaxBidEl.textContent = uw.auctionMaxBid > 0 ? `$${uw.auctionMaxBid.toLocaleString()}` : '$0';
-      if (wholesaleFeeEl) wholesaleFeeEl.textContent = `+$${uw.wholesaleProfitSpread.toLocaleString()}`;
+      renderUwPanel(pvaVal, '');
 
       // Toggle Zillow/Redfin manual search links
       const manualSearchDiv = document.getElementById('uw-manual-search');
@@ -6869,18 +7306,6 @@
         if (redfinLink) redfinLink.href = `https://www.redfin.com/property/search?queryString=${encodeURIComponent(lead.displayAddress)}`;
       } else {
         if (manualSearchDiv) manualSearchDiv.style.display = 'none';
-      }
-
-      // Underwater check inicial
-      const alertBanner = document.getElementById('uw-alert');
-      if (uw.isUnderwater) {
-        if (alertBanner) {
-          alertBanner.style.display = 'flex';
-          const alertText = document.getElementById('uw-alert-text');
-          if (alertText) alertText.textContent = dict.uw_alert_underwater.replace('{debt}', totalDebt.toLocaleString()).replace('{pva}', pvaVal.toLocaleString());
-        }
-      } else {
-        if (alertBanner) alertBanner.style.display = 'none';
       }
 
       // Fetch MCA dynamic comps
@@ -6900,69 +7325,47 @@
       fetch(`/api/mca?address=${encodeURIComponent(lead.displayAddress)}&state=${lead.state}`)
         .then(r => r.json())
         .then(res => {
+          // El usuario abrió otra ficha mientras llegaba la respuesta: no pisar sus datos.
+          if (window.__tzelDrawerKey !== drawerToken) return;
           if (res.status === 'success') {
-            mcaSuggestedArv.textContent = `$${res.mcaArv.toLocaleString()}`;
-            mcaCompsCount.textContent = `(${res.compsCount} ${dict.comp_comparables_count || 'comparables'})`;
-            
-            document.getElementById('uw-mca-crudo').textContent = `$${res.mcaArv.toLocaleString()}`;
+            const mcaVal = Number(res.mcaArv) || 0;
+            mcaSuggestedArv.textContent = mcaVal > 0 ? `$${mcaVal.toLocaleString()}` : 'N/D';
+            mcaCompsCount.textContent = `(${res.compsCount || 0} ${dict.comp_comparables_count || 'comparables'})`;
 
-            const mcaVal = res.mcaArv || 0;
-            const pvaOrMca = pvaVal > 0 ? pvaVal : mcaVal;
-
-            if (pvaOrMca > 0) {
-              const equitySpread = pvaOrMca - totalDebt;
-              document.getElementById('uw-equity-spread').textContent = `$${equitySpread.toLocaleString()}`;
-              document.getElementById('uw-equity-spread').style.color = equitySpread > 40000 ? 'var(--color-radar-green)' : (equitySpread < 0 ? '#ef4444' : 'var(--text-main)');
-              
-              const badge = document.getElementById('uw-equity-badge');
-              if (equitySpread > 40000) {
-                badge.style.display = 'inline-block';
-              } else {
-                badge.style.display = 'none';
-              }
-
-              const df = lead.state === 'KY' ? 0.66 : (lead.isHighMotivation ? 0.70 : 0.75);
-              const mpo = Math.max(0, Math.round((pvaOrMca * df) - totalDebt));
-              document.getElementById('uw-mpo-asis').textContent = `$${mpo.toLocaleString()}`;
-
-              // Update Underwater check banner
-              const isUnderwater = totalDebt > pvaOrMca;
-              const alertBanner = document.getElementById('uw-alert');
-              if (isUnderwater) {
-                alertBanner.style.display = 'flex';
-                document.getElementById('uw-alert-text').textContent = dict.uw_alert_underwater.replace('{debt}', totalDebt.toLocaleString()).replace('{pva}', pvaOrMca.toLocaleString());
-              } else {
-                alertBanner.style.display = 'none';
-              }
+            // Sin avalúo PVA: recalcular el underwriting con el ARV de comparables reales del MLS.
+            if (pvaVal <= 0 && mcaVal > 0) {
+              renderUwPanel(mcaVal, 'MCA');
             }
 
-            const t = res.target;
-            let lastClosedText = t.lastClosedPrice ? `$${t.lastClosedPrice.toLocaleString()} (${t.lastClosedDate})` : 'Sin registros de cierre';
-            const noteHtml = res.note ? `<br><span style="color: #94a3b8; font-size: 0.72rem;">ℹ️ ${res.note}</span>` : '';
+            const t = res.target || {};
+            let lastClosedText = t.lastClosedPrice ? `$${Number(t.lastClosedPrice).toLocaleString()} (${t.lastClosedDate || 's/f'})` : 'Sin registros de cierre';
+            const noteHtml = res.note ? `<br><span style="color: #94a3b8; font-size: 0.72rem;">ℹ️ ${escapeHtml(res.note)}</span>` : '';
             mcaTargetProfile.innerHTML = `
-              <strong>Perfil:</strong> ${t.beds || 3} ${dict.lbl_beds}, ${t.baths || 2} ${dict.lbl_baths}, ${t.sqft ? t.sqft + ' SqFt' : 'Área por confirmar'} | Zip: ${t.zip}<br>
-              <strong>Estatus:</strong> <span style="text-transform: uppercase; color: var(--color-radar-green);">${t.status}</span> | <strong>Última venta:</strong> ${lastClosedText}${noteHtml}
+              <strong>Perfil:</strong> ${t.beds ? escapeHtml(t.beds) : 'N/D'} ${dict.lbl_beds}, ${t.baths ? escapeHtml(t.baths) : 'N/D'} ${dict.lbl_baths}, ${t.sqft ? escapeHtml(t.sqft) + ' SqFt' : 'Área por confirmar'} | Zip: ${escapeHtml(t.zip)}<br>
+              <strong>Estatus:</strong> <span style="text-transform: uppercase; color: var(--color-radar-green);">${escapeHtml(t.status)}</span> | <strong>Última venta:</strong> ${escapeHtml(lastClosedText)}${noteHtml}
             `;
 
             mcaTbody.innerHTML = '';
-            if (res.comps.length === 0) {
+            const comps = Array.isArray(res.comps) ? res.comps : [];
+            if (comps.length === 0) {
               mcaTbody.innerHTML = `<tr><td colspan="4" style="text-align: center; padding: 12px; color: var(--text-muted); font-size: 0.74rem;">Propiedad Off-Market: Sin transacciones cerradas recientes en MLS en este código postal rural. Valuación referenciada por avalúo judicial oficial.</td></tr>`;
-              if (res.mcaArv > 0) {
-                mcaSuggestedArv.textContent = `$${res.mcaArv.toLocaleString()}`;
+              if (mcaVal > 0) {
+                mcaSuggestedArv.textContent = `$${mcaVal.toLocaleString()}`;
                 mcaCompsCount.textContent = `(Avalúo Judicial)`;
               } else {
                 mcaSuggestedArv.textContent = pvaVal > 0 ? `$${pvaVal.toLocaleString()}` : 'Off-Market';
                 mcaCompsCount.textContent = '';
               }
             } else {
-              res.comps.forEach(comp => {
+              comps.forEach(comp => {
                 const tr = document.createElement('tr');
                 tr.style.borderBottom = '1px solid var(--border-glass)';
+                const price = Number(comp.price) || 0;
                 tr.innerHTML = `
-                  <td style="padding: 6px; color: var(--text-main); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 140px;" title="${comp.address}">${comp.address}</td>
-                  <td style="padding: 6px; text-align: right; font-weight: bold; color: var(--color-radar-green-dark);">$${comp.price.toLocaleString()}</td>
-                  <td style="padding: 6px; text-align: right; color: var(--text-muted);">${comp.beds}H / ${comp.sqft}ft²</td>
-                  <td style="padding: 6px; text-align: right; color: var(--text-muted);">${comp.date}</td>
+                  <td style="padding: 6px; color: var(--text-main); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 140px;" title="${escapeHtml(comp.address)}">${escapeHtml(comp.address || 'N/D')}</td>
+                  <td style="padding: 6px; text-align: right; font-weight: bold; color: var(--color-radar-green-dark);">${price > 0 ? '$' + price.toLocaleString() : 'N/D'}</td>
+                  <td style="padding: 6px; text-align: right; color: var(--text-muted);">${escapeHtml(comp.beds != null ? comp.beds : '?')}H / ${escapeHtml(comp.sqft != null ? comp.sqft : '?')}ft²</td>
+                  <td style="padding: 6px; text-align: right; color: var(--text-muted);">${escapeHtml(comp.date || '')}</td>
                 `;
                 mcaTbody.appendChild(tr);
               });
@@ -6974,6 +7377,7 @@
           }
         })
         .catch(err => {
+          if (window.__tzelDrawerKey !== drawerToken) return;
           console.warn("Notice fetching MCA:", err);
           mcaTargetProfile.innerHTML = `<span style="color: #94a3b8; font-size: 0.74rem;">Propiedad Off-Market privada (Sin historial en MLS). Valuación sustentada en corte.</span>`;
           mcaTbody.innerHTML = `<tr><td colspan="4" style="text-align: center; padding: 10px; color: var(--text-muted); font-size: 0.74rem;">Información MLS no disponible para esta propiedad privada.</td></tr>`;
@@ -6998,7 +7402,7 @@
             <ul style="margin-left: 16px; margin-bottom: 8px; list-style-type: disc;">
               ${lead.llcDirectors.map(d => `<li>${d}</li>`).join('')}
             </ul>
-            ${lead.corporateAddress ? `<div style="margin-bottom: 8px;"><strong>Dirección Corporativa:</strong><br>${lead.corporateAddress}</div>` : ''}
+            ${lead.corporateAddress ? `<div style="margin-bottom: 8px;"><strong>Dirección Corporativa:</strong><br>${escapeHtml(lead.corporateAddress)}</div>` : ''}
           `;
         }
 
@@ -7117,8 +7521,8 @@ osintOsmCard.style.display = 'block';
               </span>
               <span style="color: ${borderClr}">${ev.event_date || 'Reciente'}</span>
             </div>
-            <div style="font-weight: 700; color: var(--text-main); margin-bottom: 2px; font-size: 0.78rem;">${ev.title}</div>
-            <div style="font-size: 0.72rem; color: var(--text-muted); line-height: 1.35;">${ev.description}</div>
+            <div style="font-weight: 700; color: var(--text-main); margin-bottom: 2px; font-size: 0.78rem;">${escapeHtml(ev.title)}</div>
+            <div style="font-size: 0.72rem; color: var(--text-muted); line-height: 1.35;">${escapeHtml(ev.description)}</div>
             ${ev.amount > 0 ? `<div style="font-size: 0.72rem; margin-top: 4px;"><strong>Monto Registrado:</strong> $${Number(ev.amount).toLocaleString()}</div>` : ''}
             ${ev.source_system ? `<div style="font-size: 0.65rem; color: #64748b; margin-top: 3px;"><strong>Fuente Judicial:</strong> ${ev.source_system}</div>` : ''}
           `;
@@ -7144,8 +7548,8 @@ osintOsmCard.style.display = 'block';
                 <span style="color: ${borderClr}; font-weight: bold; display: flex; align-items: center; gap: 4px;"><i data-lucide="${iconName}" class="inline-icon" style="color: ${borderClr}"></i> ${titleStr}</span>
                 <span style="color: ${borderClr}">${auc.auction_date || 'Fecha por fijar'}</span>
               </div>
-              <div><strong>Caso Judicial:</strong> ${auc.case_number}</div>
-              <div><strong>Demandante:</strong> ${auc.plaintiff || 'No especificado'}</div>
+              <div><strong>Caso Judicial:</strong> ${escapeHtml(auc.case_number)}</div>
+              <div><strong>Demandante:</strong> ${escapeHtml(auc.plaintiff || 'No especificado')}</div>
               <div><strong>Monto del Reclamo:</strong> $${(auc.debt_amount || 0).toLocaleString()} ${pdfLink}</div>
             `;
             logsContainer.appendChild(div);
@@ -7208,17 +7612,17 @@ osintOsmCard.style.display = 'block';
               </span>
               <span class="contact-value" style="font-weight: 800; color: var(--text-main); font-size: 0.95rem;">${contactInfo.value}</span>
             </div>
-            <a class="contact-action-btn" href="tel:${rawPhone}" onclick="logCallInitiated('${lead.propertyId || ''}', '${rawPhone}', '${lead.ownerName || ''}')" style="background: var(--color-radar-green); color: #0f172a; font-weight: 800; text-decoration: none; padding: 6px 12px; border-radius: 6px; display: flex; align-items: center; gap: 4px; font-size: 0.78rem;">
+            <a class="contact-action-btn" href="tel:${rawPhone}" onclick="logCallInitiated(${jsAttrArg(lead.propertyId)}, ${jsAttrArg(rawPhone)}, ${jsAttrArg(lead.ownerName)})" style="background: var(--color-radar-green); color: #0f172a; font-weight: 800; text-decoration: none; padding: 6px 12px; border-radius: 6px; display: flex; align-items: center; gap: 4px; font-size: 0.78rem;">
               <i data-lucide="phone-call" style="width: 13px; height: 13px;"></i> Llamar (1-Clic)
             </a>
           </div>
           <!-- Quick Outcome CRM Toolbar -->
           <div style="display: flex; gap: 4px; font-size: 0.65rem; background: rgba(0,0,0,0.03); padding: 5px 8px; border-radius: 6px; border: 1px solid var(--border-glass); align-items: center;">
             <span style="color: var(--text-muted); font-weight: 700; margin-right: 4px; text-transform: uppercase; font-size: 0.6rem;">CRM:</span>
-            <button onclick="saveCallLog('${lead.propertyId || ''}', '${rawPhone}', '${lead.ownerName || ''}', 'INTERESTED', this)" style="background: rgba(16,185,129,0.15); color: #047857; border: 1px solid rgba(16,185,129,0.3); border-radius: 4px; padding: 2px 6px; cursor: pointer; font-size: 0.65rem; font-weight: 700;">✅ Interesado</button>
-            <button onclick="saveCallLog('${lead.propertyId || ''}', '${rawPhone}', '${lead.ownerName || ''}', 'VOICEMAIL', this)" style="background: rgba(245,158,11,0.15); color: #b45309; border: 1px solid rgba(245,158,11,0.3); border-radius: 4px; padding: 2px 6px; cursor: pointer; font-size: 0.65rem;">📞 Buzón</button>
-            <button onclick="saveCallLog('${lead.propertyId || ''}', '${rawPhone}', '${lead.ownerName || ''}', 'OFFER_SENT', this)" style="background: rgba(59,130,246,0.15); color: #1d4ed8; border: 1px solid rgba(59,130,246,0.3); border-radius: 4px; padding: 2px 6px; cursor: pointer; font-size: 0.65rem; font-weight: 700;">📝 Oferta</button>
-            <button onclick="saveCallLog('${lead.propertyId || ''}', '${rawPhone}', '${lead.ownerName || ''}', 'WRONG_NUMBER', this)" style="background: rgba(239,68,68,0.15); color: #dc2626; border: 1px solid rgba(239,68,68,0.3); border-radius: 4px; padding: 2px 6px; cursor: pointer; font-size: 0.65rem;">❌ DNC</button>
+            <button onclick="saveCallLog(${jsAttrArg(lead.propertyId)}, ${jsAttrArg(rawPhone)}, ${jsAttrArg(lead.ownerName)}, 'INTERESTED', this)" style="background: rgba(16,185,129,0.15); color: #047857; border: 1px solid rgba(16,185,129,0.3); border-radius: 4px; padding: 2px 6px; cursor: pointer; font-size: 0.65rem; font-weight: 700;">✅ Interesado</button>
+            <button onclick="saveCallLog(${jsAttrArg(lead.propertyId)}, ${jsAttrArg(rawPhone)}, ${jsAttrArg(lead.ownerName)}, 'VOICEMAIL', this)" style="background: rgba(245,158,11,0.15); color: #b45309; border: 1px solid rgba(245,158,11,0.3); border-radius: 4px; padding: 2px 6px; cursor: pointer; font-size: 0.65rem;">📞 Buzón</button>
+            <button onclick="saveCallLog(${jsAttrArg(lead.propertyId)}, ${jsAttrArg(rawPhone)}, ${jsAttrArg(lead.ownerName)}, 'OFFER_SENT', this)" style="background: rgba(59,130,246,0.15); color: #1d4ed8; border: 1px solid rgba(59,130,246,0.3); border-radius: 4px; padding: 2px 6px; cursor: pointer; font-size: 0.65rem; font-weight: 700;">📝 Oferta</button>
+            <button onclick="saveCallLog(${jsAttrArg(lead.propertyId)}, ${jsAttrArg(rawPhone)}, ${jsAttrArg(lead.ownerName)}, 'WRONG_NUMBER', this)" style="background: rgba(239,68,68,0.15); color: #dc2626; border: 1px solid rgba(239,68,68,0.3); border-radius: 4px; padding: 2px 6px; cursor: pointer; font-size: 0.65rem;">❌ DNC</button>
           </div>
         `;
         contactsContainer.appendChild(div);
@@ -7574,8 +7978,8 @@ osintOsmCard.style.display = 'block';
               : `<span style="color: var(--text-muted); font-size: 0.8rem; font-style: italic;">Pendiente Skip Trace</span>`;
 
             tr.innerHTML = `
-              <td style="font-weight: bold; color: var(--text-main); padding: 14px 16px;">${item.owner_name}</td>
-              <td style="color: var(--text-muted); padding: 14px 16px;">${item.address}</td>
+              <td style="font-weight: bold; color: var(--text-main); padding: 14px 16px;">${escapeHtml(item.owner_name)}</td>
+              <td style="color: var(--text-muted); padding: 14px 16px;">${escapeHtml(item.address)}</td>
               <td style="text-align: right; color: var(--text-muted); padding: 14px 16px;">$${judgmentAmt.toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
               <td style="text-align: right; color: var(--text-muted); padding: 14px 16px;">$${winningBid.toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
               <td style="text-align: right; font-weight: bold; color: var(--color-radar-green-dark); font-size: 1rem; padding: 14px 16px;">$${surplusVal.toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
@@ -7584,7 +7988,7 @@ osintOsmCard.style.display = 'block';
               </td>
               <td style="text-align: center; color: var(--text-muted); padding: 14px 16px;">${daysStr}</td>
               <td style="text-align: center; padding: 14px 16px;">
-                <button class="copy-surplus-script-btn" onclick="copySurplusScript('${item.owner_name.replace(/'/g, "\\'")}', '${item.address.replace(/'/g, "\\'")}', '${item.county ? item.county.replace(/'/g, "\\'") : 'Jefferson'}', ${winningBid}, ${judgmentAmt}, ${surplusVal}, this)" style="background: var(--color-radar-green-pastel); border: 1px solid var(--color-radar-green-border); color: var(--color-radar-green-dark); padding: 6px 12px; border-radius: 30px; font-size: 0.75rem; cursor: pointer; transition: all 0.2s; font-family: 'Inter', sans-serif; font-weight: bold; outline: none;">
+                <button class="copy-surplus-script-btn" onclick="copySurplusScript(${jsAttrArg(item.owner_name)}, ${jsAttrArg(item.address)}, ${jsAttrArg(item.county || 'Jefferson')}, ${winningBid}, ${judgmentAmt}, ${surplusVal}, this)" style="background: var(--color-radar-green-pastel); border: 1px solid var(--color-radar-green-border); color: var(--color-radar-green-dark); padding: 6px 12px; border-radius: 30px; font-size: 0.75rem; cursor: pointer; transition: all 0.2s; font-family: 'Inter', sans-serif; font-weight: bold; outline: none;">
                   ${(translations[currentLang] || translations.es).surplus_col_action || 'Copiar Guión'}
                 </button>
               </td>
@@ -7724,9 +8128,9 @@ Este dinero le pertenece legalmente a usted, pero si no se reclama a tiempo pued
         const redfinUrl = `https://www.redfin.com/property/search?queryString=${searchEscaped}`;
         
         tr.innerHTML = `
-          <td style="padding: 12px 16px; font-weight: bold; color: var(--text-main);">${lead.ownerName}</td>
-          <td style="padding: 12px 16px; color: var(--text-main);">${lead.displayAddress}</td>
-          <td style="padding: 12px 16px; color: var(--text-muted);">${lead.county}, ${lead.state}</td>
+          <td style="padding: 12px 16px; font-weight: bold; color: var(--text-main);">${escapeHtml(lead.ownerName)}</td>
+          <td style="padding: 12px 16px; color: var(--text-main);">${escapeHtml(lead.displayAddress)}</td>
+          <td style="padding: 12px 16px; color: var(--text-muted);">${escapeHtml(lead.county)}, ${escapeHtml(lead.state)}</td>
           <td style="padding: 12px 16px; color: var(--text-main);">${lead.isAbsentee ? dict.prop_owner_absentee : dict.prop_owner_resident}</td>
           <td style="padding: 12px 16px;"><span class="badge" style="background: var(--bg-darker); color: ${typeColor}; border: 1px solid ${typeColor};">${typeText}</span></td>
           <td style="padding: 12px 16px; text-align: center;"><span class="badge" style="background: var(--bg-darker); color: ${tcColor}; border: 1px solid ${tcColor};">${tcText}</span></td>
@@ -7849,7 +8253,7 @@ Este dinero le pertenece legalmente a usted, pero si no se reclama a tiempo pued
       const marketVal = getMarketValue(lead);
       const totalDebt = (lead.primaryDebt || 0) + (lead.hiddenMortgages || 0) + (lead.hiddenLiensAmount || 0);
       const grossEquity = Math.max(0, marketVal - totalDebt);
-      const isUnknownOwner = !lead.ownerName || /desconocido|unknown|no especificado/i.test(lead.ownerName.trim());
+      const isUnknownOwner = isUnknownOwnerName(lead.ownerName);
       const isUnvaluedOrIncomplete = totalDebt === 0 || marketVal <= 0 || isUnknownOwner;
 
       const oppScore = lead.opportunityScore !== undefined ? lead.opportunityScore : (isUnvaluedOrIncomplete ? 20 : 50);
@@ -7878,14 +8282,14 @@ Este dinero le pertenece legalmente a usted, pero si no se reclama a tiempo pued
       // 4. Property Intelligence Dossier
       document.getElementById('acq-dossier-owner-type').textContent = isAbsentee ? 'Absentee (No Residente / Fuera del área)' : 'Residente en sitio';
       document.getElementById('acq-dossier-mailing').textContent = lead.mailingAddress || (isAbsentee ? 'Dirección fuera del estado' : lead.displayAddress);
-      document.getElementById('acq-dossier-specs').textContent = `${lead.beds || 3} Beds • ${lead.baths || 1.5} Baths • ${(lead.sqft || 1450).toLocaleString()} SqFt`;
+      document.getElementById('acq-dossier-specs').textContent = `${lead.beds ? lead.beds : 'N/D'} Beds • ${lead.baths ? lead.baths : 'N/D'} Baths • ${lead.sqft ? Number(lead.sqft).toLocaleString() + ' SqFt' : 'SqFt N/D'}`;
       document.getElementById('acq-dossier-arv').textContent = marketVal > 0 ? `$${marketVal.toLocaleString()}` : 'Pendiente Valor PVA';
       document.getElementById('acq-dossier-mortgage').textContent = lead.primaryDebt > 0 ? `$${lead.primaryDebt.toLocaleString()} (Judicial Claim)` : '$0 / No registrada';
       document.getElementById('acq-dossier-taxes').textContent = (lead.hiddenLiensAmount || 0) > 0 ? `$${lead.hiddenLiensAmount.toLocaleString()}` : '$0 al día';
-      document.getElementById('acq-dossier-case').textContent = (lead.auctions && lead.auctions[0] && (lead.auctions[0].caseNumber || lead.auctions[0].case_number)) || (lead.preForeclosures && lead.preForeclosures[0] && (lead.preForeclosures[0].caseNumber || lead.preForeclosures[0].case_number)) || 'KY-24-CI-RECORD';
+      document.getElementById('acq-dossier-case').textContent = (lead.auctions && lead.auctions[0] && (lead.auctions[0].caseNumber || lead.auctions[0].case_number)) || (lead.preForeclosures && lead.preForeclosures[0] && (lead.preForeclosures[0].caseNumber || lead.preForeclosures[0].case_number)) || 'Sin expediente registrado';
       document.getElementById('acq-dossier-auction').textContent = (lead.auctions && lead.auctions.length > 0) ? `Programada (${lead.auctions[0].auctionDate || lead.auctions[0].auction_date || 'Próxima'})` : 'Sin fecha fijada';
       document.getElementById('acq-dossier-violations').textContent = (lead.violations && lead.violations.length > 0) ? `${lead.violations.length} violaciones registradas` : 'Sin infracciones graves';
-      document.getElementById('acq-dossier-landbank').textContent = lead.landbankInfo ? `Sí - $${lead.landbankInfo.asking_price || 1000}` : 'No (Mercado privado)';
+      document.getElementById('acq-dossier-landbank').textContent = lead.landbankInfo ? (Number(lead.landbankInfo.asking_price) > 0 ? `Sí - $${Number(lead.landbankInfo.asking_price).toLocaleString()}` : 'Sí - precio por confirmar') : 'No (Mercado privado)';
 
       // 5. Deal Strategy & Call Brief
       renderStrategyAndBrief(lead, grossEquity, totalDebt, marketVal);
@@ -7905,7 +8309,7 @@ Este dinero le pertenece legalmente a usted, pero si no se reclama a tiempo pued
       const forensicStory = lead.forensicLegalStory || (lead.auctions && lead.auctions[0] && lead.auctions[0].forensic_legal_story);
       if (storyCard && storyText) {
         if (forensicStory && forensicStory.trim()) {
-          storyText.innerHTML = forensicStory.replace(/\n/g, '<br>');
+          storyText.innerHTML = formatAiText(forensicStory);
           storyCard.style.display = 'block';
         } else {
           storyCard.style.display = 'none';
@@ -7982,7 +8386,7 @@ Este dinero le pertenece legalmente a usted, pero si no se reclama a tiempo pued
               
               document.getElementById('acq-doc-res-debt').textContent = debt ? `$${debt.toLocaleString()}` : 'No especificada';
               document.getElementById('acq-doc-res-val').textContent = val ? `$${val.toLocaleString()}` : 'No especificado';
-              document.getElementById('acq-doc-res-explanation').innerHTML = `<strong>${resJson.data.plaintiff ? 'Acreedor: ' + resJson.data.plaintiff + '<br>' : ''}</strong>${resJson.data.explanation}<br><br><span style="color: #60a5fa;">💡 <em>${resJson.data.actionableAdvice || ''}</em></span>`;
+              document.getElementById('acq-doc-res-explanation').innerHTML = `<strong>${resJson.data.plaintiff ? 'Acreedor: ' + escapeHtml(resJson.data.plaintiff) + '<br>' : ''}</strong>${formatAiText(resJson.data.explanation)}<br><br><span style="color: #60a5fa;">💡 <em>${escapeHtml(resJson.data.actionableAdvice || '')}</em></span>`;
               document.getElementById('acq-doc-model-badge').textContent = resJson.model || 'Gemini 3.1 Pro';
               
               if (resultBox) resultBox.style.display = 'block';
@@ -8087,7 +8491,7 @@ Este dinero le pertenece legalmente a usted, pero si no se reclama a tiempo pued
       const confEl = document.getElementById('acq-motivation-conf');
       if (!container) return;
 
-      const isUnknownOwner = !lead.ownerName || /desconocido|unknown|no especificado/i.test(lead.ownerName.trim());
+      const isUnknownOwner = isUnknownOwnerName(lead.ownerName);
       const isUnvaluedOrIncomplete = totalDebt === 0 || marketVal <= 0 || isUnknownOwner;
 
       if (isUnvaluedOrIncomplete) {
@@ -8168,7 +8572,7 @@ Este dinero le pertenece legalmente a usted, pero si no se reclama a tiempo pued
       const briefOpen = document.getElementById('acq-brief-opening');
       const briefQuestions = document.getElementById('acq-brief-questions');
 
-      const isUnknownOwner = !lead.ownerName || /desconocido|unknown|no especificado/i.test(lead.ownerName.trim());
+      const isUnknownOwner = isUnknownOwnerName(lead.ownerName);
       const isUnvaluedOrIncomplete = totalDebt === 0 || marketVal <= 0 || isUnknownOwner;
 
       let title = 'Compra Directa en Efectivo (As-Is Wholesale)';
@@ -8290,36 +8694,46 @@ Este dinero le pertenece legalmente a usted, pero si no se reclama a tiempo pued
     };
 
     function renderOfferRange(lead, marketVal, totalDebt) {
-      if (!marketVal || marketVal <= 0) {
-        document.getElementById('acq-offer-var-arv').textContent = 'Pendiente Valor PVA';
-        document.getElementById('acq-offer-var-repairs').textContent = '$0 (Requiere Inspección)';
-        document.getElementById('acq-offer-var-costs').textContent = '-';
-        document.getElementById('acq-offer-var-debt').textContent = totalDebt > 0 ? `$${totalDebt.toLocaleString()}` : 'Por publicar';
+      const setText = (id, text) => { const el = document.getElementById(id); if (el) el.textContent = text; };
+      const warningEl = document.getElementById('acq-offer-warning');
+      const warnings = [];
+      const tiers = getOfferTiers(lead, marketVal);
+      const incomplete = isIncompleteLead(lead, marketVal);
 
-        document.getElementById('acq-offer-cons').textContent = 'Pendiente Valor';
-        document.getElementById('acq-offer-target').textContent = 'Pendiente Valor';
-        document.getElementById('acq-offer-max').textContent = 'Pendiente Valor';
-        return;
+      setText('acq-offer-var-debt', totalDebt > 0 ? `$${totalDebt.toLocaleString()}` : 'Por publicar');
+
+      if (!tiers || !tiers.hasValue) {
+        setText('acq-offer-var-arv', 'Pendiente Valor PVA');
+        setText('acq-offer-var-repairs', 'Requiere Inspección');
+        setText('acq-offer-var-costs', '-');
+      } else {
+        setText('acq-offer-var-arv', `$${tiers.arv.toLocaleString()}`);
+        setText('acq-offer-var-repairs', `$${tiers.rehab.toLocaleString()}`);
+        setText('acq-offer-var-costs', describeRehabBasis(tiers));
       }
 
-      const arv = marketVal;
-      const violationCount = (lead.violations && lead.violations.length) || 0;
-      const estimatedRepairs = Math.max(25000, violationCount * 15000 + 30000);
-      const holdingCosts = Math.round(arv * 0.08);
-      const verifiedDebt = totalDebt || 0;
+      // AGENTS.md §3.5: Conservadora 65% / Target 70% / MAO 75% del ARV − Rehab. Sin pisos ni márgenes forzados.
+      [['acq-offer-cons', 'conservative'], ['acq-offer-target', 'target'], ['acq-offer-max', 'max']].forEach(([id, field]) => {
+        const fmt = formatOfferTier(tiers, field, { incomplete });
+        const el = document.getElementById(id);
+        if (!el) return;
+        el.textContent = fmt.text;
+        el.title = fmt.title || '';
+      });
 
-      document.getElementById('acq-offer-var-arv').textContent = `$${arv.toLocaleString()}`;
-      document.getElementById('acq-offer-var-repairs').textContent = `$${estimatedRepairs.toLocaleString()}`;
-      document.getElementById('acq-offer-var-costs').textContent = `$${holdingCosts.toLocaleString()}`;
-      document.getElementById('acq-offer-var-debt').textContent = `$${verifiedDebt.toLocaleString()}`;
-
-      let consOffer = Math.max(15000, Math.round(arv * 0.65 - estimatedRepairs));
-      let targetOffer = Math.max(consOffer + 10000, Math.round(arv * 0.70 - estimatedRepairs));
-      let maxMAO = Math.max(targetOffer + 12000, Math.round(arv * 0.75 - estimatedRepairs));
-
-      document.getElementById('acq-offer-cons').textContent = `$${consOffer.toLocaleString()}`;
-      document.getElementById('acq-offer-target').textContent = `$${targetOffer.toLocaleString()}`;
-      document.getElementById('acq-offer-max').textContent = `$${maxMAO.toLocaleString()}`;
+      if (incomplete && tiers && tiers.hasValue) {
+        warnings.push('Expediente incompleto (sin deuda confirmada o titular verificado): ofertas bloqueadas hasta auditar en corte.');
+      }
+      if (!incomplete && tiers && tiers.hasValue) {
+        if (!tiers.viable) warnings.push('No viable: el rehab estimado supera el descuento sobre el ARV.');
+        if (tiers.belowDebt) warnings.push(`El MAO ($${tiers.max.toLocaleString()}) no cubre la deuda registrada ($${totalDebt.toLocaleString()}): requiere negociación con el acreedor / short sale.`);
+        if (tiers.redemptionRisk) warnings.push(`Kentucky (KRS 426.530): una puja menor a 2/3 del avalúo ($${tiers.kyTwoThirdsThreshold.toLocaleString()}) deja derecho de redención al deudor.`);
+        if (tiers.rehabBasis === 'arv_pct') warnings.push('Rehab estimado como % del ARV (sin SqFt registrados): confirmar en inspección.');
+      }
+      if (warningEl) {
+        warningEl.innerHTML = warnings.map(w => `⚠ ${escapeHtml(w)}`).join('<br>');
+        warningEl.style.display = warnings.length ? 'block' : 'none';
+      }
     }
 
     window.handleDispositionClick = function(disp) {
@@ -8459,8 +8873,15 @@ Este dinero le pertenece legalmente a usted, pero si no se reclama a tiempo pued
 
       if (currentAcqLead) {
         const propId = currentAcqLead.groupingKey || currentAcqLead.parcelId || currentAcqLead.displayAddress;
+        // Solo avanzar a CONVERSATION; nunca retroceder un lead que ya está más adelante en el embudo.
+        const stageSelect = document.getElementById('acq-stage-select');
+        const stageOrder = Array.from(stageSelect ? stageSelect.options : []).map(o => o.value);
+        const currentStage = (currentAcqLead.acquisitionState && currentAcqLead.acquisitionState.stage) || (stageSelect && stageSelect.value) || 'NEW';
+        const shouldAdvance = stageOrder.indexOf(currentStage) < stageOrder.indexOf('CONVERSATION');
+        const nextStage = shouldAdvance ? 'CONVERSATION' : currentStage;
+        if (stageSelect && shouldAdvance) stageSelect.value = nextStage;
         persistAcquisitionState(propId, {
-          stage: 'CONVERSATION',
+          stage: nextStage,
           motivation: motivation,
           estimated_motivation: 'HIGH',
           asking_price: asking,
@@ -8600,7 +9021,7 @@ Este dinero le pertenece legalmente a usted, pero si no se reclama a tiempo pued
         const stageLeads = columnsData[stage.id] || [];
         const displayLeads = stageLeads.slice(0, 40);
         const cardsHtml = displayLeads.map(lead => {
-          const isUnknownOwner = !lead.ownerName || /desconocido|unknown|no especificado/i.test(lead.ownerName.trim());
+          const isUnknownOwner = isUnknownOwnerName(lead.ownerName);
           const marketVal = getMarketValue(lead);
           const debt = (lead.primaryDebt || 0) + (lead.hiddenMortgages || 0);
           const isUnvaluedOrIncomplete = debt === 0 || marketVal <= 0 || isUnknownOwner;
@@ -8613,11 +9034,11 @@ Este dinero le pertenece legalmente a usted, pero si no se reclama a tiempo pued
           return `
             <div class="kanban-card" onclick="openLeadDrawer('${lead.groupingKey}'); openAcquisitionCommandCenter(allLeads.find(l => l.groupingKey === '${lead.groupingKey}'))">
               <div style="display: flex; justify-content: space-between; align-items: flex-start;">
-                <div style="font-size: 0.82rem; font-weight: 800; color: #f8fafc; line-height: 1.3;">${lead.displayAddress}</div>
+                <div style="font-size: 0.82rem; font-weight: 800; color: #f8fafc; line-height: 1.3;">${escapeHtml(lead.displayAddress)}</div>
                 <span class="badge" style="background: ${oppScore <= 35 ? 'rgba(100,116,139,0.2)' : 'rgba(0,207,204,0.15)'}; color: ${oppScore <= 35 ? '#94a3b8' : 'var(--color-radar-green)'}; font-size: 0.62rem; font-weight: 900;">${oppScore <= 35 ? '🕒' : '⚡'} ${oppScore}</span>
               </div>
               <div style="font-size: 0.72rem; color: #94a3b8;">
-                ${lead.ownerName} &bull; ${lead.isAbsentee ? '<span style="color: #34d399;">Absentee</span>' : 'Residente'}
+                ${escapeHtml(lead.ownerName)} &bull; ${lead.isAbsentee ? '<span style="color: #34d399;">Absentee</span>' : 'Residente'}
               </div>
               <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.7rem;">
                 <span style="color: #60a5fa; font-weight: 700;">Est. Equity: ${equityText}</span>

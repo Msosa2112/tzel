@@ -1,0 +1,1331 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Louisville Metro Land & Infill Acquisition Hub | Catálogo de Terrenos</title>
+  <meta name="description" content="Catálogo exclusivo de solares urbanos y terrenos de desarrollo Infill en Louisville Metro (Jefferson County, KY). Inventario oficial Landbank VAP con metraje catastral y simulador de inversión.">
+  <link rel="icon" type="image/png" href="logo.jpg">
+
+  <!-- Google Fonts Typography -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800;900&family=Outfit:wght@400;600;700;800&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+
+  <!-- Leaflet Map CSS & JS (for Satellite inspection modal) -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+
+  <style>
+    :root {
+      --bg-main: #090c10;
+      --bg-surface: #0f172a;
+      --bg-card: rgba(15, 23, 42, 0.75);
+      --bg-card-hover: rgba(30, 41, 59, 0.85);
+      --border-color: rgba(255, 255, 255, 0.08);
+      --border-accent: rgba(16, 185, 129, 0.35);
+      
+      --accent-green: #10b981;
+      --accent-green-bright: #34d399;
+      --accent-cyan: #06b6d4;
+      --accent-blue: #38bdf8;
+      --accent-amber: #f59e0b;
+      
+      --text-primary: #f8fafc;
+      --text-secondary: #94a3b8;
+      --text-muted: #64748b;
+      
+      --font-heading: 'Outfit', sans-serif;
+      --font-body: 'Plus Jakarta Sans', sans-serif;
+      --font-mono: 'JetBrains Mono', monospace;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--bg-main);
+      color: var(--text-primary);
+      font-family: var(--font-body);
+      line-height: 1.5;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow-x: hidden;
+      background-image: 
+        radial-gradient(circle at 20% 15%, rgba(16, 185, 129, 0.05) 0%, transparent 40%),
+        radial-gradient(circle at 80% 85%, rgba(6, 182, 212, 0.04) 0%, transparent 50%),
+        linear-gradient(180deg, #090c10 0%, #0b0f17 100%);
+    }
+
+    /* Container */
+    .container {
+      max-width: 1440px;
+      margin: 0 auto;
+      padding: 0 1.5rem;
+      width: 100%;
+    }
+
+    /* Header */
+    header {
+      background: rgba(15, 23, 42, 0.8);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border-bottom: 1px solid var(--border-color);
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      padding: 1rem 0;
+    }
+
+    .header-inner {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 1.5rem;
+    }
+
+    .brand-box {
+      display: flex;
+      align-items: center;
+      gap: 0.85rem;
+      text-decoration: none;
+    }
+
+    .brand-icon {
+      width: 42px;
+      height: 42px;
+      background: linear-gradient(135deg, rgba(16, 185, 129, 0.2) 0%, rgba(6, 182, 212, 0.2) 100%);
+      border: 1px solid var(--border-accent);
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--accent-green-bright);
+      box-shadow: 0 0 15px rgba(16, 185, 129, 0.2);
+    }
+
+    .brand-title {
+      font-family: var(--font-heading);
+      font-size: 1.15rem;
+      font-weight: 800;
+      letter-spacing: 0.02em;
+      color: #ffffff;
+      line-height: 1.2;
+    }
+
+    .brand-subtitle {
+      font-size: 0.72rem;
+      color: var(--text-secondary);
+      font-weight: 500;
+      letter-spacing: 0.04em;
+    }
+
+    .header-kpi-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      background: rgba(16, 185, 129, 0.1);
+      border: 1px solid rgba(16, 185, 129, 0.3);
+      padding: 0.4rem 0.9rem;
+      border-radius: 100px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      color: var(--accent-green-bright);
+    }
+
+    .pulse-dot {
+      width: 8px;
+      height: 8px;
+      background-color: var(--accent-green-bright);
+      border-radius: 50%;
+      box-shadow: 0 0 8px var(--accent-green-bright);
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.4; transform: scale(0.85); }
+    }
+
+    /* Hero Section */
+    .hero-banner {
+      padding: 2.5rem 0 1.5rem;
+    }
+
+    .hero-title {
+      font-family: var(--font-heading);
+      font-size: clamp(1.8rem, 3.5vw, 2.75rem);
+      font-weight: 800;
+      line-height: 1.15;
+      color: #ffffff;
+      margin-bottom: 0.75rem;
+    }
+
+    .hero-title span {
+      background: linear-gradient(135deg, #34d399 0%, #38bdf8 100%);
+      background-clip: text;
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .hero-desc {
+      font-size: 0.95rem;
+      color: var(--text-secondary);
+      max-width: 820px;
+      line-height: 1.6;
+    }
+
+    /* KPI Summary Row */
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 1rem;
+      margin: 1.5rem 0;
+    }
+
+    .kpi-card {
+      background: var(--bg-card);
+      backdrop-filter: blur(12px);
+      border: 1px solid var(--border-color);
+      border-radius: 16px;
+      padding: 1.25rem 1.4rem;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      transition: transform 0.25s ease, border-color 0.25s ease;
+    }
+
+    .kpi-card:hover {
+      transform: translateY(-2px);
+      border-color: rgba(255, 255, 255, 0.18);
+    }
+
+    .kpi-label {
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .kpi-num {
+      font-family: var(--font-heading);
+      font-size: 1.85rem;
+      font-weight: 800;
+      color: #ffffff;
+      margin: 0.35rem 0;
+      line-height: 1;
+    }
+
+    .kpi-sub {
+      font-size: 0.72rem;
+      color: var(--text-muted);
+    }
+
+    /* Explanation Notice */
+    .pricing-notice-box {
+      background: rgba(15, 23, 42, 0.65);
+      border: 1px solid rgba(56, 189, 248, 0.3);
+      border-left: 4px solid var(--accent-blue);
+      border-radius: 12px;
+      padding: 1rem 1.25rem;
+      margin-bottom: 1.75rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1.25rem;
+      font-size: 0.82rem;
+      color: #cbd5e1;
+    }
+
+    .pricing-notice-content {
+      display: flex;
+      align-items: center;
+      gap: 0.85rem;
+    }
+
+    .pricing-notice-tag {
+      flex-shrink: 0;
+      font-size: 0.72rem;
+      background: rgba(56, 189, 248, 0.15);
+      color: var(--accent-blue);
+      padding: 0.4rem 0.8rem;
+      border-radius: 6px;
+      font-weight: 700;
+      white-space: nowrap;
+      border: 1px solid rgba(56, 189, 248, 0.3);
+    }
+
+    /* Filter Toolbar */
+    .filter-toolbar {
+      background: rgba(15, 23, 42, 0.75);
+      backdrop-filter: blur(12px);
+      border: 1px solid var(--border-color);
+      border-radius: 16px;
+      padding: 0.85rem 1.15rem;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 0.75rem;
+      margin-bottom: 1.5rem;
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+    }
+
+    .search-input-wrapper {
+      flex: 1 1 240px;
+      position: relative;
+    }
+
+    .search-input {
+      width: 100%;
+      background: rgba(0, 0, 0, 0.4);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 10px;
+      padding: 0.65rem 1rem 0.65rem 2.4rem;
+      color: #ffffff;
+      font-family: var(--font-body);
+      font-size: 0.85rem;
+      outline: none;
+      transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .search-input:focus {
+      border-color: var(--accent-green-bright);
+      box-shadow: 0 0 0 2px rgba(52, 211, 153, 0.2);
+    }
+
+    .search-icon {
+      position: absolute;
+      left: 0.8rem;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--text-muted);
+      width: 16px;
+      height: 16px;
+      pointer-events: none;
+    }
+
+    .filter-select {
+      background: rgba(0, 0, 0, 0.4);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 10px;
+      padding: 0.65rem 1rem;
+      color: #ffffff;
+      font-family: var(--font-body);
+      font-size: 0.82rem;
+      outline: none;
+      cursor: pointer;
+      transition: border-color 0.2s ease;
+    }
+
+    .filter-select:focus {
+      border-color: var(--accent-green-bright);
+    }
+
+    .filter-select option {
+      background: #0f172a;
+      color: #ffffff;
+    }
+
+    .results-count {
+      font-size: 0.8rem;
+      color: var(--text-secondary);
+      font-weight: 700;
+      margin-left: auto;
+      white-space: nowrap;
+    }
+
+    /* Cards Grid */
+    .cards-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(330px, 1fr));
+      gap: 1.25rem;
+      margin-bottom: 3.5rem;
+    }
+
+    .land-card {
+      background: var(--bg-card);
+      backdrop-filter: blur(12px);
+      border: 1px solid var(--border-color);
+      border-radius: 18px;
+      padding: 1.4rem;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      gap: 1rem;
+      transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.25s ease, box-shadow 0.25s ease;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .land-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 3px;
+      background: transparent;
+      transition: background 0.3s ease;
+    }
+
+    .land-card.buildable::before {
+      background: linear-gradient(90deg, #10b981 0%, #06b6d4 100%);
+    }
+
+    .land-card.unbuildable::before {
+      background: linear-gradient(90deg, #64748b 0%, #475569 100%);
+    }
+
+    .land-card:hover {
+      transform: translateY(-4px);
+      border-color: rgba(255, 255, 255, 0.2);
+      box-shadow: 0 16px 36px rgba(0, 0, 0, 0.35);
+      background: var(--bg-card-hover);
+    }
+
+    .card-top-badges {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .badge-buildable {
+      font-size: 0.68rem;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      padding: 0.25rem 0.65rem;
+      border-radius: 6px;
+      background: rgba(16, 185, 129, 0.15);
+      color: var(--accent-green-bright);
+      border: 1px solid rgba(16, 185, 129, 0.3);
+    }
+
+    .badge-sideyard {
+      font-size: 0.68rem;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      padding: 0.25rem 0.65rem;
+      border-radius: 6px;
+      background: rgba(100, 116, 139, 0.2);
+      color: #94a3b8;
+      border: 1px solid rgba(100, 116, 139, 0.3);
+    }
+
+    .badge-district {
+      font-size: 0.68rem;
+      color: var(--text-secondary);
+      background: rgba(255, 255, 255, 0.05);
+      padding: 0.25rem 0.6rem;
+      border-radius: 6px;
+      border: 1px solid rgba(255, 255, 255, 0.06);
+    }
+
+    .card-address-block {
+      display: flex;
+      flex-direction: column;
+      gap: 0.35rem;
+    }
+
+    .card-address {
+      font-family: var(--font-heading);
+      font-size: 1.05rem;
+      font-weight: 700;
+      color: #ffffff;
+      line-height: 1.25;
+    }
+
+    .card-parcel-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 0.5rem;
+      margin-top: 0.2rem;
+    }
+
+    .card-parcel-id {
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      color: var(--text-secondary);
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+
+    .btn-copy {
+      background: none;
+      border: none;
+      color: var(--accent-green-bright);
+      cursor: pointer;
+      font-size: 0.8rem;
+      padding: 2px 4px;
+      border-radius: 4px;
+      transition: background 0.15s ease;
+    }
+
+    .btn-copy:hover {
+      background: rgba(52, 211, 153, 0.15);
+    }
+
+    .badge-sqft {
+      font-size: 0.72rem;
+      font-weight: 700;
+      color: var(--accent-blue);
+      background: rgba(56, 189, 248, 0.12);
+      padding: 0.2rem 0.55rem;
+      border-radius: 6px;
+      border: 1px solid rgba(56, 189, 248, 0.25);
+    }
+
+    .card-program-box {
+      font-size: 0.72rem;
+      color: #cbd5e1;
+      background: rgba(0, 0, 0, 0.35);
+      padding: 0.6rem 0.8rem;
+      border-radius: 8px;
+      border: 1px solid rgba(255, 255, 255, 0.04);
+    }
+
+    .card-program-label {
+      color: var(--text-muted);
+      font-size: 0.65rem;
+      text-transform: uppercase;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+    }
+
+    .card-pricing-grid {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      border-top: 1px solid rgba(255, 255, 255, 0.06);
+      padding-top: 0.75rem;
+    }
+
+    .price-label {
+      font-size: 0.68rem;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      margin-bottom: 2px;
+    }
+
+    .price-tag-landbank {
+      font-family: var(--font-heading);
+      font-size: 1.25rem;
+      font-weight: 800;
+      color: var(--accent-green-bright);
+    }
+
+    .price-tag-value {
+      font-family: var(--font-heading);
+      font-size: 1.25rem;
+      font-weight: 800;
+      color: var(--accent-blue);
+      text-align: right;
+    }
+
+    .card-strategy-text {
+      font-size: 0.72rem;
+      font-weight: 600;
+      color: var(--accent-green-bright);
+    }
+
+    .card-actions-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 0.5rem;
+    }
+
+    .card-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.4rem;
+      padding: 0.55rem 0.75rem;
+      font-size: 0.72rem;
+      font-weight: 700;
+      border-radius: 8px;
+      cursor: pointer;
+      text-decoration: none;
+      transition: all 0.2s ease;
+      border: 1px solid var(--border-color);
+      background: rgba(255, 255, 255, 0.04);
+      color: #ffffff;
+    }
+
+    .card-btn:hover {
+      background: rgba(255, 255, 255, 0.1);
+      border-color: rgba(255, 255, 255, 0.2);
+    }
+
+    .card-btn-primary {
+      background: rgba(16, 185, 129, 0.15);
+      border-color: rgba(16, 185, 129, 0.35);
+      color: var(--accent-green-bright);
+    }
+
+    .card-btn-primary:hover {
+      background: rgba(16, 185, 129, 0.25);
+      border-color: var(--accent-green-bright);
+      color: #ffffff;
+    }
+
+    .card-btn-calc {
+      background: rgba(6, 182, 212, 0.15);
+      border-color: rgba(6, 182, 212, 0.35);
+      color: var(--accent-cyan);
+    }
+
+    .card-btn-calc:hover {
+      background: rgba(6, 182, 212, 0.25);
+      border-color: var(--accent-cyan);
+      color: #ffffff;
+    }
+
+    /* Modals */
+    .modal-backdrop {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      background: rgba(0, 0, 0, 0.75);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      z-index: 1000;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 1.5rem;
+    }
+
+    .modal-backdrop.active {
+      display: flex;
+    }
+
+    .modal-box {
+      background: #0f172a;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 24px;
+      width: 100%;
+      max-width: 680px;
+      max-height: 90vh;
+      overflow-y: auto;
+      padding: 2rem;
+      box-shadow: 0 25px 60px rgba(0, 0, 0, 0.6);
+      animation: modalFadeIn 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .modal-box-large {
+      max-width: 900px;
+    }
+
+    @keyframes modalFadeIn {
+      from { opacity: 0; transform: scale(0.95); }
+      to { opacity: 1; transform: scale(1); }
+    }
+
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 1.5rem;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      padding-bottom: 1rem;
+    }
+
+    .modal-close-btn {
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      font-size: 1.75rem;
+      cursor: pointer;
+      line-height: 1;
+      transition: color 0.2s ease;
+    }
+
+    .modal-close-btn:hover {
+      color: #ffffff;
+    }
+
+    /* Simulator Sliders */
+    .slider-group {
+      margin-bottom: 1.25rem;
+    }
+
+    .slider-label-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      font-size: 0.8rem;
+      font-weight: 700;
+      color: #cbd5e1;
+      margin-bottom: 0.4rem;
+    }
+
+    .slider-input {
+      width: 100%;
+      accent-color: var(--accent-green-bright);
+      cursor: pointer;
+    }
+
+    .calc-results-box {
+      background: rgba(0, 0, 0, 0.4);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 16px;
+      padding: 1.25rem;
+      margin-top: 1.5rem;
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 1rem;
+    }
+
+    .calc-res-item {
+      display: flex;
+      flex-direction: column;
+      gap: 0.25rem;
+    }
+
+    .calc-res-label {
+      font-size: 0.72rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      font-weight: 700;
+    }
+
+    .calc-res-val {
+      font-family: var(--font-heading);
+      font-size: 1.35rem;
+      font-weight: 800;
+      color: #ffffff;
+    }
+
+    /* Satellite Map Container */
+    #satelliteMapContainer {
+      width: 100%;
+      height: 420px;
+      border-radius: 16px;
+      overflow: hidden;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      margin-bottom: 1rem;
+    }
+
+    /* Responsive adjustments */
+    @media (max-width: 768px) {
+      .kpi-grid {
+        grid-template-columns: repeat(2, 1fr);
+      }
+      .pricing-notice-box {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+      .filter-toolbar {
+        flex-direction: column;
+        align-items: stretch;
+      }
+      .results-count {
+        margin-left: 0;
+        text-align: right;
+      }
+      .cards-grid {
+        grid-template-columns: 1fr;
+      }
+      .calc-results-box {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Header -->
+  <header>
+    <div class="container header-inner">
+      <div class="brand-box">
+        <div class="brand-icon">
+          <i data-lucide="trees"></i>
+        </div>
+        <div>
+          <div class="brand-title">TZEL LANDS &bull; LOUISVILLE INFILL</div>
+          <div class="brand-subtitle">PORTAL OFICIAL DE SOLARES MUNICIPALES (VAP)</div>
+        </div>
+      </div>
+
+      <div class="header-kpi-pill">
+        <div class="pulse-dot"></div>
+        <span id="headerLiveBadge">808 Terrenos en Inventario</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Content Area -->
+  <main class="container">
+    
+    <!-- Hero Title -->
+    <section class="hero-banner">
+      <h1 class="hero-title">Buscador Táctico de <span>Terrenos & Infill</span></h1>
+      <p class="hero-desc">
+        Catálogo de solares urbanos y parcelas edificables de Louisville Metro Landbank (VAP). Analiza metrajes oficiales del PVA, calcula costos de construcción nueva y proyecta retornos de desarrollo antes de solicitar.
+      </p>
+    </section>
+
+    <!-- KPI Summary Grid -->
+    <section class="kpi-grid">
+      <div class="kpi-card">
+        <span class="kpi-label">Total Terrenos</span>
+        <div class="kpi-num" id="kpiTotalLots">808</div>
+        <span class="kpi-sub">Jefferson County, KY</span>
+      </div>
+
+      <div class="kpi-card">
+        <span class="kpi-label">Disponibles Compra VAP</span>
+        <div class="kpi-num" id="kpiAvailableLots" style="color: var(--accent-green-bright);">494</div>
+        <span class="kpi-sub">Adquisición Inmediata</span>
+      </div>
+
+      <div class="kpi-card">
+        <span class="kpi-label">Lotes Edificables (Infill)</span>
+        <div class="kpi-num" id="kpiBuildableLots" style="color: var(--accent-cyan);">763</div>
+        <span class="kpi-sub">94.4% del inventario</span>
+      </div>
+
+      <div class="kpi-card">
+        <span class="kpi-label">Solares Mow-To-Own</span>
+        <div class="kpi-num" id="kpiDollarLots" style="color: var(--accent-amber);">45</div>
+        <span class="kpi-sub">Para vecinos colindantes ($500)</span>
+      </div>
+    </section>
+
+    <!-- Pricing Explanation Notice -->
+    <div class="pricing-notice-box">
+      <div class="pricing-notice-content">
+        <i data-lucide="info" style="color: var(--accent-blue); width: 22px; height: 22px; flex-shrink: 0;"></i>
+        <div>
+          <strong style="color: #ffffff;">¿Por qué los precios de adquisición son $1,000 o $500?</strong>
+          <div style="color: #94a3b8; margin-top: 2px;">
+            Los terrenos pertenecen al programa municipal <em>Louisville Metro Landbank (VAP)</em>, el cual aplica <strong>tarifas fijas reglamentarias</strong> ($1,000 infill directo / $500 Mow-to-Own) para incentivar la revitalización urbana, no precios de mercado abierto. El <strong>Valor Estimado</strong> de cada solar se calcula individualmente según su metraje catastral PVA.
+          </div>
+        </div>
+      </div>
+      <div class="pricing-notice-tag">
+        🏛️ Tarifa Fija Municipal VAP
+      </div>
+    </div>
+
+    <!-- Filter Control Ribbon -->
+    <div class="filter-toolbar">
+      <div class="search-input-wrapper">
+        <i data-lucide="search" class="search-icon"></i>
+        <input type="text" id="landsSearchInput" class="search-input" placeholder="Buscar por calle o Parcel ID (ej. Burnett, Wilson, 040H...)" oninput="debouncedSearch()">
+      </div>
+
+      <select id="filterStatus" class="filter-select" onchange="fetchLands()">
+        <option value="available" selected>🟢 Solo Disponibles para Compra (VAP)</option>
+        <option value="all">📋 Todos los Terrenos (Incluye Reservas)</option>
+      </select>
+
+      <select id="filterBuildable" class="filter-select" onchange="fetchLands()">
+        <option value="all">Edificabilidad: Todos los Lotes</option>
+        <option value="yes" selected>🏗️ Solo Edificables (Infill Ready)</option>
+        <option value="no">🏡 No Edificables (Mow to Own / Side Yard)</option>
+      </select>
+
+      <select id="filterZip" class="filter-select" onchange="fetchLands()">
+        <option value="">Código Postal: Todos</option>
+        <option value="40212">40212 (Portland)</option>
+        <option value="40211">40211 (Shawnee)</option>
+        <option value="40210">40210 (Russell / Park Hill)</option>
+        <option value="40203">40203 (California / Old Louisville)</option>
+        <option value="40216">40216 (Shively)</option>
+        <option value="40208">40208 (South / University)</option>
+        <option value="40215">40215 (Taylor Berry)</option>
+      </select>
+
+      <select id="filterPrice" class="filter-select" onchange="fetchLands()">
+        <option value="all">Rango de Precio: Todos</option>
+        <option value="dollar">💵 Hasta $500 (Mow to Own / Dollar Lots)</option>
+        <option value="direct">🏷️ $501 a $2,500 (Venta Directa)</option>
+        <option value="above">💎 Mayor a $2,500</option>
+      </select>
+
+      <select id="filterSort" class="filter-select" onchange="fetchLands()">
+        <option value="default">Ordenar: Edificables Primero</option>
+        <option value="value_desc">Mayor Valor Estimado</option>
+        <option value="sqft_desc">Mayor Metraje (SqFt)</option>
+        <option value="price_asc">Precio: Menor a Mayor</option>
+        <option value="price_desc">Precio: Mayor a Menor</option>
+        <option value="zip">Por Dirección / Calle</option>
+      </select>
+
+      <span id="resultsIndicator" class="results-count">Cargando inventario...</span>
+    </div>
+
+    <!-- Cards Grid -->
+    <div id="cardsGrid" class="cards-grid">
+      <!-- Injected dynamically via JS -->
+    </div>
+
+  </main>
+
+  <!-- ================================================================= -->
+  <!-- MODAL 1: CALCULADORA DE DESARROLLO INFILL (ROI & CAPITAL)         -->
+  <!-- ================================================================= -->
+  <div id="calcModal" class="modal-backdrop" onclick="if(event.target === this) closeCalcModal()">
+    <div class="modal-box">
+      <div class="modal-header">
+        <div>
+          <div style="font-size: 0.72rem; font-weight: 800; color: var(--accent-green-bright); text-transform: uppercase; letter-spacing: 0.05em;">
+            UNDERWRITING TÁCTICO &bull; LOUISVILLE INFILL
+          </div>
+          <h2 style="font-family: var(--font-heading); font-size: 1.25rem; font-weight: 800; color: #fff; margin-top: 4px;">
+            Simulador de Desarrollo Infill
+          </h2>
+          <div id="calcModalAddress" style="font-size: 0.8rem; color: var(--text-secondary); margin-top: 2px;">
+            Seleccione un solar
+          </div>
+        </div>
+        <button class="modal-close-btn" onclick="closeCalcModal()">&times;</button>
+      </div>
+
+      <!-- Sliders -->
+      <div class="slider-group">
+        <div class="slider-label-row">
+          <span>Precio Adquisición Terreno (Landbank):</span>
+          <span id="sliderValLand" style="color: var(--accent-green-bright);">$1,000</span>
+        </div>
+        <input type="range" id="sliderLand" class="slider-input" min="1" max="10000" step="100" value="1000" oninput="recalcInfill()">
+      </div>
+
+      <div class="slider-group">
+        <div class="slider-label-row">
+          <span>Metraje Construcción Nueva (SqFt):</span>
+          <span id="sliderValSqft" style="color: var(--accent-cyan);">1,400 sqft</span>
+        </div>
+        <input type="range" id="sliderSqft" class="slider-input" min="900" max="2500" step="50" value="1400" oninput="recalcInfill()">
+      </div>
+
+      <div class="slider-group">
+        <div class="slider-label-row">
+          <span>Costo de Construcción por Pie Cuadrado:</span>
+          <span id="sliderValCost" style="color: var(--accent-amber);">$135 / sqft</span>
+        </div>
+        <input type="range" id="sliderCost" class="slider-input" min="110" max="200" step="5" value="135" oninput="recalcInfill()">
+      </div>
+
+      <div class="slider-group">
+        <div class="slider-label-row">
+          <span>Valor de Reventa Final (ARV Proyectado):</span>
+          <span id="sliderValArv" style="color: var(--accent-blue);">$245,000</span>
+        </div>
+        <input type="range" id="sliderArv" class="slider-input" min="170000" max="380000" step="5000" value="245000" oninput="recalcInfill()">
+      </div>
+
+      <!-- Results Grid -->
+      <div class="calc-results-box">
+        <div class="calc-res-item">
+          <span class="calc-res-label">Costo de Obra Nueva</span>
+          <span class="calc-res-val" id="resBuildCost">$189,000</span>
+        </div>
+
+        <div class="calc-res-item">
+          <span class="calc-res-label">Costo Total Proyecto</span>
+          <span class="calc-res-val" id="resTotalCost" style="color: var(--accent-amber);">$198,500</span>
+        </div>
+
+        <div class="calc-res-item">
+          <span class="calc-res-label">Beneficio Neto Estimado</span>
+          <span class="calc-res-val" id="resNetProfit" style="color: var(--accent-green-bright);">+$31,800</span>
+        </div>
+
+        <div class="calc-res-item">
+          <span class="calc-res-label">Retorno Sobre Inversión (ROI)</span>
+          <span class="calc-res-val" id="resRoi" style="color: var(--accent-cyan);">16.0%</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================================================================= -->
+  <!-- MODAL 2: INSPECCIÓN SATELITAL HD CON MAPA LEAFLET                -->
+  <!-- ================================================================= -->
+  <div id="satelliteModal" class="modal-backdrop" onclick="if(event.target === this) closeSatelliteModal()">
+    <div class="modal-box modal-box-large">
+      <div class="modal-header">
+        <div>
+          <div style="font-size: 0.72rem; font-weight: 800; color: var(--accent-green-bright); text-transform: uppercase; letter-spacing: 0.05em;">
+            INSPECCIÓN SATELITAL HD &bull; JEFFERSON COUNTY PVA
+          </div>
+          <h2 id="satelliteModalTitle" style="font-family: var(--font-heading); font-size: 1.25rem; font-weight: 800; color: #fff; margin-top: 4px;">
+            Inspección de Parcela
+          </h2>
+          <div id="satelliteModalCoords" style="font-size: 0.78rem; color: var(--text-secondary); font-family: var(--font-mono); margin-top: 2px;">
+            Coordenadas GPS
+          </div>
+        </div>
+        <button class="modal-close-btn" onclick="closeSatelliteModal()">&times;</button>
+      </div>
+
+      <!-- Leaflet Container -->
+      <div id="satelliteMapContainer"></div>
+
+      <!-- Quick Action External Links -->
+      <div style="display: flex; gap: 0.75rem; justify-content: flex-end; flex-wrap: wrap;">
+        <a id="btnGmapsLink" href="#" target="_blank" rel="noopener noreferrer" class="card-btn" style="background: rgba(56, 189, 248, 0.15); color: var(--accent-blue);">
+          <i data-lucide="external-link" style="width: 14px; height: 14px;"></i>
+          <span>Abrir en Google Maps</span>
+        </a>
+        <a id="btnStreetViewLink" href="#" target="_blank" rel="noopener noreferrer" class="card-btn" style="background: rgba(245, 158, 11, 0.15); color: var(--accent-amber);">
+          <i data-lucide="camera" style="width: 14px; height: 14px;"></i>
+          <span>Abrir Google Street View</span>
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <!-- JavaScript Logic -->
+  <script>
+    let allLots = [];
+    let currentLot = null;
+    let searchTimer = null;
+    let satMap = null;
+    let satMarker = null;
+
+    function escapeHtml(str) {
+      if (!str) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
+
+    function copyToClipboard(text) {
+      if (navigator.clipboard) {
+        navigator.clipboard.writeText(text).then(() => {
+          alert(`Parcel ID copiado al portapapeles: ${text}`);
+        });
+      }
+    }
+
+    function debouncedSearch() {
+      clearTimeout(searchTimer);
+      searchTimer = setTimeout(() => {
+        fetchLands();
+      }, 300);
+    }
+
+    async function fetchLands() {
+      const indicator = document.getElementById('resultsIndicator');
+      const grid = document.getElementById('cardsGrid');
+      if (indicator) indicator.textContent = 'Consultando parcelas...';
+
+      const status = document.getElementById('filterStatus')?.value || 'available';
+      const buildable = document.getElementById('filterBuildable')?.value || 'yes';
+      const zip = document.getElementById('filterZip')?.value || '';
+      const priceFilter = document.getElementById('filterPrice')?.value || 'all';
+      const sort = document.getElementById('filterSort')?.value || 'default';
+      const search = document.getElementById('landsSearchInput')?.value || '';
+
+      let minPrice = '';
+      let maxPrice = '';
+      if (priceFilter === 'dollar') {
+        maxPrice = '500';
+      } else if (priceFilter === 'direct') {
+        minPrice = '501';
+        maxPrice = '2500';
+      } else if (priceFilter === 'above') {
+        minPrice = '2501';
+      }
+
+      const params = new URLSearchParams();
+      if (status) params.set('status', status);
+      if (buildable) params.set('buildable', buildable);
+      if (zip) params.set('zip', zip);
+      if (search) params.set('search', search);
+      if (minPrice) params.set('minPrice', minPrice);
+      if (maxPrice) params.set('maxPrice', maxPrice);
+      if (sort) params.set('sort', sort);
+
+      try {
+        const resp = await fetch(`/api/lands?${params.toString()}`);
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        const data = await resp.json();
+
+        allLots = data.data || [];
+
+        // Actualizar KPIs
+        if (data.kpis) {
+          const totalLots = data.kpis.total_lots || allLots.length;
+          const availableLots = data.kpis.available_lots || 0;
+          const buildableLots = data.kpis.buildable_lots || 0;
+          const dollarLots = data.kpis.dollar_lots || 0;
+
+          const elTotal = document.getElementById('kpiTotalLots');
+          const elAvail = document.getElementById('kpiAvailableLots');
+          const elBuild = document.getElementById('kpiBuildableLots');
+          const elDollar = document.getElementById('kpiDollarLots');
+
+          if (elTotal) elTotal.textContent = Number(totalLots).toLocaleString();
+          if (elAvail) elAvail.textContent = Number(availableLots).toLocaleString();
+          if (elBuild) elBuild.textContent = Number(buildableLots).toLocaleString();
+          if (elDollar) elDollar.textContent = Number(dollarLots).toLocaleString();
+          document.getElementById('headerLiveBadge').textContent = `${Number(totalLots).toLocaleString()} Terrenos en Inventario`;
+        }
+
+        if (indicator) {
+          indicator.textContent = `${allLots.length} parcelas encontradas`;
+        }
+
+        renderGrid(allLots);
+      } catch (err) {
+        console.error('[LANDS ERROR]', err);
+        if (indicator) indicator.textContent = 'Error al consultar inventario';
+        if (grid) {
+          grid.innerHTML = `
+            <div style="grid-column: 1 / -1; text-align: center; padding: 40px; color: #ef4444;">
+              <i data-lucide="alert-circle" style="width: 36px; height: 36px; margin-bottom: 8px;"></i>
+              <div>No se pudo conectar con la base de datos de terrenos de Louisville Metro.</div>
+            </div>
+          `;
+          if (typeof lucide !== 'undefined') lucide.createIcons();
+        }
+      }
+    }
+
+    function renderGrid(lots) {
+      const grid = document.getElementById('cardsGrid');
+      if (!grid) return;
+
+      if (!lots || lots.length === 0) {
+        grid.innerHTML = `
+          <div style="grid-column: 1 / -1; text-align: center; padding: 60px 20px; color: #94a3b8;">
+            <i data-lucide="trees" style="width: 48px; height: 48px; color: #34d399; margin-bottom: 12px; opacity: 0.5;"></i>
+            <h3 style="color: #fff; margin: 0 0 8px 0;">No se encontraron terrenos con los filtros seleccionados</h3>
+            <p style="font-size: 0.85rem; max-width: 450px; margin: 0 auto;">Intente seleccionar "Todos los Códigos Postales" o ampliar el rango de precios.</p>
+          </div>
+        `;
+        if (typeof lucide !== 'undefined') lucide.createIcons();
+        return;
+      }
+
+      grid.innerHTML = lots.map((lot, idx) => {
+        const isBuildable = String(lot.buildable_lot || '').toLowerCase() === 'yes';
+        const askingPrice = Number(lot.asking_price) || 1000;
+        const parcelId = escapeHtml(lot.parcel_id || 'N/A');
+        const address = escapeHtml(lot.address || 'Louisville, KY');
+        const category = escapeHtml(lot.category || 'Available');
+        const status = escapeHtml(lot.property_status || 'Available');
+        const district = lot.council_district ? `Distrito ${lot.council_district}` : 'Jefferson Co.';
+        const lat = lot.lat ? Number(lot.lat) : null;
+        const lon = lot.lon ? Number(lot.lon) : null;
+        const sqft = lot.sqft ? Number(lot.sqft) : null;
+        const acres = lot.acres ? Number(lot.acres) : null;
+        const estimatedVal = Number(lot.estimated_value) || (isBuildable ? (sqft ? Math.round(sqft * 6) : 28000) : (sqft ? Math.round(sqft * 2.5) : 3500));
+
+        const strategyText = isBuildable 
+          ? '🏗️ Infill New Construction (Single Family / Duplex)' 
+          : '🏡 Mow to Own / Adjoining Side Yard Expansion';
+
+        return `
+          <div class="land-card ${isBuildable ? 'buildable' : 'unbuildable'}">
+            <!-- Badges -->
+            <div class="card-top-badges">
+              <span class="${isBuildable ? 'badge-buildable' : 'badge-sideyard'}">
+                ${isBuildable ? '🏗️ Lote Edificable' : '🏡 No Edificable (Side Yard)'}
+              </span>
+              <span class="badge-district">
+                ${district}
+              </span>
+            </div>
+
+            <!-- Address & Parcel ID -->
+            <div class="card-address-block">
+              <div class="card-address">${address}</div>
+              <div class="card-parcel-row">
+                <div class="card-parcel-id">
+                  <span>Parcela:</span>
+                  <strong>${parcelId}</strong>
+                  <button class="btn-copy" onclick="copyToClipboard('${parcelId}')" title="Copiar Parcel ID">📋</button>
+                </div>
+                ${sqft ? `
+                  <span class="badge-sqft" title="Metraje oficial PVA">
+                    📐 ${sqft.toLocaleString()} sqft · ${acres ? acres.toFixed(3) + ' ac' : ''}
+                  </span>
+                ` : ''}
+              </div>
+            </div>
+
+            <!-- Program Details -->
+            <div class="card-program-box">
+              <div class="card-program-label">Programa Louisville Landbank:</div>
+              <div style="font-weight: 600; color: #e2e8f0; margin-top: 1px;">
+                ${category} &bull; <span style="color: var(--accent-green-bright);">${status}</span>
+              </div>
+            </div>
+
+            <!-- Pricing Grid -->
+            <div class="card-pricing-grid">
+              <div>
+                <div class="price-label" title="Tarifa oficial fija por ordenanza municipal">Tarifa Adquisición:</div>
+                <div class="price-tag-landbank">$${askingPrice.toLocaleString()} <span style="font-size: 0.65rem; color: #94a3b8; font-weight: normal;">(Fija VAP)</span></div>
+              </div>
+              <div>
+                <div class="price-label" title="Valor catastral estimado según metraje PVA">Valor Catastral Est.:</div>
+                <div class="price-tag-value">$${estimatedVal.toLocaleString()}</div>
+              </div>
+            </div>
+
+            <!-- Strategy text -->
+            <div class="card-strategy-text">
+              ${strategyText}
+            </div>
+
+            <!-- Action Buttons Grid -->
+            <div class="card-actions-grid">
+              <button class="card-btn card-btn-primary" onclick="openSatelliteModal(${lat}, ${lon}, '${escapeHtml(address)}', '${parcelId}')">
+                <i data-lucide="map" style="width: 13px; height: 13px;"></i>
+                <span>Ver Satélite</span>
+              </button>
+
+              <button class="card-btn card-btn-calc" onclick="openCalcModal(allLots[${idx}])">
+                <i data-lucide="calculator" style="width: 13px; height: 13px;"></i>
+                <span>Simular Infill</span>
+              </button>
+
+              <a class="card-btn" href="https://jeffersonpva.ky.gov/property-search/" target="_blank" rel="noopener noreferrer">
+                <i data-lucide="external-link" style="width: 13px; height: 13px;"></i>
+                <span>PVA Oficial</span>
+              </a>
+
+              <a class="card-btn" href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}" target="_blank" rel="noopener noreferrer">
+                <i data-lucide="compass" style="width: 13px; height: 13px;"></i>
+                <span>Google Maps</span>
+              </a>
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      if (typeof lucide !== 'undefined') lucide.createIcons();
+    }
+
+    // --- SATELLITE MAP MODAL ---
+    function openSatelliteModal(lat, lon, address, parcelId) {
+      if (!lat || !lon) {
+        alert('Este terreno aún no tiene coordenadas GPS exactas.');
+        return;
+      }
+
+      document.getElementById('satelliteModalTitle').textContent = address;
+      document.getElementById('satelliteModalCoords').textContent = `Parcela: ${parcelId} • Lat: ${lat.toFixed(6)}, Lon: ${lon.toFixed(6)}`;
+      
+      document.getElementById('btnGmapsLink').href = `https://www.google.com/maps/@?api=1&map_action=map&center=${lat},${lon}&zoom=19&basemap=satellite`;
+      document.getElementById('btnStreetViewLink').href = `https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${lat},${lon}`;
+
+      const modal = document.getElementById('satelliteModal');
+      modal.classList.add('active');
+
+      setTimeout(() => {
+        if (!satMap) {
+          satMap = L.map('satelliteMapContainer').setView([lat, lon], 19);
+          // High-Res Esri World Imagery (Satellite)
+          L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+            attribution: 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community',
+            maxZoom: 20
+          }).addTo(satMap);
+        } else {
+          satMap.invalidateSize();
+          satMap.setView([lat, lon], 19);
+        }
+
+        if (satMarker) satMap.removeLayer(satMarker);
+        
+        satMarker = L.circleMarker([lat, lon], {
+          radius: 10,
+          fillColor: '#10b981',
+          color: '#ffffff',
+          weight: 3,
+          opacity: 1,
+          fillOpacity: 0.85
+        }).addTo(satMap);
+
+        satMarker.bindPopup(`<strong>${address}</strong><br>Parcela: ${parcelId}`).openPopup();
+      }, 200);
+
+      if (typeof lucide !== 'undefined') lucide.createIcons();
+    }
+
+    function closeSatelliteModal() {
+      document.getElementById('satelliteModal').classList.remove('active');
+    }
+
+    // --- CALCULATOR MODAL ---
+    function openCalcModal(lot) {
+      currentLot = lot;
+      const modal = document.getElementById('calcModal');
+      const addrEl = document.getElementById('calcModalAddress');
+
+      if (lot) {
+        const sqftText = lot.sqft ? ` • Metraje: ${Number(lot.sqft).toLocaleString()} sqft` : '';
+        addrEl.innerHTML = `${lot.address} <span style="color: #64748b;">(Parcela: ${lot.parcel_id || 'N/A'})</span>${sqftText}`;
+        document.getElementById('sliderLand').value = lot.asking_price || 1000;
+      } else {
+        addrEl.textContent = 'Simulación General Infill en Louisville';
+      }
+
+      modal.classList.add('active');
+      recalcInfill();
+      if (typeof lucide !== 'undefined') lucide.createIcons();
+    }
+
+    function closeCalcModal() {
+      document.getElementById('calcModal').classList.remove('active');
+    }
+
+    function recalcInfill() {
+      const land = Number(document.getElementById('sliderLand')?.value || 1000);
+      const sqft = Number(document.getElementById('sliderSqft')?.value || 1400);
+      const cost = Number(document.getElementById('sliderCost')?.value || 135);
+      const arv = Number(document.getElementById('sliderArv')?.value || 245000);
+      const permitsCost = 8500;
+
+      // Update Labels
+      document.getElementById('sliderValLand').textContent = `$${land.toLocaleString()}`;
+      document.getElementById('sliderValSqft').textContent = `${sqft.toLocaleString()} sqft`;
+      document.getElementById('sliderValCost').textContent = `$${cost} / sqft`;
+      document.getElementById('sliderValArv').textContent = `$${arv.toLocaleString()}`;
+
+      // Calculations
+      const buildCost = sqft * cost;
+      const totalProject = land + buildCost + permitsCost;
+      const closingRealtor = arv * 0.06;
+      const netProfit = arv - totalProject - closingRealtor;
+      const roi = totalProject > 0 ? (netProfit / totalProject) * 100 : 0;
+
+      document.getElementById('resBuildCost').textContent = `$${buildCost.toLocaleString()}`;
+      document.getElementById('resTotalCost').textContent = `$${totalProject.toLocaleString()}`;
+      document.getElementById('resNetProfit').textContent = `${netProfit >= 0 ? '+' : ''}$${Math.round(netProfit).toLocaleString()}`;
+      document.getElementById('resNetProfit').style.color = netProfit >= 0 ? 'var(--accent-green-bright)' : '#ef4444';
+      document.getElementById('resRoi').textContent = `${roi.toFixed(1)}%`;
+      document.getElementById('resRoi').style.color = roi >= 15 ? 'var(--accent-cyan)' : (roi > 0 ? 'var(--accent-amber)' : '#ef4444');
+    }
+
+    // Initialize on page load
+    document.addEventListener('DOMContentLoaded', () => {
+      fetchLands();
+    });
+  </script>
+</body>
+</html>

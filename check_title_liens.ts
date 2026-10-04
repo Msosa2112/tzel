@@ -255,7 +255,7 @@ export async function runTitleLienCheck(auctionsOnly: boolean = false) {
           console.log(`[SUCCESS] Base de datos actualizada con hidden_liens_amount = $${hiddenLiensAmount} para subasta ${auctionId}`);
 
           if (hiddenLiensAmount > 0) {
-            const rehab = calculateRehab(sqft, []);
+            const rehab = calculateRehab(sqft, [], arv);
             const adjustedMao = calculateMAO(arv, rehab, hiddenMortgages, hiddenLiensAmount);
 
             // Alerta roja brillante en consola
@@ -332,7 +332,7 @@ export async function runTitleLienCheck(auctionsOnly: boolean = false) {
           console.log(`[SUCCESS] Base de datos actualizada con hidden_liens_amount = $${hiddenLiensAmount} para violación ${violationId}`);
 
           if (hiddenLiensAmount > 0) {
-            const rehab = calculateRehab(sqft, []);
+            const rehab = calculateRehab(sqft, [], arv);
             const adjustedMao = calculateMAO(arv, rehab, hiddenMortgages, hiddenLiensAmount);
 
             // Alerta roja brillante en consola
@@ -442,7 +442,7 @@ export async function retryFailedTitleChecks(maxRetries: number = 3, auctionsOnl
             console.log(`[REINTENTO EXITOSO] Subasta ${auctionId} completada. Deuda: $${hiddenLiensAmount}`);
 
             if (hiddenLiensAmount > 0) {
-              const rehab = calculateRehab(sqft, []);
+              const rehab = calculateRehab(sqft, [], arv);
               const adjustedMao = calculateMAO(arv, rehab, hiddenMortgages, hiddenLiensAmount);
               const tgMsg = `🏦 [ALERTA DE REINTENTO] HIPOTECAS OCULTAS DETECTADAS EN ${address}. Deuda extra: $${hiddenLiensAmount.toLocaleString("en-US", { minimumFractionDigits: 2 })}. MAO: $${adjustedMao.toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
               await sendTelegramNotification(tgMsg);
@@ -488,7 +488,7 @@ export async function retryFailedTitleChecks(maxRetries: number = 3, auctionsOnl
             console.log(`[REINTENTO EXITOSO] Violación ${violationId} completada. Deuda: $${hiddenLiensAmount}`);
 
             if (hiddenLiensAmount > 0) {
-              const rehab = calculateRehab(sqft, []);
+              const rehab = calculateRehab(sqft, [], arv);
               const adjustedMao = calculateMAO(arv, rehab, hiddenMortgages, hiddenLiensAmount);
               const tgMsg = `🏦 [ALERTA DE REINTENTO] HIPOTECAS OCULTAS DETECTADAS EN ${address}. Deuda extra: $${hiddenLiensAmount.toLocaleString("en-US", { minimumFractionDigits: 2 })}. MAO: $${adjustedMao.toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
               await sendTelegramNotification(tgMsg);

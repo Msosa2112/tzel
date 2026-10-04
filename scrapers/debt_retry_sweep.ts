@@ -125,7 +125,8 @@ async function performOSINTDebtSearch(
   }
 
   // Enviar a Gemini para análisis financiero
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${apiKey}`;
+  const model = process.env.GEMINI_MODEL || "gemini-3.8-flash";
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
   const prompt = `Eres un perito auditor inmobiliario. Analiza la siguiente recopilación de resultados de búsqueda pública para una propiedad o deudor y extrae:
   1. El monto total de la deuda hipotecaria en ejecución de subasta ("debtAmount").
   2. El monto de hipotecas secundarias (segundas hipotecas) no liberadas ("hiddenMortgages").

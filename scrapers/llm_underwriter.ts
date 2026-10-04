@@ -52,8 +52,8 @@ async function callGeminiModels(prompt: string): Promise<string> {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) throw new Error("GEMINI_API_KEY no configurada en .env");
 
-  // Orden de prioridad: Modelo insignia Pro primero, luego Flash
-  const models = ["gemini-3.1-pro-preview", "gemini-3.8-flash"];
+  // Orden de prioridad: Gemini 3.8 Flash primero para máxima velocidad y precisión, fallback a 3.1-flash-lite
+  const models = [process.env.GEMINI_MODEL || "gemini-3.8-flash", "gemini-3.1-flash-lite"];
   let lastError: any = null;
 
   for (const model of models) {

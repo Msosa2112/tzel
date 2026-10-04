@@ -322,56 +322,68 @@ async function classifyFacebookLead(postText: string, author: string, postUrl: s
   if (!initialCheck.isValidConstruction) return initialCheck;
 
   const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) return initialCheck;
+  if (!apiKey) return { isValidConstruction: false, rejectedReason: "No API Key" };
 
-  const prompt = `Eres el Auditor de Leads de Facebook de TZEL para Construcción, Obras y Reformas en Louisville, KY y Sur de Indiana.
+  const prompt = `Eres el Auditor Táctico de Leads de Barba Construction en Facebook para Louisville, KY y Sur de Indiana.
 
-REGLAS DE CLASIFICACIÓN:
-1. LEAD VÁLIDO: Propietario o cliente buscando cotizaciones, recomendaciones de contratistas o reportando daños físicos en su propiedad para:
-   - Techos (Roofing), Goteras, Tejas.
-   - Canaletas (Gutters), Bajantes, Fascia, Soffit.
-   - Siding (Revestimiento de vinilo, madera, Hardie).
-   - Extensiones y Ampliaciones de casas (Home Additions, Sunrooms, Garajes).
-   - Porches, Terrazas, Patios cubiertos, Pérgolas, Decks de madera/compuesto.
-   - Remodelaciones generales (Cocinas, Sótanos, Drywall, Pintura, Pisos).
-   - Remodelación de Baños, Duchas modernas, Azulejos, Tinás.
-   - Cercas perimetrales (Fences de madera, vinilo, aluminio).
-   - Concreto, Pavimentación, Driveways, Losas, Muros de contención.
-   - Obra nueva y reparaciones por tormentas/árboles caídos.
+REGLAS DE CLASIFICACIÓN ESTRICTAS:
+1. LEAD VÁLIDO (isValidConstruction = true):
+   - EXCLUSIVAMENTE Propietario o cliente final buscando cotizaciones, recomendaciones de contratistas o reportando daños físicos en su propiedad para:
+     * Techos (Roofing), Goteras, Tejas, Storm Damage.
+     * Canaletas (Gutters), Bajantes, Fascia, Soffit.
+     * Siding (Revestimiento de vinilo, madera, Hardie board).
+     * Extensiones y Ampliaciones de casas (Home Additions, Sunrooms, Garajes).
+     * Porches, Terrazas, Patios cubiertos, Pérgolas, Decks de madera/compuesto.
+     * Remodelaciones generales (Cocinas, Sótanos, Drywall, Pintura interior/exterior, Pisos).
+     * Remodelación de Baños, Duchas modernas, Azulejos.
+     * Cercas perimetrales (Fences de madera, vinilo, aluminio).
+     * Concreto, Pavimentación, Driveways, Losas, Muros de contención.
+     * Obra nueva y reparaciones por tormentas/árboles caídos.
 
-2. RECHAZAR OBLIGATORIAMENTE:
-   - Trabajos de Plomería pura (calentadores de agua, tuberías tapadas, fontanería).
-   - Trabajos de Electricidad pura (cableado, paneles eléctricos, enchufes).
-   - Autopromoción de contratistas que venden sus propios servicios ("ofrecemos", "call us", "llámanos", fotos de trabajos terminados).
+2. RECHAZAR OBLIGATORIAMENTE (isValidConstruction = false):
+   - Albañiles, ayudantes o jornaleros buscando trabajo ("busco trabajo", "tengo cuadrilla", "looking for work").
+   - Autopromoción de contratistas o empresas vendiendo sus propios servicios ("ofrecemos", "call us", "llámanos", fotos de trabajos terminados, "free estimates").
+   - Personas contratando empleados o buscando ayudantes ("se busca ayudante", "now hiring").
+   - Plomería pura o electricidad pura (salvo que sea remodelación integral).
    - Venta de productos, autos o empleos ajenos.
 
 Post de "${author}":
-"""${postText.substring(0, 1500)}"""
+"""${postText.substring(0, 1800)}"""
 
-Responde ÚNICAMENTE en JSON:
+Responde ÚNICAMENTE en JSON con esta estructura exacta:
 {
   "isValidConstruction": true o false,
-  "rejectedReason": "Motivo si fue rechazada",
-  "category": "Una de las 8 categorías aprobadas de obra",
-  "estimatedValue": número aproximado en USD,
+  "rejectedReason": "Motivo conciso si fue rechazada",
+  "category": "Una de las categorías aprobadas",
+  "estimatedValue": número aproximado en USD o 0,
   "urgency": "HIGH",
-  "summarySpanish": "Resumen claro en español de 2 líneas describiendo exactamente el trabajo o daño físico que requiere el cliente"
+  "summarySpanish": "Resumen claro en español de 2 líneas describiendo exactamente el trabajo que requiere el cliente",
+  "suggestedResponse": "Respuesta profesional en inglés de 2 a 3 líneas lista para que Barba Construction comente o contacte por DM al cliente, destacando seguro, licencia en KY/IN y ofreciendo estimado sin costo."
 }`;
 
-  try {
-    const res = await axios.post(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
-      {
-        contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: { response_mime_type: "application/json", temperature: 0.1 }
-      },
-      { timeout: 9000 }
-    );
-    const text = res.data?.candidates?.[0]?.content?.parts?.[0]?.text;
-    if (text) return JSON.parse(text) as ClassifierResult;
-  } catch {}
+  const models = [process.env.GEMINI_MODEL || "gemini-3.8-flash", "gemini-3.1-flash-lite"];
 
-  return initialCheck;
+  for (const model of models) {
+    try {
+      const res = await axios.post(
+        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
+        {
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: { response_mime_type: "application/json", temperature: 0.1 }
+        },
+        { timeout: 8000 }
+      );
+      const text = res.data?.candidates?.[0]?.content?.parts?.[0]?.text;
+      if (text) {
+        const parsed = JSON.parse(text) as ClassifierResult;
+        return parsed;
+      }
+    } catch (err: any) {
+      console.warn(`[FB CLASSIFIER] Falló ${model}: ${err.message}`);
+    }
+  }
+
+  return { isValidConstruction: false, rejectedReason: "Error de verificación por IA (descartado por precaución)" };
 }
 
 /**
@@ -589,8 +601,9 @@ export async function collectFacebookGroupLeads(): Promise<ConstructionLead[]> {
             triggerDate: new Date().toISOString().split("T")[0],
             urgencyLevel: evaluation.urgency || "HIGH",
             sourcePortal: "Facebook Groups Feed (/groups/feed/)",
-            rawDetails: `${evaluation.summarySpanish}\n💬 Texto original: "${p.text.substring(0, 220)}..."\n🔗 Enlace directo al Post: ${p.link}`,
-            permitNumber: p.link
+            rawDetails: `${evaluation.summarySpanish}\n💬 Texto original: "${p.text.substring(0, 220)}..."\n🎯 Respuesta Sugerida Barba Construction: ${evaluation.suggestedResponse || "Estimado sin costo disponible"}\n🔗 Enlace directo al Post: ${p.link}`,
+            permitNumber: p.link,
+            suggestedResponse: evaluation.suggestedResponse
           };
 
           await saveConstructionLead(lead);
@@ -667,8 +680,9 @@ export async function collectFacebookGroupLeads(): Promise<ConstructionLead[]> {
               triggerDate: new Date().toISOString().split("T")[0],
               urgencyLevel: evaluation.urgency || "HIGH",
               sourcePortal: `Facebook Search ("${q}")`,
-              rawDetails: `${evaluation.summarySpanish}\n💬 Texto original: "${p.text.substring(0, 220)}..."\n🔗 Enlace directo al Post: ${p.link}`,
-              permitNumber: p.link
+              rawDetails: `${evaluation.summarySpanish}\n💬 Texto original: "${p.text.substring(0, 220)}..."\n🎯 Respuesta Sugerida Barba Construction: ${evaluation.suggestedResponse || "Estimado sin costo disponible"}\n🔗 Enlace directo al Post: ${p.link}`,
+              permitNumber: p.link,
+              suggestedResponse: evaluation.suggestedResponse
             };
 
             await saveConstructionLead(lead);

@@ -9,7 +9,7 @@ dotenv.config();
 
 // Configuración de Supabase de BarbaProsystem
 const BARBAPRO_SUPABASE_URL = process.env.BARBAPRO_SUPABASE_URL || "https://ddwyutisxymuvofkjhpz.supabase.co";
-const BARBAPRO_SUPABASE_KEY = process.env.BARBAPRO_SUPABASE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRkd3l1dGlzeHltdXZvZmtqaHB6Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NzA1MzM5NSwiZXhwIjoyMDkyNjI5Mzk1fQ.cJQgzQsy1TUa4Yk01qkBedrmM8HxYqnH3VqzVLKpUDY";
+const BARBAPRO_SUPABASE_KEY = process.env.BARBAPRO_SUPABASE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || "";
 
 export const supabaseBarba = createClient(BARBAPRO_SUPABASE_URL, BARBAPRO_SUPABASE_KEY);
 
@@ -62,14 +62,15 @@ Responde ÚNICAMENTE en formato JSON con la siguiente estructura:
   "callOpening": "Guión de apertura para llamada telefónica si se dispone de número"
 }`;
 
+  const model = process.env.GEMINI_MODEL || "gemini-3.8-flash";
   try {
     const res = await axios.post(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
       {
         contents: [{ parts: [{ text: prompt }] }],
         generationConfig: { response_mime_type: "application/json", temperature: 0.2 }
       },
-      { timeout: 9000 }
+      { timeout: 8000 }
     );
 
     const text = res.data?.candidates?.[0]?.content?.parts?.[0]?.text;

@@ -1,37 +1,17 @@
 /**
  * Módulo de Suscripción y Underwriting Financiero para Adquisición de Propiedades
+ *
+ * Las fórmulas de oferta y rehab viven en ./offer_engine.js (fuente única compartida con la UI).
  */
-
-// Palabras clave de daños severos y moderados para cálculo de Rehab
-const SEVERE_DAMAGE_KEYWORDS = ["structural", "roof", "dangerous", "unsafe", "foundation", "fire", "daño", "peligro", "techo"];
-const MODERATE_DAMAGE_KEYWORDS = ["boarded", "plumbing", "electrical", "maintenance", "grass", "weed", "tapiado", "plomería", "mantenimiento"];
+import { computeOfferTiers, estimateRehab, type OfferTiers } from "./offer_engine";
 
 /**
- * Estima el costo de reparación (Rehab) automáticamente basándose en los pies cuadrados y estresores físicos.
+ * Estima el costo de reparación (Rehab) basándose en los pies cuadrados reales y estresores físicos.
+ * Sin pies cuadrados NO se asume una casa estándar: se estima como % del ARV (si se conoce).
+ * Sin sqft ni ARV devuelve 0 (rehab desconocido).
  */
-export function calculateRehab(sqFt: number | null, violationKeywords: string[]): number {
-  // Si no hay pies cuadrados, asumimos una casa estándar de 1,400 SqFt
-  const actualSqFt = sqFt && sqFt > 0 ? sqFt : 1400;
-  
-  let baseRatePerSqFt = 25; // Tarifa cosmética básica (pintura, limpieza, detalles)
-
-  const hasSevere = violationKeywords.some(keyword => 
-    SEVERE_DAMAGE_KEYWORDS.some(severe => keyword.toLowerCase().includes(severe))
-  );
-  
-  const hasModerate = violationKeywords.some(keyword => 
-    MODERATE_DAMAGE_KEYWORDS.some(mod => keyword.toLowerCase().includes(mod))
-  );
-
-  if (hasSevere) {
-    baseRatePerSqFt = 65; // Daño estructural o de seguridad (reparación total)
-  } else if (hasModerate) {
-    baseRatePerSqFt = 45; // Daño moderado (drywall, cocinas, baños, mantenimiento)
-  }
-
-  // Costo base más un 15% de margen de contingencia para imprevistos
-  const baseRehab = actualSqFt * baseRatePerSqFt;
-  return Math.round(baseRehab * 1.15);
+export function calculateRehab(sqFt: number | null, violationKeywords: string[], arv: number = 0): number {
+  return estimateRehab({ arv, sqft: sqFt, keywords: violationKeywords || [] }).amount;
 }
 
 /**
@@ -49,9 +29,9 @@ export function calculateNetEquity(
 }
 
 /**
- * Calcula la Oferta Máxima Permitida (MAO) basándose en el ARV, el costo de reparación y deudas ocultas.
- * MAO = (ARV * 0.70) - Rehab - Costos_Adquisición - Deuda_Oculta
- * Asume costos de adquisición estándar del 3% del ARV.
+ * Calcula la Oferta Máxima Permitida (MAO) según AGENTS.md: MAO = 75% ARV − Rehab.
+ * Para pujas en subasta se restan además las deudas ocultas que sobreviven a la venta
+ * (hipotecas/gravámenes que el comprador hereda).
  */
 export function calculateMAO(
   arv: number,
@@ -60,9 +40,8 @@ export function calculateMAO(
   hiddenLiensAmount: number = 0
 ): number {
   if (arv <= 0) return 0;
-  const acquisitionCosts = arv * 0.03; // Gastos de cierre y administrativos de compra (3%)
   const cleanHidden = (hiddenMortgages || 0) + (hiddenLiensAmount || 0);
-  const mao = (arv * 0.70) - rehab - acquisitionCosts - cleanHidden;
+  const mao = (arv * 0.75) - rehab - cleanHidden;
   return Math.max(0, Math.round(mao));
 }
 
@@ -213,20 +192,37 @@ export interface InstitutionalUnderwriting {
   wholesaleProfitSpread: number;
   equitySpread: number;
   isUnderwater: boolean;
+  /** Niveles de oferta del motor único (Conservadora/Target/MAO). */
+  offerTiers: OfferTiers;
 }
 
 /**
- * Motor de Underwriting Multicapa Institucional
- * Desglosa ARV, Rehab, Holding, Closing, Margen Deseado, Target Contract Price, Walk-Away y Auction Max Bid.
+ * Motor de Underwriting Multicapa Institucional (AGENTS.md §3.5)
+ *   - ARV = valor de mercado efectivo (sin multiplicadores inventados).
+ *   - targetContractPrice = Target (70% ARV − Rehab)
+ *   - walkAwayPrice       = MAO (75% ARV − Rehab)
+ *   - auctionMaxBid       = Conservadora (65% ARV − Rehab)
+ *   - wholesaleProfitSpread/assignmentFee = MAO − Target (margen real, no una cuota fija)
+ * holdingCosts/closingCosts son informativos (4% / 5% del ARV) y ya están absorbidos por el descuento.
  */
 export function calculateInstitutionalUnderwriting(
   marketValue: number,
   sqft: number | null,
   violationKeywords: string[],
   totalDebt: number,
-  state: string = 'KY'
+  state: string = 'KY',
+  courtAppraisal: number = 0
 ): InstitutionalUnderwriting {
-  if (!marketValue || marketValue <= 0) {
+  const offerTiers = computeOfferTiers({
+    arv: marketValue,
+    sqft,
+    keywords: violationKeywords || [],
+    totalDebt,
+    state,
+    courtAppraisal
+  });
+
+  if (!offerTiers.hasValue) {
     return {
       arv: 0,
       rehab: 0,
@@ -239,46 +235,31 @@ export function calculateInstitutionalUnderwriting(
       auctionMaxBid: 0,
       wholesaleProfitSpread: 0,
       equitySpread: 0,
-      isUnderwater: false
+      isUnderwater: false,
+      offerTiers
     };
   }
 
-  const baseVal = marketValue;
-  const arv = Math.round(baseVal * 1.15);
-  
-  // Rehab calculation
-  let rehabPerSqft = 25;
-  const isSevere = violationKeywords.some(v => /structural|roof|dangerous|unsafe|foundation|fire|demolition/i.test(v));
-  const isModerate = violationKeywords.some(v => /boarded|plumbing|electrical|maintenance|grass|weed/i.test(v));
-  if (isSevere) rehabPerSqft = 65;
-  else if (isModerate) rehabPerSqft = 45;
-
-  const area = (sqft && sqft > 400 && sqft < 10000) ? sqft : 1400;
-  const rehab = Math.round(area * rehabPerSqft * 1.15);
-
+  const arv = offerTiers.arv;
   const holdingCosts = Math.round(arv * 0.04);
   const closingCosts = Math.round(arv * 0.05);
-  const desiredProfit = Math.round(Math.max(25000, arv * 0.15));
-  const assignmentFee = 15000;
-
-  const targetContractPrice = Math.max(0, arv - rehab - holdingCosts - closingCosts - desiredProfit - assignmentFee);
-  const walkAwayPrice = targetContractPrice + 12000;
-  const discountFactor = (state || '').toUpperCase() === 'KY' ? 0.66 : 0.70;
-  const auctionMaxBid = Math.max(0, Math.round((arv * discountFactor) - rehab));
-  const equitySpread = baseVal - totalDebt;
+  // Ganancia implícita del comprador final al pagar el MAO.
+  const desiredProfit = Math.max(0, arv - offerTiers.rehab - offerTiers.max);
+  const equitySpread = marketValue - totalDebt;
 
   return {
     arv,
-    rehab,
+    rehab: offerTiers.rehab,
     holdingCosts,
     closingCosts,
     desiredProfit,
-    assignmentFee,
-    targetContractPrice,
-    walkAwayPrice,
-    auctionMaxBid,
-    wholesaleProfitSpread: assignmentFee,
+    assignmentFee: offerTiers.wholesaleSpread,
+    targetContractPrice: offerTiers.target,
+    walkAwayPrice: offerTiers.max,
+    auctionMaxBid: offerTiers.conservative,
+    wholesaleProfitSpread: offerTiers.wholesaleSpread,
     equitySpread,
-    isUnderwater: totalDebt > baseVal && baseVal > 0
+    isUnderwater: totalDebt > marketValue && marketValue > 0,
+    offerTiers
   };
 }
