@@ -4872,34 +4872,6 @@
   
   <!-- Client Dashboard Code -->
   <script>
-    // ===== Seguridad: API key para /api/* cuando el cliente no es localhost (p.ej. Vercel) =====
-    (function installTzelApiAuth() {
-      const nativeFetch = window.fetch.bind(window);
-      const KEY_STORAGE = 'tzel_api_key';
-      const isApiUrl = (input) => {
-        const url = typeof input === 'string' ? input : (input && input.url) || '';
-        return url.startsWith('/api/') || url.startsWith(window.location.origin + '/api/');
-      };
-      const withKey = (init) => {
-        const key = localStorage.getItem(KEY_STORAGE);
-        if (!key) return init || {};
-        const headers = new Headers((init && init.headers) || {});
-        headers.set('x-tzel-key', key);
-        return Object.assign({}, init || {}, { headers });
-      };
-      window.fetch = async function (input, init) {
-        if (!isApiUrl(input)) return nativeFetch(input, init);
-        let res = await nativeFetch(input, withKey(init));
-        if (res.status === 401) {
-          const entered = window.prompt('TZEL: introduce la API key de acceso (TZEL_API_KEY)');
-          if (entered && entered.trim()) {
-            localStorage.setItem(KEY_STORAGE, entered.trim());
-            res = await nativeFetch(input, withKey(init));
-          }
-        }
-        return res;
-      };
-    })();
 
     // ===== Helpers compartidos =====
     // Escapa texto proveniente de scrapers / IA antes de interpolarlo en innerHTML.

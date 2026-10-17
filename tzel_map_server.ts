@@ -1,7 +1,6 @@
 import { parseAddress, getUnitInfo, getGroupingKey, buildPropertyId } from "./utils/address_key";
 import express from "express";
 import axios from "axios";
-import * as crypto from "crypto";
 import { db } from "./db";
 import * as dotenv from "dotenv";
 import * as path from "path";
@@ -13,9 +12,7 @@ dotenv.config();
 
 const app = express();
 const PORT = Number(process.env.PORT || 3000);
-// Por defecto solo escucha en loopback. Usa HOST=0.0.0.0 explícitamente si necesitas acceso LAN (requerirá TZEL_API_KEY).
 const HOST = process.env.HOST || "127.0.0.1";
-const API_KEY = process.env.TZEL_API_KEY || "";
 
 // Security: whitelist estricta de archivos estáticos. NUNCA servir el directorio del proyecto
 // (contiene browser_profiles/ con cookies de sesión, dumps de entorno, PDFs judiciales, etc.).
@@ -38,28 +35,6 @@ for (const [route, file] of Object.entries(STATIC_WHITELIST)) {
     res.sendFile(path.join(__dirname, file));
   });
 }
-
-function isLoopbackRequest(req: express.Request): boolean {
-  if (process.env.VERCEL) return false; // En Vercel siempre se exige API key
-  const ip = req.socket.remoteAddress || "";
-  return ip === "127.0.0.1" || ip === "::1" || ip === "::ffff:127.0.0.1";
-}
-
-function isValidApiKey(provided: string): boolean {
-  if (!API_KEY || !provided) return false;
-  const a = Buffer.from(provided);
-  const b = Buffer.from(API_KEY);
-  return a.length === b.length && crypto.timingSafeEqual(a, b);
-}
-
-// Auth: localhost pasa libre; cualquier otro cliente (LAN, Vercel) necesita header x-tzel-key.
-// Si TZEL_API_KEY no está definida, los clientes remotos quedan bloqueados (fail-closed).
-// EXCEPCIÓN PÚBLICA: /api/lands es accesible públicamente para el portal independiente de terrenos.
-app.use("/api", (req, res, next) => {
-  if (req.path === "/lands" || req.path.startsWith("/lands")) return next();
-  if (isLoopbackRequest(req) || isValidApiKey(req.get("x-tzel-key") || "")) return next();
-  return res.status(401).json({ status: "error", message: "No autorizado: falta o es inválida la API key (x-tzel-key)." });
-});
 
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ limit: "50mb", extended: true }));
@@ -2019,9 +1994,6 @@ async function initializeServer() {
       console.log(`\n========================================================`);
       console.log(`🚀 TZEL TACTICAL MAP SERVER STARTED ON ${HOST}:${PORT}`);
       console.log(`👉 Open http://localhost:${PORT} in your browser`);
-      if (HOST !== "127.0.0.1" && !API_KEY) {
-        console.warn(`⚠️  HOST=${HOST} sin TZEL_API_KEY: los clientes remotos recibirán 401.`);
-      }
       console.log(`========================================================\n`);
     });
   }
